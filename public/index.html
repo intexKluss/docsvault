@@ -1,1 +1,91 @@
-<!DOCTYPE html><html><head><title>otris docs assistant</title></head><body></body></html>
+<!DOCTYPE html>
+<html lang="de">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>otris docs assistant</title>
+  <link rel="stylesheet" href="style.css">
+  <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/highlight.js/11.9.0/styles/github-dark.min.css">
+</head>
+<body class="landing">
+
+  <!-- landing -->
+  <div id="landing">
+    <div class="landing-content">
+      <div class="logo-wrap">
+        <svg viewBox="0 0 56 56" fill="none" xmlns="http://www.w3.org/2000/svg" class="logo-svg">
+          <rect x="8" y="4" width="34" height="44" rx="3" stroke="#7c9dd6" stroke-width="2.5" fill="none"/>
+          <rect x="14" y="8" width="34" height="44" rx="3" stroke="#5b7fb5" stroke-width="2.5" fill="#1a1a1a"/>
+          <line x1="22" y1="20" x2="40" y2="20" stroke="#5b7fb5" stroke-width="2" stroke-linecap="round"/>
+          <line x1="22" y1="27" x2="40" y2="27" stroke="#4a6a9a" stroke-width="2" stroke-linecap="round"/>
+          <line x1="22" y1="34" x2="34" y2="34" stroke="#3d5a85" stroke-width="2" stroke-linecap="round"/>
+        </svg>
+      </div>
+      <h1>Stelle eine Frage zur otris Dokumentation</h1>
+      <p class="subtitle">Durchsuche API-Referenzen, Handbücher und HowTos</p>
+      <a href="/help/" class="help-link">Wie installiere ich es?</a>
+    </div>
+    <div class="input-area landing-input">
+      <div class="input-box">
+        <textarea id="landing-input" placeholder="Wie kann ich dir helfen?" rows="1"></textarea>
+        <div class="input-controls">
+          <button id="landing-speed" class="speed-toggle" data-mode="fast" title="Schnell">
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polygon points="13 2 3 14 12 14 11 22 21 10 12 10 13 2"/></svg>
+            <span>Schnell</span>
+          </button>
+          <button id="landing-send" class="send-btn" disabled>
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><line x1="12" y1="19" x2="12" y2="5"/><polyline points="5 12 12 5 19 12"/></svg>
+          </button>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- chat -->
+  <div id="chat" style="display:none;">
+    <header id="chat-header">
+      <div class="header-left">
+        <svg viewBox="0 0 56 56" fill="none" xmlns="http://www.w3.org/2000/svg" class="header-logo">
+          <rect x="8" y="4" width="34" height="44" rx="3" stroke="#7c9dd6" stroke-width="2.5" fill="none"/>
+          <rect x="14" y="8" width="34" height="44" rx="3" stroke="#5b7fb5" stroke-width="2.5" fill="#1a1a1a"/>
+          <line x1="22" y1="20" x2="40" y2="20" stroke="#5b7fb5" stroke-width="2" stroke-linecap="round"/>
+          <line x1="22" y1="27" x2="40" y2="27" stroke="#4a6a9a" stroke-width="2" stroke-linecap="round"/>
+          <line x1="22" y1="34" x2="34" y2="34" stroke="#3d5a85" stroke-width="2" stroke-linecap="round"/>
+        </svg>
+        <span class="header-title">otris docs assistant</span>
+      </div>
+      <div class="header-right">
+        <button id="btn-install" class="header-btn">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="7 10 12 15 17 10"/><line x1="12" y1="15" x2="12" y2="3"/></svg>
+          <span>Installieren</span>
+        </button>
+        <button id="btn-new-chat" class="header-btn">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><line x1="12" y1="5" x2="12" y2="19"/><line x1="5" y1="12" x2="19" y2="12"/></svg>
+          <span>Neuer Chat</span>
+        </button>
+      </div>
+    </header>
+
+    <div id="messages"></div>
+
+    <div class="input-area chat-input">
+      <div class="input-box">
+        <textarea id="chat-input" placeholder="Wie kann ich dir helfen?" rows="1"></textarea>
+        <div class="input-controls">
+          <button id="chat-speed" class="speed-toggle" data-mode="fast" title="Schnell">
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polygon points="13 2 3 14 12 14 11 22 21 10 12 10 13 2"/></svg>
+            <span>Schnell</span>
+          </button>
+          <button id="chat-send" class="send-btn" disabled>
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><line x1="12" y1="19" x2="12" y2="5"/><polyline points="5 12 12 5 19 12"/></svg>
+          </button>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/marked/12.0.2/marked.min.js"></script>
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/highlight.js/11.9.0/highlight.min.js"></script>
+  <script src="app.js"></script>
+</body>
+</html>
