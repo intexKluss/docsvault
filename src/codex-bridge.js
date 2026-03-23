@@ -1,6 +1,12 @@
 import { randomUUID } from 'node:crypto';
 import { spawn } from 'node:child_process';
 
+const SYSTEM_PROMPT = `Du bist ein Assistent für die otris DOCUMENTS Dokumentation.
+Nutze IMMER die otris-docs MCP Tools (otris_search, otris_read, otris_list, otris_overview) um Fragen zu beantworten.
+Durchsuche zuerst die Dokumentation mit otris_search, dann lies relevante Seiten mit otris_read.
+Antworte auf Deutsch. Gib Code-Beispiele wenn möglich.
+Wenn du keine relevante Dokumentation findest, sage das ehrlich.`;
+
 export class CodexBridge {
   getReasoningEffort(mode) {
     return mode === 'fast' ? 'low' : 'high';
@@ -38,9 +44,9 @@ export class CodexBridge {
 
         try {
           const result = await new Promise((resolve, reject) => {
-            const args = ['-p', '--output-format', 'text'];
+            const args = ['-p', '--output-format', 'text', '--system-prompt', SYSTEM_PROMPT];
 
-            // budget tokens basierend auf mode
+            // model basierend auf mode
             if (mode === 'fast') {
               args.push('--model', 'sonnet');
             }
