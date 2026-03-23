@@ -3,10 +3,10 @@ import { spawn } from 'node:child_process';
 
 const SYSTEM_PROMPT = [
   'Du bist ein Assistent für die otris DOCUMENTS Dokumentation.',
-  'Nutze IMMER die otris-docs MCP Tools (otris_search, otris_read, otris_list, otris_overview) um Fragen zu beantworten.',
-  'Durchsuche zuerst die Dokumentation mit otris_search, dann lies relevante Seiten mit otris_read.',
-  'Antworte auf Deutsch. Gib Code-Beispiele wenn möglich.',
-  'Wenn du keine relevante Dokumentation findest, sage das ehrlich.'
+  'Du hast Zugriff auf otris-docs MCP Tools (otris_search, otris_read, otris_list, otris_overview).',
+  'Nutze die Tools NUR wenn der User eine konkrete Frage zur Dokumentation hat.',
+  'Bei Rückfragen, Klarstellungen oder einfachen Antworten: antworte direkt ohne Tools.',
+  'Antworte auf Deutsch. Halte Antworten kurz und präzise.'
 ].join(' ');
 
 // verzeichnis wo .mcp.json liegt
@@ -32,25 +32,31 @@ export class CodexBridge {
 
         history.push({ role: 'user', content });
 
-        // vorherige nachrichten als context
+        // vorherige nachrichten als context (nur letzte 4 nachrichten)
         let fullPrompt = content;
         if (history.length > 2) {
-          const context = history.slice(0, -1).map(m =>
+          const recent = history.slice(-5, -1);
+          const context = recent.map(m =>
             m.role === 'user' ? `User: ${m.content}` : `Assistant: ${m.content}`
           ).join('\n\n');
-          fullPrompt = `Bisheriger Konversationsverlauf:\n${context}\n\nAktuelle Frage: ${content}`;
+          fullPrompt = `Bisheriger Verlauf:\n${context}\n\nUser: ${content}`;
         }
 
         yield { type: 'tool_use', tool: 'otris_search', status: 'running' };
 
         try {
+          const startTime = Date.now();
           const result = await new Promise((resolve, reject) => {
-            // prompt über stdin übergeben statt als argument (vermeidet shell-escaping)
             const args = ['-p', '--output-format', 'text', '--system-prompt', SYSTEM_PROMPT];
 
             if (mode === 'fast') {
               args.push('--model', 'sonnet');
+              args.push('--max-turns', '2');
+            } else {
+              args.push('--max-turns', '5');
             }
+
+            console.log(`[claude] mode=${mode}, prompt: ${content.substring(0, 80)}`);
 
             const proc = spawn('claude', args, {
               stdio: ['pipe', 'pipe', 'pipe'],
@@ -70,6 +76,8 @@ export class CodexBridge {
             });
 
             proc.on('close', (code) => {
+              const elapsed = ((Date.now() - startTime) / 1000).toFixed(1);
+              console.log(`[claude] fertig in ${elapsed}s, ${stdout.length} chars`);
               if (code !== 0) {
                 reject(new Error(stderr || `claude exited with code ${code}`));
               } else {
@@ -77,11 +85,8 @@ export class CodexBridge {
               }
             });
 
-            proc.on('error', (err) => {
-              reject(err);
-            });
+            proc.on('error', reject);
 
-            // prompt über stdin schicken
             proc.stdin.write(fullPrompt);
             proc.stdin.end();
           });
@@ -89,7 +94,7 @@ export class CodexBridge {
           yield { type: 'tool_use', tool: 'otris_search', status: 'done' };
 
           // antwort in chunks für streaming-effekt
-          const chunkSize = 20;
+          const chunkSize = 50;
           for (let i = 0; i < result.length; i += chunkSize) {
             yield { type: 'chunk', content: result.slice(i, i + chunkSize) };
           }
