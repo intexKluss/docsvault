@@ -9,10 +9,10 @@ export class SessionManager {
   constructor(bridge, config = {}) {
     this.#bridge = bridge;
     this.#config = {
-      maxSessions: config.maxSessions || 50,
-      sessionTimeoutMin: config.sessionTimeoutMin || 30,
-      rateLimitPerMin: config.rateLimitPerMin || 10,
-      maxMessageLength: config.maxMessageLength || 2000,
+      maxSessions: config.maxSessions ?? 50,
+      sessionTimeoutMin: config.sessionTimeoutMin ?? 30,
+      rateLimitPerMin: config.rateLimitPerMin ?? 10,
+      maxMessageLength: config.maxMessageLength ?? 2000,
     };
   }
 
@@ -78,6 +78,12 @@ export class SessionManager {
   }
 
   validateMessage(content) {
+    if (content == null) {
+      throw new Error('Nachricht darf nicht leer sein');
+    }
+    if (typeof content !== 'string') {
+      throw new Error('Nachricht muss ein String sein');
+    }
     if (content.length > this.#config.maxMessageLength) {
       throw new Error(`Nachricht zu lang (max ${this.#config.maxMessageLength} Zeichen)`);
     }
@@ -96,12 +102,10 @@ export class SessionManager {
     }
   }
 
-  shutdown() {
+  async shutdown() {
     for (const timer of this.#removalTimers.values()) clearTimeout(timer);
     for (const timer of this.#inactivityTimers.values()) clearTimeout(timer);
     const ids = [...this.#sessions.keys()];
-    for (const clientId of ids) {
-      this.#removeSession(clientId);
-    }
+    await Promise.allSettled(ids.map(id => this.#removeSession(id)));
   }
 }
