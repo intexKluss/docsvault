@@ -1,0 +1,3 @@
+[submodule "public/help"]
+	path = public/help
+	url = https://github.com/leminkozey/help-book.git
