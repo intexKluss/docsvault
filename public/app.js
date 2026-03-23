@@ -340,7 +340,7 @@
 
   // header buttons
   btnInstall.addEventListener('click', function () {
-    window.open('/help/', '_blank');
+    window.open('/help/help/', '_blank');
   });
 
   btnNewChat.addEventListener('click', function () {
