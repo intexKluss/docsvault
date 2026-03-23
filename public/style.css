@@ -49,6 +49,12 @@ button {
   height: 64px;
 }
 
+.logo-img {
+  width: 80px;
+  height: 80px;
+  border-radius: 50%;
+}
+
 .landing-content h1 {
   font-size: 28px;
   font-weight: 600;
@@ -222,6 +228,12 @@ body.landing #chat { display: none !important; }
 .header-logo {
   width: 28px;
   height: 28px;
+}
+
+.header-logo-img {
+  width: 28px;
+  height: 28px;
+  border-radius: 50%;
 }
 
 .header-title {
