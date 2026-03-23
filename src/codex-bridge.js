@@ -1,42 +1,17 @@
 import { randomUUID } from 'node:crypto';
-
-function isAuthError(err) {
-  const msg = (err?.message || '').toLowerCase();
-  return msg.includes('auth') || msg.includes('token') || msg.includes('unauthorized') || msg.includes('api key');
-}
-
-const AUTH_USER_MSG = 'Service temporär nicht verfügbar. Bitte später erneut versuchen.';
+import { spawn } from 'node:child_process';
 
 export class CodexBridge {
   getReasoningEffort(mode) {
     return mode === 'fast' ? 'low' : 'high';
   }
 
-  async createSession(sdk) {
-    try {
-      if (!sdk) {
-        sdk = await import('@openai/codex-sdk');
-      }
-    } catch (err) {
-      if (isAuthError(err)) {
-        throw new Error(AUTH_USER_MSG);
-      }
-      throw err;
-    }
-
-    let thread;
-    try {
-      thread = await sdk.startThread();
-    } catch (err) {
-      if (isAuthError(err)) {
-        throw new Error(AUTH_USER_MSG);
-      }
-      throw err;
-    }
-
+  async createSession() {
     const id = randomUUID();
     let destroyed = false;
     const bridge = this;
+    // conversation history für context
+    const history = [];
 
     return {
       id,
@@ -45,44 +20,76 @@ export class CodexBridge {
       async *send(content, mode) {
         if (destroyed) throw new Error('Session destroyed');
 
+        history.push({ role: 'user', content });
+
+        // system prompt mit context aus vorherigen nachrichten
+        let prompt = content;
+        if (history.length > 2) {
+          // vorherige nachrichten als context mitgeben
+          const context = history.slice(0, -1).map(m =>
+            m.role === 'user' ? `User: ${m.content}` : `Assistant: ${m.content}`
+          ).join('\n\n');
+          prompt = `Bisheriger Konversationsverlauf:\n${context}\n\nAktuelle Frage: ${content}`;
+        }
+
+        yield { type: 'tool_use', tool: 'otris_search', status: 'running' };
+
         const effort = bridge.getReasoningEffort(mode);
-        let stream;
+
         try {
-          stream = thread.runStreamed(content, { reasoning_effort: effort });
-        } catch (err) {
-          if (isAuthError(err)) {
-            yield { type: 'error', message: AUTH_USER_MSG };
-            return;
-          }
-          throw err;
-        }
+          const result = await new Promise((resolve, reject) => {
+            const args = ['-p', '--output-format', 'text'];
 
-        let done = false;
-
-        for await (const event of stream) {
-          // event-typen müssen in Task 7 gegen die echte SDK-Doku verifiziert werden
-          if (event.type === 'tool_use') {
-            yield { type: 'tool_use', tool: event.name, status: 'running' };
-          } else if (event.type === 'tool_result') {
-            yield { type: 'tool_use', tool: event.name, status: 'done' };
-          } else if (event.type === 'text_delta') {
-            yield { type: 'chunk', content: event.text };
-          } else if (event.type === 'turn_completed') {
-            done = true;
-            yield { type: 'done' };
-          } else if (event.type === 'error') {
-            const msg = event.message || 'Unbekannter Fehler';
-            if (msg.includes('auth') || msg.includes('token') || msg.includes('unauthorized')) {
-              yield { type: 'error', message: AUTH_USER_MSG };
-            } else {
-              yield { type: 'error', message: msg };
+            // budget tokens basierend auf mode
+            if (mode === 'fast') {
+              args.push('--model', 'sonnet');
             }
-          }
-        }
 
-        // fallback: stream endete ohne turn_completed
-        if (!done) {
+            args.push(prompt);
+
+            const proc = spawn('claude', args, {
+              stdio: ['pipe', 'pipe', 'pipe'],
+              shell: true,
+              env: { ...process.env }
+            });
+
+            let stdout = '';
+            let stderr = '';
+
+            proc.stdout.on('data', (data) => {
+              stdout += data.toString();
+            });
+
+            proc.stderr.on('data', (data) => {
+              stderr += data.toString();
+            });
+
+            proc.on('close', (code) => {
+              if (code !== 0) {
+                reject(new Error(stderr || `claude exited with code ${code}`));
+              } else {
+                resolve(stdout.trim());
+              }
+            });
+
+            proc.on('error', (err) => {
+              reject(err);
+            });
+          });
+
+          yield { type: 'tool_use', tool: 'otris_search', status: 'done' };
+
+          // antwort in chunks aufteilen für streaming-effekt
+          const chunkSize = 20;
+          for (let i = 0; i < result.length; i += chunkSize) {
+            yield { type: 'chunk', content: result.slice(i, i + chunkSize) };
+          }
+
+          history.push({ role: 'assistant', content: result });
           yield { type: 'done' };
+        } catch (err) {
+          yield { type: 'tool_use', tool: 'otris_search', status: 'done' };
+          yield { type: 'error', message: err.message || 'Fehler bei der Verarbeitung' };
         }
       },
 
