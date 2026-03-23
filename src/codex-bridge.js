@@ -1,11 +1,16 @@
 import { randomUUID } from 'node:crypto';
 import { spawn } from 'node:child_process';
 
-const SYSTEM_PROMPT = `Du bist ein Assistent für die otris DOCUMENTS Dokumentation.
-Nutze IMMER die otris-docs MCP Tools (otris_search, otris_read, otris_list, otris_overview) um Fragen zu beantworten.
-Durchsuche zuerst die Dokumentation mit otris_search, dann lies relevante Seiten mit otris_read.
-Antworte auf Deutsch. Gib Code-Beispiele wenn möglich.
-Wenn du keine relevante Dokumentation findest, sage das ehrlich.`;
+const SYSTEM_PROMPT = [
+  'Du bist ein Assistent für die otris DOCUMENTS Dokumentation.',
+  'Nutze IMMER die otris-docs MCP Tools (otris_search, otris_read, otris_list, otris_overview) um Fragen zu beantworten.',
+  'Durchsuche zuerst die Dokumentation mit otris_search, dann lies relevante Seiten mit otris_read.',
+  'Antworte auf Deutsch. Gib Code-Beispiele wenn möglich.',
+  'Wenn du keine relevante Dokumentation findest, sage das ehrlich.'
+].join(' ');
+
+// verzeichnis wo .mcp.json liegt
+const MCP_CWD = 'C:\\Users\\m.kluss\\ai';
 
 export class CodexBridge {
   getReasoningEffort(mode) {
@@ -16,7 +21,6 @@ export class CodexBridge {
     const id = randomUUID();
     let destroyed = false;
     const bridge = this;
-    // conversation history für context
     const history = [];
 
     return {
@@ -28,34 +32,29 @@ export class CodexBridge {
 
         history.push({ role: 'user', content });
 
-        // system prompt mit context aus vorherigen nachrichten
-        let prompt = content;
+        // vorherige nachrichten als context
+        let fullPrompt = content;
         if (history.length > 2) {
-          // vorherige nachrichten als context mitgeben
           const context = history.slice(0, -1).map(m =>
             m.role === 'user' ? `User: ${m.content}` : `Assistant: ${m.content}`
           ).join('\n\n');
-          prompt = `Bisheriger Konversationsverlauf:\n${context}\n\nAktuelle Frage: ${content}`;
+          fullPrompt = `Bisheriger Konversationsverlauf:\n${context}\n\nAktuelle Frage: ${content}`;
         }
 
         yield { type: 'tool_use', tool: 'otris_search', status: 'running' };
 
-        const effort = bridge.getReasoningEffort(mode);
-
         try {
           const result = await new Promise((resolve, reject) => {
+            // prompt über stdin übergeben statt als argument (vermeidet shell-escaping)
             const args = ['-p', '--output-format', 'text', '--system-prompt', SYSTEM_PROMPT];
 
-            // model basierend auf mode
             if (mode === 'fast') {
               args.push('--model', 'sonnet');
             }
 
-            args.push(prompt);
-
             const proc = spawn('claude', args, {
               stdio: ['pipe', 'pipe', 'pipe'],
-              shell: true,
+              cwd: MCP_CWD,
               env: { ...process.env }
             });
 
@@ -81,11 +80,15 @@ export class CodexBridge {
             proc.on('error', (err) => {
               reject(err);
             });
+
+            // prompt über stdin schicken
+            proc.stdin.write(fullPrompt);
+            proc.stdin.end();
           });
 
           yield { type: 'tool_use', tool: 'otris_search', status: 'done' };
 
-          // antwort in chunks aufteilen für streaming-effekt
+          // antwort in chunks für streaming-effekt
           const chunkSize = 20;
           for (let i = 0; i < result.length; i += chunkSize) {
             yield { type: 'chunk', content: result.slice(i, i + chunkSize) };
