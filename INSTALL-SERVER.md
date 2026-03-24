@@ -31,12 +31,20 @@ docker run -d \
   --restart unless-stopped \
   -p 3000:3000 \
   -e BRIDGE=codex \
+  -e OPENAI_API_KEY=sk-... \
   -e ALLOWED_ORIGINS=http://SERVER-IP:3000 \
   -e ALLOW_NO_ORIGIN=true \
+  -v $(pwd)/reports.json:/app/reports.json \
   otris-docs
 ```
 
-`SERVER-IP` durch die tatsaechliche IP oder Domain des Servers ersetzen.
+Ersetzen:
+- `SERVER-IP` → tatsaechliche IP oder Domain des Servers
+- `sk-...` → OpenAI API Key (fuer Codex Bridge)
+
+Das `-v` Volume sorgt dafuer, dass Bug-Reports bei Container-Rebuilds erhalten bleiben.
+
+**Hinweis:** Ohne `OPENAI_API_KEY` startet der Server zwar, aber Chat-Anfragen werden fehlschlagen. Die REST API (Suche, Lesen) funktioniert unabhaengig davon.
 
 ### 4. Testen
 
@@ -84,6 +92,7 @@ Details: [INSTALL-DEVELOPER.md](INSTALL-DEVELOPER.md)
 | `PORT` | `3000` | Server-Port |
 | `VAULT_PATH` | `/app/vault` | Pfad zum Vault im Container |
 | `ALLOWED_ORIGINS` | — | Erlaubte Origins fuer WebSocket (kommasepariert) |
+| `OPENAI_API_KEY` | — | OpenAI API Key (noetig fuer Codex Bridge Chat) |
 | `ALLOW_NO_ORIGIN` | `false` | Verbindungen ohne Origin-Header erlauben (fuer REST API/MCP Clients noetig) |
 | `MAX_SESSIONS` | `50` | Max gleichzeitige Chat-Sessions |
 | `RATE_LIMIT_PER_MIN` | `10` | WebSocket-Nachrichten pro Minute pro IP |
@@ -135,8 +144,10 @@ docker run -d \
   --restart unless-stopped \
   -p 3000:3000 \
   -e BRIDGE=codex \
+  -e OPENAI_API_KEY=sk-... \
   -e ALLOWED_ORIGINS=http://SERVER-IP:3000 \
   -e ALLOW_NO_ORIGIN=true \
+  -v $(pwd)/reports.json:/app/reports.json \
   otris-docs
 ```
 
@@ -153,6 +164,13 @@ Der Server sollte `Server läuft auf http://localhost:3000` loggen. Wenn nicht, 
 ### WebSocket verbindet nicht
 
 Pruefen ob `ALLOWED_ORIGINS` korrekt gesetzt ist. Fuer REST API und MCP Clients muss `ALLOW_NO_ORIGIN=true` gesetzt sein.
+
+### Chat antwortet nicht / Fehler bei Verarbeitung
+
+Der Server startet, aber Chat-Anfragen schlagen fehl:
+- Pruefen ob `OPENAI_API_KEY` gesetzt ist: `docker exec otris-docs env | grep OPENAI`
+- Container-Logs pruefen: `docker logs otris-docs`
+- Die REST API (Suche, Lesen) funktioniert auch ohne API Key — nur der Chat braucht ihn.
 
 ### MCP Client verbindet nicht
 
