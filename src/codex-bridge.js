@@ -7,7 +7,6 @@ const __filename = fileURLToPath(import.meta.url);
 const __dirname = dirname(__filename);
 
 const MCP_CWD = resolve(__dirname, '..');
-console.log(`[codex-sdk] MCP_CWD: ${MCP_CWD}`);
 
 const SYSTEM_PROMPT = `Du bist der otris DOCUMENTS Dokumentations-Assistent. Dein EINZIGER Zweck ist es, Fragen zur otris DOCUMENTS Dokumentation zu beantworten.
 
@@ -32,13 +31,12 @@ export class CodexBridge {
     const id = randomUUID();
     let destroyed = false;
     let warmedUp = false;
+    let warmingUp = false; // locking gegen parallele warmUp calls
     let activeAbort = null;
-
-    const codex = new Codex({
-      codexPathOverride: process.env.CODEX_PATH || undefined,
+    let codex = new Codex({
+      codexPathOverride: process.env.CODEX_PATH,
     });
-
-    const thread = codex.startThread({
+    let thread = codex.startThread({
       model: process.env.CODEX_MODEL || 'gpt-5.4',
       workingDirectory: MCP_CWD,
       sandboxMode: 'read-only',
@@ -52,13 +50,13 @@ export class CodexBridge {
       get ready() { return warmedUp; },
 
       async warmUp() {
-        if (destroyed || warmedUp) return;
+        if (destroyed || warmedUp || warmingUp) return;
+        warmingUp = true;
 
         console.log(`[codex-sdk] warming up session ${id}...`);
         const startTime = Date.now();
 
         try {
-          // system prompt als erste nachricht + warm-up
           await thread.run(SYSTEM_PROMPT + '\n\nAntworte nur mit: Bereit.');
           warmedUp = true;
           const elapsed = ((Date.now() - startTime) / 1000).toFixed(1);
@@ -66,13 +64,16 @@ export class CodexBridge {
         } catch (err) {
           console.error(`[codex-sdk] warm-up error: ${err.message}`);
           throw err;
+        } finally {
+          warmingUp = false;
         }
       },
 
       async *send(content, mode) {
         if (destroyed) throw new Error('Session destroyed');
+        if (!warmedUp) throw new Error('Session not ready');
+        if (typeof content !== 'string' || !content.trim()) throw new Error('Invalid content');
 
-        // mode per prompt steuern
         const modePrefix = mode === 'thorough'
           ? '[GRÜNDLICH] Recherchiere gruendlich. Lies relevante Dokumente komplett. Pruefe ob deine Antwort wirklich korrekt und vollstaendig ist. Gib ausfuehrliche Erklaerungen mit Code-Beispielen.\n\n'
           : '[SCHNELL] Antworte kurz und praezise. Suche gezielt, nicht breit.\n\n';
@@ -80,15 +81,13 @@ export class CodexBridge {
         const fullPrompt = modePrefix + content;
 
         console.log(`[codex-sdk] mode=${mode}, thread=${thread.id || 'new'}`);
-        console.log(`[codex-sdk] prompt: ${content.substring(0, 80)}`);
         const startTime = Date.now();
 
         const abort = new AbortController();
         activeAbort = abort;
         let toolRunning = false;
         let currentToolName = null;
-        let pendingMessages = []; // agent_messages sammeln, nur letzte senden
-        let toolCount = 0;
+        let pendingMessages = [];
 
         try {
           const { events } = await thread.runStreamed(fullPrompt, {
@@ -98,42 +97,34 @@ export class CodexBridge {
           for await (const event of events) {
             if (abort.signal.aborted) break;
 
-            // mcp tool gestartet
             if (event.type === 'item.started' && event.item.type === 'mcp_tool_call') {
               toolRunning = true;
-              toolCount++;
-              currentToolName = event.item.tool || 'otris_search';
+              currentToolName = event.item.tool || 'unknown';
               yield { type: 'tool_use', tool: currentToolName, status: 'running' };
             }
 
-            // mcp tool fertig
             if (event.type === 'item.completed' && event.item.type === 'mcp_tool_call') {
               if (toolRunning) {
-                yield { type: 'tool_use', tool: currentToolName || 'otris_search', status: 'done' };
+                yield { type: 'tool_use', tool: currentToolName, status: 'done' };
                 toolRunning = false;
               }
             }
 
-            // agent text — sammeln, nicht sofort senden
-            // zwischen-messages (denkprozess) werden ueberschrieben,
-            // nur die letzte message (die echte antwort) wird gesendet
             if (event.type === 'item.completed' && event.item.type === 'agent_message') {
               if (toolRunning) {
-                yield { type: 'tool_use', tool: currentToolName || 'otris_search', status: 'done' };
+                yield { type: 'tool_use', tool: currentToolName, status: 'done' };
                 toolRunning = false;
               }
               pendingMessages.push(event.item.text);
             }
 
-            // turn fertig — jetzt die letzte message senden
             if (event.type === 'turn.completed') {
               if (pendingMessages.length > 0) {
-                // nur die letzte message ist die echte antwort
                 yield { type: 'chunk', content: pendingMessages[pendingMessages.length - 1] };
+                pendingMessages = [];
               }
             }
 
-            // fehler
             if (event.type === 'error') {
               yield { type: 'error', message: event.message || 'Unbekannter Fehler' };
             }
@@ -144,7 +135,7 @@ export class CodexBridge {
           }
 
           if (toolRunning) {
-            yield { type: 'tool_use', tool: currentToolName || 'otris_search', status: 'done' };
+            yield { type: 'tool_use', tool: currentToolName, status: 'done' };
           }
 
           const elapsed = ((Date.now() - startTime) / 1000).toFixed(1);
@@ -153,14 +144,14 @@ export class CodexBridge {
           yield { type: 'done' };
         } catch (err) {
           if (toolRunning) {
-            yield { type: 'tool_use', tool: currentToolName || 'otris_search', status: 'done' };
+            yield { type: 'tool_use', tool: currentToolName, status: 'done' };
           }
           if (abort.signal.aborted) {
-            console.log(`[codex-sdk] query abgebrochen nach ${((Date.now() - startTime) / 1000).toFixed(1)}s`);
+            console.log(`[codex-sdk] query abgebrochen`);
             return;
           }
           console.error(`[codex-sdk] error: ${err.message}`);
-          yield { type: 'error', message: err.message || 'Fehler bei der Verarbeitung' };
+          yield { type: 'error', message: 'Fehler bei der Verarbeitung. Bitte versuche es erneut.' };
         } finally {
           activeAbort = null;
         }
@@ -169,10 +160,11 @@ export class CodexBridge {
       async destroy() {
         if (activeAbort) {
           activeAbort.abort();
-          console.log(`[codex-sdk] session ${id}: laufende query abgebrochen`);
         }
         destroyed = true;
         warmedUp = false;
+        thread = null;
+        codex = null;
         console.log(`[codex-sdk] session ${id} destroyed`);
       }
     };

@@ -3,7 +3,6 @@
 (function () {
   'use strict';
 
-  // tool name mapping
   const TOOL_LABELS = {
     otris_search: 'Durchsuche Dokumentation',
     otris_read: 'Lese Dokument',
@@ -12,7 +11,6 @@
     otris_status: 'Prüfe Status',
   };
 
-  // done labels
   const TOOL_DONE_LABELS = {
     otris_search: 'Dokumentation durchsucht',
     otris_read: 'Dokument gelesen',
@@ -21,7 +19,6 @@
     otris_status: 'Status geprüft',
   };
 
-  // svgs
   const SVG_SPINNER = '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="10"/><path d="M12 6v6l4 2"/></svg>';
   const SVG_CHECK = '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polyline points="20 6 9 17 4 12"/></svg>';
   const SVG_CHEVRON = '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polyline points="6 9 12 15 18 9"/></svg>';
@@ -30,7 +27,6 @@
   const SVG_SEND = '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><line x1="12" y1="19" x2="12" y2="5"/><polyline points="5 12 12 5 19 12"/></svg>';
   const SVG_STOP = '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><rect x="6" y="6" width="12" height="12" rx="1"/></svg>';
 
-  // elemente
   const landingEl = document.getElementById('landing');
   const chatEl = document.getElementById('chat');
   const messagesEl = document.getElementById('messages');
@@ -49,14 +45,9 @@
   const reportCancel = document.getElementById('report-cancel');
   const sessionStatus = document.getElementById('session-status');
 
-  // marked konfigurieren
-  marked.setOptions({
-    gfm: true,
-    breaks: true,
-  });
+  marked.setOptions({ gfm: true, breaks: true });
 
-  // zufaellige texte
-  var PLACEHOLDERS = [
+  const PLACEHOLDERS = [
     'Wo stehst du auf dem Schlauch?',
     'Was moechtest du wissen?',
     'Wie kann ich helfen?',
@@ -65,7 +56,7 @@
     'Wobei brauchst du Hilfe?',
   ];
 
-  var INIT_MESSAGES = [
+  const INIT_MESSAGES = [
     'Wir richten alles fuer dich ein...',
     'Einen kleinen Moment noch...',
     'Wird alles vorbereitet...',
@@ -76,7 +67,6 @@
     return arr[Math.floor(Math.random() * arr.length)];
   }
 
-  // zustand
   let ws = null;
   let isChat = false;
   let sessionReady = false;
@@ -84,13 +74,11 @@
   let currentAiText = '';
   let isProcessing = false;
 
-  // typewriter
   let textBuffer = '';
   let typewriterTimer = null;
-  var CHARS_PER_TICK = 3;
-  var TICK_MS = 12;
+  const CHARS_PER_TICK = 3;
+  const TICK_MS = 12;
 
-  // websocket verbindung
   function connect() {
     const proto = location.protocol === 'https:' ? 'wss:' : 'ws:';
     const url = proto + '//' + location.host;
@@ -113,11 +101,14 @@
       }
     };
 
-    ws.onerror = function () {};
+    ws.onerror = function () {
+      console.warn('[ws] connection error');
+    };
   }
 
-  // events verarbeiten
   function handleEvent(msg) {
+    if (!msg || typeof msg.type !== 'string') return;
+
     switch (msg.type) {
       case 'session_init':
         sessionReady = false;
@@ -129,13 +120,11 @@
         break;
 
       case 'session_ready':
-        // session ist bereit - input freigeben
         sessionReady = true;
         if (sessionStatus) {
           sessionStatus.classList.remove('loading');
           sessionStatus.classList.add('ready');
           sessionStatus.innerHTML = SVG_CHECK + '<span>Bereit</span>';
-          // nach kurzer zeit ausblenden
           setTimeout(function () {
             sessionStatus.classList.add('hidden');
           }, 1500);
@@ -146,6 +135,7 @@
         break;
 
       case 'chunk':
+        if (typeof msg.content !== 'string') break;
         if (!currentAiMsg) {
           currentAiMsg = appendAiMessage();
           currentAiText = '';
@@ -155,6 +145,7 @@
         break;
 
       case 'tool_use':
+        if (!msg.tool || !msg.status) break;
         if (!currentAiMsg) {
           currentAiMsg = appendAiMessage();
           currentAiText = '';
@@ -173,7 +164,7 @@
         break;
 
       case 'error':
-        appendError(msg.message);
+        appendError(typeof msg.message === 'string' ? msg.message : 'Unbekannter Fehler');
         setInputEnabled(true);
         break;
 
@@ -184,7 +175,6 @@
     }
   }
 
-  // nachricht senden
   function sendMessage(text) {
     text = text.trim();
     if (!text || !ws || ws.readyState !== WebSocket.OPEN || !sessionReady) return;
@@ -198,10 +188,10 @@
     const mode = getActiveSpeed().dataset.mode;
     ws.send(JSON.stringify({ type: 'message', content: text, mode: mode }));
 
-    // sofort ai-message mit tool-block anzeigen
     currentAiMsg = appendAiMessage();
     currentAiText = '';
     getToolBlock(currentAiMsg);
+    userScrolledUp = false;
     scrollToBottom();
 
     setInputEnabled(false);
@@ -210,17 +200,14 @@
     chatInput.focus();
   }
 
-  // zur chat-ansicht wechseln
   function switchToChat() {
     isChat = true;
     document.body.classList.remove('landing');
     document.body.classList.add('chat');
-    // speed-modus übernehmen
     chatSpeed.dataset.mode = landingSpeed.dataset.mode;
     updateSpeedDisplay(chatSpeed);
   }
 
-  // user-nachricht anzeigen
   function appendUserMessage(text) {
     const wrap = document.createElement('div');
     wrap.className = 'msg-wrap msg-user';
@@ -232,7 +219,6 @@
     scrollToBottom();
   }
 
-  // ai-nachricht erstellen
   function appendAiMessage() {
     const wrap = document.createElement('div');
     wrap.className = 'msg-wrap msg-ai';
@@ -243,9 +229,8 @@
     return wrap;
   }
 
-  // typewriter — zeichen einzeln aus buffer in currentAiText schieben
   function startTypewriter() {
-    if (typewriterTimer) return; // laeuft schon
+    if (typewriterTimer) return;
     typewriterTimer = setInterval(typewriterTick, TICK_MS);
   }
 
@@ -255,7 +240,7 @@
       typewriterTimer = null;
       return;
     }
-    var chars = textBuffer.substring(0, CHARS_PER_TICK);
+    const chars = textBuffer.substring(0, CHARS_PER_TICK);
     textBuffer = textBuffer.substring(CHARS_PER_TICK);
     currentAiText += chars;
     renderAiContent();
@@ -275,12 +260,16 @@
     }
   }
 
-  // warten bis typewriter fertig, dann response abschliessen
+  let finishAttempts = 0;
   function finishResponse() {
-    if (textBuffer.length > 0 || typewriterTimer) {
+    if ((textBuffer.length > 0 || typewriterTimer) && finishAttempts++ < 200) {
       setTimeout(finishResponse, 50);
       return;
     }
+    // safety-net: force flush wenn timeout
+    if (textBuffer.length > 0) flushTypewriter();
+    finishAttempts = 0;
+
     if (currentAiMsg) {
       finalizeToolBlock(currentAiMsg);
       highlightCodeBlocks(currentAiMsg);
@@ -290,7 +279,6 @@
     setInputEnabled(true);
   }
 
-  // ai-inhalt rendern
   function renderAiContent() {
     if (!currentAiMsg) return;
     const contentEl = currentAiMsg.querySelector('.msg-content');
@@ -299,80 +287,92 @@
     }
   }
 
-  // tool-anzeige: kollabierter block mit spinner + aufklappbare details
   function getToolBlock(aiMsg) {
-    var block = aiMsg.querySelector('.tool-block');
+    let block = aiMsg.querySelector('.tool-block');
     if (block) return block;
 
-    // neuen block erstellen
     block = document.createElement('div');
     block.className = 'tool-block';
 
-    var header = document.createElement('div');
+    const header = document.createElement('div');
     header.className = 'tool-block-header';
     header.innerHTML = SVG_SPINNER + '<span class="tool-block-label">Doku wird durchsucht...</span><span class="tool-block-chevron">' + SVG_CHEVRON + '</span>';
-    header.addEventListener('click', function () {
-      block.classList.toggle('expanded');
-    });
 
-    var details = document.createElement('div');
+    function toggleExpand() {
+      block.classList.toggle('expanded');
+    }
+    header.addEventListener('click', toggleExpand);
+    header._toggleExpand = toggleExpand;
+
+    const details = document.createElement('div');
     details.className = 'tool-block-details';
 
     block.appendChild(header);
     block.appendChild(details);
 
-    var contentEl = aiMsg.querySelector('.msg-content');
+    const contentEl = aiMsg.querySelector('.msg-content');
     aiMsg.insertBefore(block, contentEl);
     return block;
   }
 
   function handleToolUse(msg) {
     if (!currentAiMsg) return;
-    var block = getToolBlock(currentAiMsg);
-    var details = block.querySelector('.tool-block-details');
-    var label = TOOL_LABELS[msg.tool] || 'Verarbeite Anfrage';
+    const block = getToolBlock(currentAiMsg);
+    const details = block.querySelector('.tool-block-details');
+    const label = TOOL_LABELS[msg.tool] || 'Verarbeite Anfrage';
 
     if (msg.status === 'running') {
-      var item = document.createElement('div');
+      const item = document.createElement('div');
       item.className = 'tool-detail running';
       item.dataset.tool = msg.tool || 'default';
       item.innerHTML = SVG_SPINNER + '<span>' + label + '...</span>';
       details.appendChild(item);
     } else if (msg.status === 'done') {
-      var items = details.querySelectorAll('.tool-detail.running[data-tool="' + (msg.tool || 'default') + '"]');
-      var item = items[items.length - 1];
+      // CSS.escape gegen selector injection
+      const safeTool = CSS.escape(msg.tool || 'default');
+      const items = details.querySelectorAll('.tool-detail.running[data-tool="' + safeTool + '"]');
+      const item = items[items.length - 1];
       if (item) {
         item.className = 'tool-detail done';
-        var doneLabel = TOOL_DONE_LABELS[msg.tool] || 'Anfrage verarbeitet';
+        const doneLabel = TOOL_DONE_LABELS[msg.tool] || 'Anfrage verarbeitet';
         item.innerHTML = SVG_CHECK + '<span>' + doneLabel + '</span>';
       }
 
-      // counter aktualisieren
-      var doneCount = details.querySelectorAll('.tool-detail.done').length;
-      var headerLabel = block.querySelector('.tool-block-label');
-      var hasRunning = details.querySelectorAll('.tool-detail.running').length > 0;
+      const doneCount = details.querySelectorAll('.tool-detail.done').length;
+      const headerLabel = block.querySelector('.tool-block-label');
+      const hasRunning = details.querySelectorAll('.tool-detail.running').length > 0;
       if (hasRunning) {
         headerLabel.textContent = 'Doku wird durchsucht... (' + doneCount + ' abgeschlossen)';
       }
     }
   }
 
-  // tool-block abschliessen (nach done)
   function finalizeToolBlock(aiMsg) {
-    var block = aiMsg ? aiMsg.querySelector('.tool-block') : null;
+    const block = aiMsg ? aiMsg.querySelector('.tool-block') : null;
     if (!block) return;
     block.classList.add('finished');
-    var header = block.querySelector('.tool-block-header');
-    var details = block.querySelector('.tool-block-details');
-    var doneCount = details.querySelectorAll('.tool-detail.done').length;
-    header.innerHTML = SVG_CHECK + '<span class="tool-block-label">' + doneCount + ' Quellen durchsucht</span><span class="tool-block-chevron">' + SVG_CHEVRON + '</span>';
-    // re-attach click handler
-    header.addEventListener('click', function () {
+
+    const header = block.querySelector('.tool-block-header');
+    const details = block.querySelector('.tool-block-details');
+    const doneCount = details.querySelectorAll('.tool-detail.done').length;
+
+    // alten listener entfernen, neuen setzen
+    if (header._toggleExpand) {
+      header.removeEventListener('click', header._toggleExpand);
+    }
+
+    const label = header.querySelector('.tool-block-label');
+    const icon = header.querySelector('svg');
+    if (label) label.textContent = doneCount + ' Quellen durchsucht';
+    if (icon) icon.outerHTML = SVG_CHECK;
+
+    function toggleExpand() {
       block.classList.toggle('expanded');
-    });
+    }
+    header.addEventListener('click', toggleExpand);
+    header._toggleExpand = toggleExpand;
   }
 
-  // fehler anzeigen
   function appendError(text) {
     const wrap = document.createElement('div');
     wrap.className = 'msg-wrap';
@@ -384,7 +384,6 @@
     scrollToBottom();
   }
 
-  // code-blöcke highlighten
   function highlightCodeBlocks(container) {
     if (!container || !window.hljs) return;
     container.querySelectorAll('pre code').forEach(function (block) {
@@ -393,20 +392,62 @@
   }
 
   // auto-scroll
-  function scrollToBottom() {
+  let userScrolledUp = false;
+
+  messagesEl.addEventListener('wheel', function (e) {
+    if (e.deltaY < 0) {
+      userScrolledUp = true;
+      updateScrollButton();
+    }
+  }, { passive: true });
+
+  messagesEl.addEventListener('touchmove', function () {
+    const distanceFromBottom = messagesEl.scrollHeight - messagesEl.scrollTop - messagesEl.clientHeight;
+    if (distanceFromBottom > 40) {
+      userScrolledUp = true;
+      updateScrollButton();
+    }
+  }, { passive: true });
+
+  messagesEl.addEventListener('scroll', function () {
+    const distanceFromBottom = messagesEl.scrollHeight - messagesEl.scrollTop - messagesEl.clientHeight;
+    if (distanceFromBottom < 20 && userScrolledUp) {
+      userScrolledUp = false;
+      updateScrollButton();
+    }
+  });
+
+  function scrollToBottom(force) {
+    if (!force && userScrolledUp) return;
     requestAnimationFrame(function () {
-      messagesEl.scrollTop = messagesEl.scrollHeight;
+      messagesEl.scrollTo({ top: messagesEl.scrollHeight, behavior: force ? 'smooth' : 'auto' });
+      userScrolledUp = false;
+      updateScrollButton();
     });
   }
 
-  // input aktivieren/deaktivieren
+  const scrollBtn = document.createElement('button');
+  scrollBtn.className = 'scroll-to-bottom hidden';
+  scrollBtn.innerHTML = '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><polyline points="6 9 12 15 18 9"/></svg>';
+  scrollBtn.addEventListener('click', function () {
+    scrollToBottom(true);
+  });
+  document.getElementById('chat').appendChild(scrollBtn);
+
+  function updateScrollButton() {
+    if (userScrolledUp && isChat) {
+      scrollBtn.classList.remove('hidden');
+    } else {
+      scrollBtn.classList.add('hidden');
+    }
+  }
+
   function setInputEnabled(enabled) {
     isProcessing = !enabled;
     chatInput.disabled = !enabled;
     updateChatSendButton();
   }
 
-  // send-button zwischen senden/abbrechen umschalten
   function updateChatSendButton() {
     if (isProcessing) {
       chatSend.innerHTML = SVG_STOP;
@@ -419,13 +460,13 @@
     }
   }
 
-  // anfrage abbrechen
   function cancelRequest() {
     if (!isProcessing) return;
     flushTypewriter();
     if (currentAiMsg) {
-      currentAiMsg.querySelectorAll('.tool-indicator.running').forEach(function (el) {
-        el.className = 'tool-indicator done';
+      // richtige klasse: .tool-detail (nicht .tool-indicator)
+      currentAiMsg.querySelectorAll('.tool-detail.running').forEach(function (el) {
+        el.className = 'tool-detail done';
         el.innerHTML = SVG_CHECK + '<span>Abgebrochen</span>';
       });
       if (currentAiText) {
@@ -435,21 +476,19 @@
     currentAiMsg = null;
     currentAiText = '';
     if (ws) {
+      ws.onmessage = null;
       ws.onclose = null;
       ws.close();
     }
     setInputEnabled(true);
-    // neu verbinden — neue session
     sessionReady = false;
     connect();
   }
 
-  // aktiven speed-toggle ermitteln
   function getActiveSpeed() {
     return isChat ? chatSpeed : landingSpeed;
   }
 
-  // speed-toggle umschalten
   function toggleSpeed(btn) {
     if (btn.dataset.mode === 'fast') {
       btn.dataset.mode = 'thorough';
@@ -469,13 +508,11 @@
     }
   }
 
-  // textarea auto-resize
   function autoResize(textarea) {
     textarea.style.height = 'auto';
     textarea.style.height = Math.min(textarea.scrollHeight, 200) + 'px';
   }
 
-  // send-button status
   function updateSendBtn(input, btn) {
     if (input === landingInput && !sessionReady) {
       btn.disabled = true;
@@ -485,8 +522,6 @@
   }
 
   // event listener
-
-  // landing input
   landingInput.addEventListener('input', function () {
     autoResize(this);
     updateSendBtn(this, landingSend);
@@ -503,7 +538,6 @@
     sendMessage(landingInput.value);
   });
 
-  // chat input
   chatInput.addEventListener('input', function () {
     autoResize(this);
     updateSendBtn(this, chatSend);
@@ -524,7 +558,6 @@
     }
   });
 
-  // speed toggles
   landingSpeed.addEventListener('click', function () {
     toggleSpeed(this);
   });
@@ -533,7 +566,6 @@
     toggleSpeed(this);
   });
 
-  // header buttons
   btnInstall.addEventListener('click', function () {
     window.open('/help/', '_blank');
   });
@@ -542,7 +574,6 @@
     location.reload();
   });
 
-  // bug report
   btnReport.addEventListener('click', function () {
     openReportOverlay();
   });
@@ -575,14 +606,13 @@
   }
 
   function submitReport() {
-    var desc = reportText.value.trim();
+    const desc = reportText.value.trim();
     if (!desc || !ws || ws.readyState !== WebSocket.OPEN) return;
 
-    // chat-verlauf als kontext sammeln
-    var context = [];
+    const context = [];
     messagesEl.querySelectorAll('.msg-wrap').forEach(function (wrap) {
-      var bubble = wrap.querySelector('.msg-bubble');
-      var content = wrap.querySelector('.msg-content');
+      const bubble = wrap.querySelector('.msg-bubble');
+      const content = wrap.querySelector('.msg-content');
       if (bubble) {
         context.push({ role: 'user', text: bubble.textContent });
       } else if (content) {
@@ -593,17 +623,16 @@
     ws.send(JSON.stringify({
       type: 'report',
       description: desc,
-      chatContext: context.slice(-10), // letzte 10 nachrichten
+      chatContext: context.slice(-10),
     }));
 
     reportSend.disabled = true;
   }
 
-  // system-nachricht (nicht fehler, nicht ai)
   function appendSystemMessage(text) {
-    var wrap = document.createElement('div');
+    const wrap = document.createElement('div');
     wrap.className = 'msg-wrap';
-    var msg = document.createElement('div');
+    const msg = document.createElement('div');
     msg.className = 'msg-system';
     msg.textContent = text;
     wrap.appendChild(msg);
@@ -611,6 +640,5 @@
     scrollToBottom();
   }
 
-  // verbindung starten
   connect();
 })();

@@ -1,5 +1,5 @@
 import { createServer as createHttpServer } from 'node:http';
-import { readFile, writeFile } from 'node:fs/promises';
+import { appendFile } from 'node:fs/promises';
 import { fileURLToPath } from 'node:url';
 import { dirname, join } from 'node:path';
 import { randomUUID } from 'node:crypto';
@@ -10,7 +10,6 @@ import { SessionManager } from './session-manager.js';
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = dirname(__filename);
 
-// BRIDGE=codex -> OpenAI Codex SDK, BRIDGE=claude (default) -> Claude Agent SDK
 const BRIDGE_MODE = process.env.BRIDGE || 'claude';
 
 async function loadBridge() {
@@ -36,6 +35,12 @@ export async function createServer(opts = {}) {
   const manager = new SessionManager(bridge, config);
 
   const app = express();
+
+  // trust proxy fuer korrekte IP hinter reverse proxy
+  if (process.env.TRUST_PROXY) {
+    app.set('trust proxy', process.env.TRUST_PROXY);
+  }
+
   app.use(express.static(join(__dirname, '..', 'public')));
 
   const server = createHttpServer(app);
@@ -45,7 +50,8 @@ export async function createServer(opts = {}) {
     maxPayload: 16 * 1024,
     verifyClient: ({ req }) => {
       const origin = req.headers.origin;
-      if (!origin) return true; // non-browser clients
+      // ohne origin nur erlauben wenn explizit konfiguriert
+      if (!origin) return !!process.env.ALLOW_NO_ORIGIN;
       const allowed = [
         'http://localhost:' + config.port,
         'https://localhost:' + config.port,
@@ -58,7 +64,6 @@ export async function createServer(opts = {}) {
     }
   });
 
-  // heartbeat: ping alle 30s, tote verbindungen beenden
   const heartbeatInterval = setInterval(() => {
     for (const ws of wss.clients) {
       if (ws.isAlive === false) {
@@ -70,10 +75,7 @@ export async function createServer(opts = {}) {
     }
   }, 30000);
 
-  wss.on('close', () => {
-    clearInterval(heartbeatInterval);
-  });
-
+  // nur an einer stelle cleanen
   server.on('close', () => {
     clearInterval(heartbeatInterval);
     wss.close();
@@ -92,10 +94,8 @@ export async function createServer(opts = {}) {
       ws.isAlive = true;
     });
 
-    // sofort session_init senden
     ws.send(JSON.stringify({ type: 'session_init' }));
 
-    // session im hintergrund erstellen und vorwaermen
     manager.createAndWarmUp(clientId).then(() => {
       if (ws.readyState === 1) {
         ws.send(JSON.stringify({ type: 'session_ready' }));
@@ -113,7 +113,6 @@ export async function createServer(opts = {}) {
     });
 
     ws.on('close', () => {
-      // session sofort beenden wenn user geht
       manager.removeSession(clientId).catch((err) => {
         console.error(`[server] session cleanup error: ${err.message}`);
       });
@@ -128,18 +127,28 @@ export async function createServer(opts = {}) {
   });
 }
 
-// nachrichten-queue abarbeiten (eine nachricht gleichzeitig)
 async function processQueue(ws, manager, req) {
   if (ws.processing) return;
   ws.processing = true;
   try {
     while (ws.messageQueue.length > 0) {
+      if (ws.readyState !== 1) {
+        ws.messageQueue.length = 0;
+        break;
+      }
       const raw = ws.messageQueue.shift();
       await handleMessage(ws, manager, req, raw);
     }
   } finally {
     ws.processing = false;
   }
+}
+
+// IP ermitteln (proxy-aware)
+function getClientIp(req) {
+  // express req.ip respektiert trust proxy
+  if (req.ip) return req.ip;
+  return req.socket.remoteAddress || 'unknown';
 }
 
 async function handleMessage(ws, manager, req, raw) {
@@ -152,13 +161,13 @@ async function handleMessage(ws, manager, req, raw) {
   }
 
   if (msg.type === 'report') {
-    await handleReport(ws, msg, req);
+    await handleReport(ws, msg);
     return;
   }
 
   if (msg.type !== 'message') return;
 
-  const ip = req.socket.remoteAddress || 'unknown';
+  const ip = getClientIp(req);
 
   try {
     manager.checkRateLimit(ip);
@@ -183,25 +192,33 @@ async function handleMessage(ws, manager, req, raw) {
   try {
     const mode = msg.mode === 'fast' ? 'fast' : 'thorough';
     for await (const event of session.send(msg.content, mode)) {
-      // websocket geschlossen -> abbrechen
-      if (ws.readyState !== 1) {
-        console.log('[server] WebSocket closed, aborting query');
-        break;
-      }
-      console.log(`[server] -> client: ${JSON.stringify(event).substring(0, 120)}`);
+      if (ws.readyState !== 1) break;
       ws.send(JSON.stringify(event));
     }
   } catch (err) {
+    console.error(`[server] query error: ${err.message}`);
     if (ws.readyState === 1) {
-      ws.send(JSON.stringify({ type: 'error', message: err.message }));
+      // generische fehlermeldung, keine internen details leaken
+      ws.send(JSON.stringify({ type: 'error', message: 'Fehler bei der Verarbeitung. Bitte versuche es erneut.' }));
     }
   }
 }
 
-// bug reports
+// bug reports — JSONL (append-only, keine race condition)
 const REPORTS_PATH = join(__dirname, '..', 'reports.json');
+const MAX_CONTEXT_ITEM_LENGTH = 600;
 
-async function handleReport(ws, msg, req) {
+function sanitizeChatContext(context) {
+  if (!Array.isArray(context)) return [];
+  return context.slice(0, 10).map((item) => {
+    if (typeof item !== 'object' || item === null) return null;
+    const role = typeof item.role === 'string' ? item.role.substring(0, 20) : 'unknown';
+    const text = typeof item.text === 'string' ? item.text.substring(0, MAX_CONTEXT_ITEM_LENGTH) : '';
+    return { role, text };
+  }).filter(Boolean);
+}
+
+async function handleReport(ws, msg) {
   const desc = typeof msg.description === 'string' ? msg.description.trim() : '';
   if (!desc || desc.length > 5000) {
     ws.send(JSON.stringify({ type: 'error', message: 'Ungültiger Bug-Report.' }));
@@ -211,22 +228,14 @@ async function handleReport(ws, msg, req) {
   const report = {
     timestamp: new Date().toISOString(),
     description: desc,
-    chatContext: Array.isArray(msg.chatContext) ? msg.chatContext.slice(0, 10) : [],
+    chatContext: sanitizeChatContext(msg.chatContext),
     clientId: ws.clientId,
-    ip: req.socket.remoteAddress || 'unknown',
   };
 
   try {
-    let reports = [];
-    try {
-      const data = await readFile(REPORTS_PATH, 'utf8');
-      reports = JSON.parse(data);
-    } catch {
-      // datei existiert noch nicht
-    }
-    reports.push(report);
-    await writeFile(REPORTS_PATH, JSON.stringify(reports, null, 2));
-    console.log(`[server] bug report saved (${reports.length} total)`);
+    // JSONL: eine zeile pro report, append-only (keine race condition)
+    await appendFile(REPORTS_PATH, JSON.stringify(report) + '\n');
+    console.log(`[server] bug report saved`);
     ws.send(JSON.stringify({ type: 'report_saved' }));
   } catch (err) {
     console.error(`[server] report save error: ${err.message}`);
@@ -234,7 +243,6 @@ async function handleReport(ws, msg, req) {
   }
 }
 
-// direkt starten wenn als main-modul ausgeführt
 const isMain = process.argv[1] && fileURLToPath(import.meta.url) === process.argv[1];
 if (isMain) {
   createServer().then(({ port }) => {

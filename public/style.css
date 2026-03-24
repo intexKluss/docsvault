@@ -152,6 +152,43 @@ button {
   background: linear-gradient(to bottom, transparent, #1a1a1a);
 }
 
+/* scroll-to-bottom button */
+.scroll-to-bottom {
+  position: fixed;
+  bottom: 130px;
+  left: 50%;
+  transform: translateX(-50%);
+  width: 36px;
+  height: 36px;
+  border-radius: 50%;
+  background: #333;
+  border: 1px solid #444;
+  color: #ccc;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  cursor: pointer;
+  z-index: 10;
+  transition: opacity 0.2s, transform 0.2s;
+  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.4);
+}
+
+.scroll-to-bottom svg {
+  width: 18px;
+  height: 18px;
+}
+
+.scroll-to-bottom:hover {
+  background: #444;
+  color: #fff;
+}
+
+.scroll-to-bottom.hidden {
+  opacity: 0;
+  pointer-events: none;
+  transform: translateX(-50%) translateY(8px);
+}
+
 .input-box {
   background: #2a2a2a;
   border: 1px solid #383838;

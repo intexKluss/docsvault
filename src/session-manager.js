@@ -25,28 +25,37 @@ export class SessionManager {
     return this.#sessions.size;
   }
 
-  // session sofort erstellen und vorwaermen
   async createAndWarmUp(clientId) {
+    // synchroner platzhalter gegen race condition bei bursts
     if (this.#sessions.size >= this.#config.maxSessions) {
       throw new Error('Max sessions reached');
     }
-    const session = await this.#bridge.createSession();
-    this.#sessions.set(clientId, session);
+    // platzhalter sofort setzen bevor async work startet
+    const placeholder = { ready: false, destroyed: false };
+    this.#sessions.set(clientId, placeholder);
 
-    // warm-up im hintergrund starten
-    await session.warmUp();
-    return session;
+    try {
+      const session = await this.#bridge.createSession();
+      this.#sessions.set(clientId, session);
+      await session.warmUp();
+      return session;
+    } catch (err) {
+      this.#sessions.delete(clientId);
+      throw err;
+    }
   }
 
   getSession(clientId) {
-    return this.#sessions.get(clientId) || null;
+    const session = this.#sessions.get(clientId);
+    if (!session || session.ready === false) return null;
+    return session;
   }
 
   async removeSession(clientId) {
     const session = this.#sessions.get(clientId);
-    if (session) {
+    this.#sessions.delete(clientId);
+    if (session && typeof session.destroy === 'function') {
       await session.destroy();
-      this.#sessions.delete(clientId);
     }
   }
 
