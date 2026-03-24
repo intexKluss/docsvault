@@ -19,9 +19,13 @@
       <p class="subtitle">Durchsuche API-Referenzen, Handbücher und HowTos</p>
       <a href="/help/" class="help-link">Wie installiere ich es?</a>
     </div>
+    <div class="session-status" id="session-status">
+      <svg class="status-spinner" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="10"/><path d="M12 6v6l4 2"/></svg>
+      <span>Session wird eingerichtet...</span>
+    </div>
     <div class="input-area landing-input">
       <div class="input-box">
-        <textarea id="landing-input" placeholder="Wie kann ich dir helfen?" rows="1"></textarea>
+        <textarea id="landing-input" placeholder="Wie kann ich dir helfen?" rows="1" disabled></textarea>
         <div class="input-controls">
           <button id="landing-speed" class="speed-toggle" data-mode="fast" title="Schnell">
             <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polygon points="13 2 3 14 12 14 11 22 21 10 12 10 13 2"/></svg>
@@ -74,6 +78,7 @@
 
   <script src="https://cdnjs.cloudflare.com/ajax/libs/marked/12.0.2/marked.min.js"></script>
   <script src="https://cdnjs.cloudflare.com/ajax/libs/highlight.js/11.9.0/highlight.min.js"></script>
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/dompurify/3.1.6/purify.min.js"></script>
   <script src="app.js"></script>
 </body>
 </html>

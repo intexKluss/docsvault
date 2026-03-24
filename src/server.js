@@ -14,7 +14,6 @@ export async function createServer(opts = {}) {
   const config = {
     port: opts.port ?? parseInt(process.env.PORT || '3000', 10),
     maxSessions: parseInt(process.env.MAX_SESSIONS || '50', 10),
-    sessionTimeoutMin: parseInt(process.env.SESSION_TIMEOUT_MIN || '30', 10),
     rateLimitPerMin: parseInt(process.env.RATE_LIMIT_PER_MIN || '10', 10),
     maxMessageLength: parseInt(process.env.MAX_MESSAGE_LENGTH || '2000', 10),
   };
@@ -27,7 +26,23 @@ export async function createServer(opts = {}) {
 
   const server = createHttpServer(app);
 
-  const wss = new WebSocketServer({ server });
+  const wss = new WebSocketServer({
+    server,
+    maxPayload: 16 * 1024,
+    verifyClient: ({ req }) => {
+      const origin = req.headers.origin;
+      if (!origin) return true; // non-browser clients
+      const allowed = [
+        'http://localhost:' + config.port,
+        'https://localhost:' + config.port,
+        'http://127.0.0.1:' + config.port,
+      ];
+      if (process.env.ALLOWED_ORIGINS) {
+        allowed.push(...process.env.ALLOWED_ORIGINS.split(','));
+      }
+      return allowed.includes(origin);
+    }
+  });
 
   // heartbeat: ping alle 30s, tote verbindungen beenden
   const heartbeatInterval = setInterval(() => {
@@ -45,7 +60,6 @@ export async function createServer(opts = {}) {
     clearInterval(heartbeatInterval);
   });
 
-  // cleanup bei server-close
   server.on('close', () => {
     clearInterval(heartbeatInterval);
     wss.close();
@@ -53,8 +67,7 @@ export async function createServer(opts = {}) {
   });
 
   wss.on('connection', (ws, req) => {
-    const url = new URL(req.url, `http://${req.headers.host}`);
-    const clientId = url.searchParams.get('sid') || randomUUID();
+    const clientId = randomUUID();
 
     ws.isAlive = true;
     ws.clientId = clientId;
@@ -65,11 +78,20 @@ export async function createServer(opts = {}) {
       ws.isAlive = true;
     });
 
-    // reconnect: ausstehende entfernung abbrechen
-    manager.cancelRemoval(clientId);
+    // sofort session_init senden
+    ws.send(JSON.stringify({ type: 'session_init' }));
 
-    // ready-nachricht senden
-    ws.send(JSON.stringify({ type: 'ready', sid: clientId }));
+    // session im hintergrund erstellen und vorwaermen
+    manager.createAndWarmUp(clientId).then(() => {
+      if (ws.readyState === 1) {
+        ws.send(JSON.stringify({ type: 'session_ready' }));
+      }
+    }).catch((err) => {
+      console.error(`[server] warm-up failed for ${clientId}: ${err.message}`);
+      if (ws.readyState === 1) {
+        ws.send(JSON.stringify({ type: 'error', message: 'Session konnte nicht erstellt werden. Bitte Seite neu laden.' }));
+      }
+    });
 
     ws.on('message', (data) => {
       ws.messageQueue.push(data);
@@ -77,7 +99,10 @@ export async function createServer(opts = {}) {
     });
 
     ws.on('close', () => {
-      manager.scheduleRemoval(clientId);
+      // session sofort beenden wenn user geht
+      manager.removeSession(clientId).catch((err) => {
+        console.error(`[server] session cleanup error: ${err.message}`);
+      });
     });
   });
 
@@ -93,13 +118,14 @@ export async function createServer(opts = {}) {
 async function processQueue(ws, manager, req) {
   if (ws.processing) return;
   ws.processing = true;
-
-  while (ws.messageQueue.length > 0) {
-    const raw = ws.messageQueue.shift();
-    await handleMessage(ws, manager, req, raw);
+  try {
+    while (ws.messageQueue.length > 0) {
+      const raw = ws.messageQueue.shift();
+      await handleMessage(ws, manager, req, raw);
+    }
+  } finally {
+    ws.processing = false;
   }
-
-  ws.processing = false;
 }
 
 async function handleMessage(ws, manager, req, raw) {
@@ -129,20 +155,22 @@ async function handleMessage(ws, manager, req, raw) {
     return;
   }
 
-  let session;
-  try {
-    session = await manager.getOrCreateSession(ws.clientId);
-    manager.touchSession(ws.clientId);
-  } catch (err) {
-    ws.send(JSON.stringify({ type: 'error', message: err.message }));
+  const session = manager.getSession(ws.clientId);
+  if (!session || !session.ready) {
+    ws.send(JSON.stringify({ type: 'error', message: 'Session wird noch eingerichtet. Bitte kurz warten.' }));
     return;
   }
 
   try {
-    for await (const event of session.send(msg.content, msg.mode)) {
-      if (ws.readyState === 1) {
-        ws.send(JSON.stringify(event));
+    const mode = msg.mode === 'fast' ? 'fast' : 'thorough';
+    for await (const event of session.send(msg.content, mode)) {
+      // websocket geschlossen -> abbrechen
+      if (ws.readyState !== 1) {
+        console.log('[server] WebSocket closed, aborting query');
+        break;
       }
+      console.log(`[server] -> client: ${JSON.stringify(event).substring(0, 120)}`);
+      ws.send(JSON.stringify(event));
     }
   } catch (err) {
     if (ws.readyState === 1) {
