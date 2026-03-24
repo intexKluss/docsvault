@@ -5,3 +5,5 @@ Thumbs.db
 *.log
 reports.json
 .mcp.json
+todo
+vault/.auth.json

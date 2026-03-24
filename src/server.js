@@ -288,7 +288,22 @@ async function handleReport(ws, msg) {
 
 const isMain = process.argv[1] && fileURLToPath(import.meta.url) === process.argv[1];
 if (isMain) {
-  createServer().then(({ port }) => {
+  createServer().then(({ server, port }) => {
     console.log(`Server läuft auf http://localhost:${port}`);
+
+    function shutdown(signal) {
+      console.log(`[server] ${signal} received, shutting down...`);
+      server.close(() => {
+        console.log('[server] closed');
+        process.exit(0);
+      });
+      setTimeout(() => {
+        console.error('[server] forced shutdown after timeout');
+        process.exit(1);
+      }, 10000);
+    }
+
+    process.on('SIGTERM', () => shutdown('SIGTERM'));
+    process.on('SIGINT', () => shutdown('SIGINT'));
   });
 }
