@@ -57,10 +57,8 @@ export async function createServer(opts = {}) {
     next();
   });
 
-  // REST API for remote MCP clients
   app.use(createApiRouter(VAULT_PATH));
 
-  // MCP remote endpoint — SSE transport
   app.get('/sse', (req, res) => {
     handleSseGet(req, res, VAULT_PATH);
   });
@@ -69,7 +67,6 @@ export async function createServer(opts = {}) {
     handleSsePost(req, res);
   });
 
-  // MCP remote endpoint — Streamable HTTP transport
   app.post('/mcp', express.json(), async (req, res) => {
     await handleStreamablePost(req, res, VAULT_PATH);
   });
@@ -179,7 +176,6 @@ async function processQueue(ws, manager, req) {
   }
 }
 
-// IP ermitteln (proxy-aware)
 function getClientIp(req) {
   if (process.env.TRUST_PROXY) {
     const xff = req.headers['x-forwarded-for'];
@@ -247,7 +243,7 @@ async function handleMessage(ws, manager, req, raw) {
   }
 }
 
-// bug reports — JSONL (append-only, keine race condition)
+// append-only JSONL, no race conditions
 const REPORTS_PATH = join(__dirname, '..', 'reports.json');
 const MAX_CONTEXT_ITEM_LENGTH = 600;
 
@@ -276,7 +272,6 @@ async function handleReport(ws, msg) {
   };
 
   try {
-    // JSONL: eine zeile pro report, append-only (keine race condition)
     await appendFile(REPORTS_PATH, JSON.stringify(report) + '\n');
     console.log(`[server] bug report saved`);
     ws.send(JSON.stringify({ type: 'report_saved' }));
