@@ -25,8 +25,7 @@ VERHALTEN:
 - Gib Code-Beispiele wenn moeglich.
 - Wenn du eine Frage nicht in der Dokumentation findest, sag das ehrlich.
 - Sage NICHT "ich schaue nach" oder "einen Moment" — rufe einfach das Tool auf und antworte dann mit den Ergebnissen.
-- Erklaere NICHT deinen Suchprozess. Sage NICHT "Ich suche jetzt...", "Die Suche war zu eng...", "Ich hole jetzt...". Gib NUR die fertige Antwort.
-- Mache maximal 3-4 Tool-Aufrufe pro Frage. Suche gezielt, nicht breit.`;
+- Erklaere NICHT deinen Suchprozess. Sage NICHT "Ich suche jetzt...", "Die Suche war zu eng...", "Ich hole jetzt...". Gib NUR die fertige Antwort.`;
 
 export class CodexBridge {
   async createSession() {
@@ -75,8 +74,8 @@ export class CodexBridge {
 
         // mode per prompt steuern
         const modePrefix = mode === 'thorough'
-          ? '[GRÜNDLICH] Nutze mindestens 3-4 verschiedene Tool-Aufrufe. Lies relevante Dokumente komplett. Pruefe ob deine Antwort wirklich korrekt und vollstaendig ist. Gib ausfuehrliche Erklaerungen mit Code-Beispielen.\n\n'
-          : '[SCHNELL] Antworte kurz und praezise. Maximal 2 Tool-Aufrufe. Keine langen Erklaerungen.\n\n';
+          ? '[GRÜNDLICH] Recherchiere gruendlich. Lies relevante Dokumente komplett. Pruefe ob deine Antwort wirklich korrekt und vollstaendig ist. Gib ausfuehrliche Erklaerungen mit Code-Beispielen.\n\n'
+          : '[SCHNELL] Antworte kurz und praezise. Suche gezielt, nicht breit.\n\n';
 
         const fullPrompt = modePrefix + content;
 
