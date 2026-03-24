@@ -53,6 +53,12 @@
   let currentAiText = '';
   let isProcessing = false;
 
+  // typewriter
+  let textBuffer = '';
+  let typewriterTimer = null;
+  var CHARS_PER_TICK = 3;
+  var TICK_MS = 12;
+
   // websocket verbindung
   function connect() {
     const proto = location.protocol === 'https:' ? 'wss:' : 'ws:';
@@ -112,9 +118,8 @@
           currentAiMsg = appendAiMessage();
           currentAiText = '';
         }
-        currentAiText += msg.content;
-        renderAiContent();
-        scrollToBottom();
+        textBuffer += msg.content;
+        startTypewriter();
         break;
 
       case 'tool_use':
@@ -127,12 +132,7 @@
         break;
 
       case 'done':
-        if (currentAiMsg) {
-          highlightCodeBlocks(currentAiMsg);
-        }
-        currentAiMsg = null;
-        currentAiText = '';
-        setInputEnabled(true);
+        finishResponse();
         break;
 
       case 'report_saved':
@@ -203,6 +203,53 @@
     wrap.appendChild(content);
     messagesEl.appendChild(wrap);
     return wrap;
+  }
+
+  // typewriter — zeichen einzeln aus buffer in currentAiText schieben
+  function startTypewriter() {
+    if (typewriterTimer) return; // laeuft schon
+    typewriterTimer = setInterval(typewriterTick, TICK_MS);
+  }
+
+  function typewriterTick() {
+    if (textBuffer.length === 0) {
+      clearInterval(typewriterTimer);
+      typewriterTimer = null;
+      return;
+    }
+    var chars = textBuffer.substring(0, CHARS_PER_TICK);
+    textBuffer = textBuffer.substring(CHARS_PER_TICK);
+    currentAiText += chars;
+    renderAiContent();
+    scrollToBottom();
+  }
+
+  function flushTypewriter() {
+    if (typewriterTimer) {
+      clearInterval(typewriterTimer);
+      typewriterTimer = null;
+    }
+    if (textBuffer.length > 0) {
+      currentAiText += textBuffer;
+      textBuffer = '';
+      renderAiContent();
+      scrollToBottom();
+    }
+  }
+
+  // warten bis typewriter fertig, dann response abschliessen
+  function finishResponse() {
+    if (textBuffer.length > 0 || typewriterTimer) {
+      // buffer noch nicht leer — warten
+      setTimeout(finishResponse, 50);
+      return;
+    }
+    if (currentAiMsg) {
+      highlightCodeBlocks(currentAiMsg);
+    }
+    currentAiMsg = null;
+    currentAiText = '';
+    setInputEnabled(true);
   }
 
   // ai-inhalt rendern
@@ -292,6 +339,7 @@
   // anfrage abbrechen
   function cancelRequest() {
     if (!isProcessing) return;
+    flushTypewriter();
     if (currentAiMsg) {
       currentAiMsg.querySelectorAll('.tool-indicator.running').forEach(function (el) {
         el.className = 'tool-indicator done';
