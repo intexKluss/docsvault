@@ -9,7 +9,7 @@ Dein Coding-Agent (Claude Code, Codex CLI, Gemini CLI, etc.) bekommt Zugriff auf
 
 ## Option 1: Remote MCP (empfohlen)
 
-Verbinde deinen Agent direkt per MCP-Netzwerkprotokoll mit dem Server.
+Verbinde deinen Agent direkt per MCP-Netzwerkprotokoll mit dem Server. Keine lokale Installation noetig.
 
 ### Claude Code
 
@@ -39,24 +39,40 @@ In `~/.codex/config.json` oder `.codex/config.json` im Projektordner:
 }
 ```
 
-## Option 2: REST API
+## Option 2: Lokaler MCP-Proxy
 
-Fuer Agents oder Tools die kein MCP unterstuetzen, gibt es eine REST API:
+Fuer Agents die kein Remote-MCP unterstuetzen (z.B. Gemini CLI). Installiert einen lokalen MCP-Server der Anfragen an den otris-docs-web Server weiterleitet.
 
 ```bash
-# Suchen
+npm install -g git+ssh://git@github.com:leminkozey/otris-docs-mcp.git
+```
+
+Dann in der Agent-Konfiguration:
+
+```json
+{
+  "mcpServers": {
+    "otris-docs": {
+      "command": "otris-docs-mcp",
+      "env": {
+        "OTRIS_DOCS_URL": "http://SERVER-IP:3000"
+      }
+    }
+  }
+}
+```
+
+Details: [otris-docs-mcp Repository](https://github.com/leminkozey/otris-docs-mcp)
+
+## Option 3: REST API
+
+Fuer Agents oder Tools die kein MCP unterstuetzen:
+
+```bash
 curl "http://SERVER-IP:3000/api/search?query=DocFile"
-
-# Dokument lesen
-curl "http://SERVER-IP:3000/api/read?path=portalscript-api/classes/DocFile"
-
-# Bereich auflisten
-curl "http://SERVER-IP:3000/api/list?section=portalscript-api"
-
-# Uebersicht
+curl "http://SERVER-IP:3000/api/read?path=Portalscript%20API/classes/DocFile"
+curl "http://SERVER-IP:3000/api/list?section=Portalscript%20API"
 curl "http://SERVER-IP:3000/api/overview"
-
-# Status
 curl "http://SERVER-IP:3000/api/status"
 ```
 
