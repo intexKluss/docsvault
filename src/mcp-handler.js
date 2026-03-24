@@ -7,7 +7,6 @@ import { handleRead } from './tools/read.js';
 import { handleList } from './tools/list.js';
 import { handleStatus } from './tools/status.js';
 
-// active SSE sessions keyed by sessionId
 const sseSessions = new Map();
 
 export function createMcpServer(vaultPath) {

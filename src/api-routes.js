@@ -12,7 +12,6 @@ function clampInt(value, min, max, fallback) {
   return Math.max(min, Math.min(max, n));
 }
 
-// per-IP rate limiting for REST API
 const apiRateCounts = new Map();
 const API_RATE_LIMIT = parseInt(process.env.API_RATE_LIMIT_PER_MIN || '60', 10);
 
@@ -97,7 +96,6 @@ export function createApiRouter(vaultPath) {
     res.json(result);
   });
 
-  // catch errors in API routes
   router.use('/api', (err, req, res, next) => {
     console.error(`[api] error: ${err.message}`);
     res.status(500).json({ error: 'Internal server error' });
