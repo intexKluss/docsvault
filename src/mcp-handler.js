@@ -1,11 +1,11 @@
 import { McpServer } from '@modelcontextprotocol/sdk/server/mcp.js';
 import { SSEServerTransport } from '@modelcontextprotocol/sdk/server/sse.js';
 import { z } from 'zod';
-import { handleOverview } from 'otris-docs-mcp/src/server/tools/overview.mjs';
-import { handleSearch } from 'otris-docs-mcp/src/server/tools/search.mjs';
-import { handleRead } from 'otris-docs-mcp/src/server/tools/read.mjs';
-import { handleList } from 'otris-docs-mcp/src/server/tools/list.mjs';
-import { handleStatus } from 'otris-docs-mcp/src/server/tools/status.mjs';
+import { handleOverview } from './tools/overview.js';
+import { handleSearch } from './tools/search.js';
+import { handleRead } from './tools/read.js';
+import { handleList } from './tools/list.js';
+import { handleStatus } from './tools/status.js';
 
 // active SSE sessions keyed by sessionId
 const sseSessions = new Map();
