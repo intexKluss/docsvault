@@ -49,14 +49,12 @@ Claude Code / Codex CLI / beliebiger MCP-Client
 
 ### 1. MCP-Netzwerk-Endpunkt (neu)
 
+Neue Datei `src/mcp-handler.js`: Erstellt einen `McpServer` (aus `@modelcontextprotocol/sdk/server`) und registriert die 5 Tools. Die Tool-Funktionen (search, read, list, overview, status) werden direkt aus dem `otris-docs-mcp` Package importiert — kein Child-Process fuer den Netzwerk-Endpunkt.
+
 Neue Routen in `server.js`:
 
-- **`GET /sse`** — SSE-Transport. MCP-Client oeffnet long-lived Connection, Server streamt MCP-Responses als Server-Sent Events.
-- **`POST /message`** — Streamable HTTP. MCP-Client sendet einzelne MCP-Requests per POST, bekommt Response zurueck.
-
-Nutzt `@modelcontextprotocol/sdk`:
-- `SSEServerTransport` fuer den SSE-Endpunkt
-- `StreamableHTTPServerTransport` fuer den HTTP-Endpunkt (falls im SDK verfuegbar, sonst nur SSE)
+- **`GET /sse`** — SSE-Transport via `SSEServerTransport` (aus `@modelcontextprotocol/sdk/server/sse.js`). Deprecated aber breit unterstuetzt.
+- **`POST /message`** — Streamable HTTP via `StreamableHTTPServerTransport` (aus `@modelcontextprotocol/sdk/server/streamableHttp.js`, falls verfuegbar).
 
 Beide Endpunkte stellen dieselben 5 Tools bereit:
 - `otris_search` — Volltext-Suche im Vault
@@ -65,7 +63,7 @@ Beide Endpunkte stellen dieselben 5 Tools bereit:
 - `otris_overview` — Vault-Uebersicht
 - `otris_status` — Vault-Freshness (letzter Crawl-Zeitpunkt)
 
-Die Tool-Logik wird direkt aus dem `otris-docs-mcp` Package importiert (das als npm-Dependency eingebunden ist).
+**Multi-Session:** Jeder MCP-Client bekommt eine eigene Transport-Instanz. Der `mcp-handler.js` verwaltet eine Session-Map fuer parallele Verbindungen.
 
 **Kein Auth, kein Rate-Limiting** auf dem MCP-Endpunkt (LAN-only, nur interne Entwickler).
 
@@ -77,7 +75,7 @@ Der Vault (995 Markdown-Seiten) wird ins `otris-docs-web` Repo kopiert.
 1. Auf dem Mac: `otris-docs-mcp crawl` (Playwright crawlt die otris-Doku)
 2. Vault-Dateien ins Repo kopieren
 3. `git add vault/ && git commit && git push`
-4. Auf dem Pi: `git pull && docker build -t otris-docs . && docker restart otris-docs`
+4. Auf dem Pi: `git pull && docker build -t otris-docs . && docker stop otris-docs && docker rm otris-docs && docker run -d --name otris-docs -p 3000:3000 otris-docs`
 
 ### 3. Dockerfile (neu)
 
@@ -96,7 +94,19 @@ CMD ["node", "src/server.js"]
 - `otris-docs-mcp` ist npm-Dependency → CLI verfuegbar unter `node_modules/.bin/otris-docs-mcp`
 - Bridges nutzen den vollen Pfad zum Binary statt globales `otris-docs-mcp`
 
-### 4. Bridge-Anpassung (minimal)
+### 4. .dockerignore (neu)
+
+```
+.git
+node_modules
+docs
+test
+*.md
+!vault/**/*.md
+!vault/**/*.json
+```
+
+### 5. Bridge-Anpassung (minimal)
 
 Die Bridges (`claude-bridge.js`, `codex-bridge.js`) aendern den MCP-Server-Pfad:
 
@@ -116,9 +126,9 @@ const MCP_SERVERS = {
 };
 ```
 
-Sonst aendert sich an den Bridges nichts.
+Die Bridges nutzen weiterhin Stdio (Child-Process) fuer die Chat-Sessions. Das ist unabhaengig vom MCP-Netzwerk-Endpunkt.
 
-### 5. Help-Page Anpassung (minimal)
+### 6. Help-Page Anpassung (minimal)
 
 Die bestehende Install-Doku unter `/help/` bekommt einen neuen Abschnitt:
 
@@ -126,11 +136,17 @@ Die bestehende Install-Doku unter `/help/` bekommt einen neuen Abschnitt:
 
 Erklaert wie man die Server-URL in die MCP-Config seines Agents eintraegt. Beispiel-Configs fuer Claude Code und Codex CLI als Copy-Paste Snippets. Keine IDE-Integration, nur Agent-Config.
 
-### 6. Environment-Variablen (Ergaenzung)
+### 7. Dependencies (neu)
+
+In `package.json` hinzufuegen:
+- `otris-docs-mcp` — als Git-Dependency (`"otris-docs-mcp": "github:user/otris-docs-mcp"`) oder lokaler Pfad fuer Dev. Stellt CLI + Tool-Logik + Vault-Reader bereit.
+- `@modelcontextprotocol/sdk` — MCP Server + Transports
+
+### 8. Environment-Variablen (Ergaenzung)
 
 | Variable | Default | Beschreibung |
 |----------|---------|-------------|
-| `VAULT_PATH` | `./vault` | Pfad zum Vault-Verzeichnis (fuer MCP-Endpunkt) |
+| `VAULT_PATH` | `./vault` | Pfad zum Vault-Verzeichnis. Wird an die Tool-Funktionen aus otris-docs-mcp uebergeben und von mcp-handler.js beim Setup gelesen. |
 
 Alle bestehenden Env-Variablen bleiben unveraendert.
 
@@ -148,7 +164,7 @@ Alle bestehenden Env-Variablen bleiben unveraendert.
 otris-docs-web/
   src/
     server.js              + MCP-Routen (/sse, /message)
-    mcp-handler.js         NEU: MCP Server Setup + Tool-Registration
+    mcp-handler.js         NEU: McpServer Setup, Tool-Registration, Session-Map
     session-manager.js     unveraendert
     claude-bridge.js       MCP-Pfad angepasst
     codex-bridge.js        MCP-Pfad angepasst
@@ -157,13 +173,15 @@ otris-docs-web/
   vault/                   NEU: gecrawlte Markdown-Dateien
   Dockerfile               NEU
   .dockerignore            NEU
-  package.json             + otris-docs-mcp als Dependency
+  package.json             + otris-docs-mcp + @modelcontextprotocol/sdk
 ```
 
 ## Risiken
 
 | Risiko | Mitigation |
 |--------|-----------|
-| MCP SDK hat keinen StreamableHTTPServerTransport | SSE als Primary, HTTP nur wenn SDK es unterstuetzt |
-| Vault wird gross (aktuell ~995 Seiten) | .dockerignore fuer dev-files, Multi-Stage Build wenn noetig |
+| SDK-API aendert sich (SSE deprecated, neue Packages) | Zur Implementierung aktuelle SDK-Docs pruefen, SSE als Fallback behalten |
+| otris-docs-mcp exportiert Tool-Logik nicht als Module | Tool-Handler ggf. in mcp-handler.js duplizieren oder otris-docs-mcp anpassen |
+| Vault wird gross (aktuell ~995 Seiten) | .dockerignore fuer dev-files, Image bleibt trotzdem klein (~100MB) |
 | Container-Restart bei Vault-Update | Akzeptabel fuer internes Tool, kein HA noetig |
+| MCP-Client-Kompatibilitaet (Remote SSE/HTTP) | Vor Implementierung testen ob Claude Code und Codex CLI Remote-MCP per URL unterstuetzen |
