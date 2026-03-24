@@ -7,10 +7,6 @@ import { extractFromPage } from './extractors.mjs';
 import { buildFileIndex, convertLinks } from './link-converter.mjs';
 import { getDocsPath, getManifestPath } from './config.mjs';
 
-// ---------------------------------------------------------------------------
-// Helpers
-// ---------------------------------------------------------------------------
-
 function sanitize(name) {
   return name.replace(/[<>:"/\\|?*]/g, '_').replace(/\s+/g, ' ').trim().substring(0, 80);
 }
@@ -26,10 +22,7 @@ function writeDoc(filePath, title, sourceUrl, content) {
   writeFileSync(filePath, makeFrontmatter(title, sourceUrl) + content);
 }
 
-/**
- * Delete all non-dot-prefixed directories and files in docsPath,
- * but keep .auth.json, .gitignore, _manifest.json, etc.
- */
+// keeps dotfiles and _prefixed files (.auth.json, _manifest.json, etc)
 function cleanDocs(docsPath) {
   if (!existsSync(docsPath)) return;
   for (const entry of readdirSync(docsPath)) {
@@ -44,9 +37,6 @@ function cleanDocs(docsPath) {
   }
 }
 
-/**
- * Walk all .md files in a directory tree.
- */
 function walkMd(dir) {
   const results = [];
   if (!existsSync(dir)) return results;
@@ -63,10 +53,6 @@ function walkMd(dir) {
   return results;
 }
 
-// ---------------------------------------------------------------------------
-// Link collection helpers
-// ---------------------------------------------------------------------------
-
 async function collectSidebarLinks(page, sectionUrl) {
   await page.goto(sectionUrl, { waitUntil: 'domcontentloaded', timeout: 15000 });
   await page.waitForTimeout(2000);
@@ -80,7 +66,6 @@ async function collectSidebarLinks(page, sectionUrl) {
     })).filter(l => l.href.includes('otris.software') && !l.href.includes('#'));
   });
 
-  // Deduplicate
   const seen = new Set();
   return links.filter(l => {
     if (seen.has(l.href)) return false;
@@ -145,10 +130,6 @@ async function collectBookSubPages(page, bookHref) {
   }, bookHref);
 }
 
-// ---------------------------------------------------------------------------
-// Section crawlers
-// ---------------------------------------------------------------------------
-
 async function crawlApiSection(page, section, docsPath, stats) {
   const sectionUrl = BASE_URL + section.urlPath;
   const sectionDir = join(docsPath, sanitize(section.name));
@@ -158,7 +139,6 @@ async function crawlApiSection(page, section, docsPath, stats) {
 
   const links = await collectSidebarLinks(page, sectionUrl);
 
-  // Always include the index page itself
   const allUrls = [{ text: section.name, href: sectionUrl }, ...links];
   const uniqueUrls = [...new Map(allUrls.map(l => [l.href, l])).values()];
   console.log(`  Found ${uniqueUrls.length} pages`);
@@ -166,7 +146,7 @@ async function crawlApiSection(page, section, docsPath, stats) {
   for (let i = 0; i < uniqueUrls.length; i++) {
     const link = uniqueUrls[i];
 
-    // Skip PDF URLs (would trigger download error)
+    // pdfs would trigger download instead of page load
     if (link.href.endsWith('.pdf')) {
       console.log(`  Skipping PDF: ${link.href}`);
       continue;
@@ -275,7 +255,7 @@ async function crawlManuals(page, authPath, docsPath, stats) {
     const pdfDir = join(manualsDir, 'PDFs');
     if (!existsSync(pdfDir)) mkdirSync(pdfDir, { recursive: true });
 
-    // Parse auth cookies from storageState for curl
+    // curl needs cookies as a string, not playwright's storageState
     const authData = JSON.parse(readFileSync(authPath, 'utf-8'));
     const cookieStr = authData.cookies.map(c => c.name + '=' + c.value).join('; ');
 
@@ -304,14 +284,12 @@ async function crawlManuals(page, authPath, docsPath, stats) {
       try {
         const subPages = await collectBookSubPages(page, book.href);
 
-        // Include the index page itself
         const allPages = [{ text: book.text, href: book.href }, ...subPages];
         const uniquePages = [...new Map(allPages.map(l => [l.href, l])).values()];
 
         for (let i = 0; i < uniquePages.length; i++) {
           const sp = uniquePages[i];
 
-          // Skip PDF links inside book pages
           if (sp.href.endsWith('.pdf')) continue;
 
           try {
@@ -341,10 +319,6 @@ async function crawlManuals(page, authPath, docsPath, stats) {
   }
 }
 
-// ---------------------------------------------------------------------------
-// Link conversion pass
-// ---------------------------------------------------------------------------
-
 function convertAllLinks(docsPath) {
   console.log('\n=== Converting Links ===');
   const fileIndex = buildFileIndex(docsPath);
@@ -364,10 +338,6 @@ function convertAllLinks(docsPath) {
   console.log(`  Converted links in ${converted} files (${mdFiles.length} total)`);
 }
 
-// ---------------------------------------------------------------------------
-// Manifest
-// ---------------------------------------------------------------------------
-
 function writeManifest(docsPath, stats) {
   const manifest = {
     crawledAt: new Date().toISOString(),
@@ -381,12 +351,7 @@ function writeManifest(docsPath, stats) {
   console.log(`Manifest written to ${getManifestPath()}`);
 }
 
-// ---------------------------------------------------------------------------
-// Main orchestrator
-// ---------------------------------------------------------------------------
-
 export async function runCrawl({ login, section }) {
-  // Step 1: Interactive login if requested
   if (login) {
     await loginInteractive();
     if (!section) {
@@ -395,27 +360,21 @@ export async function runCrawl({ login, section }) {
     }
   }
 
-  // Step 2: Load auth state
   const authPath = loadAuthState();
-
-  // Step 3: Load Playwright
   const { chromium } = await loadPlaywright();
 
   const docsPath = getDocsPath();
   if (!existsSync(docsPath)) mkdirSync(docsPath, { recursive: true });
 
-  // Step 4: Clean existing docs
   console.log(`Cleaning ${docsPath}...`);
   cleanDocs(docsPath);
 
-  // Step 5: Launch browser
   const browser = await chromium.launch();
   const context = await browser.newContext({ storageState: authPath });
   const page = await context.newPage();
 
   const stats = { pages: 0, pdfs: 0, errors: [], sections: [] };
 
-  // Determine which sections to crawl
   const sectionsToProcess = section
     ? SECTIONS.filter(s => s.id === section || s.name.toLowerCase() === section.toLowerCase())
     : SECTIONS;
@@ -427,7 +386,6 @@ export async function runCrawl({ login, section }) {
     return;
   }
 
-  // Step 6: Crawl each section
   for (const sec of sectionsToProcess) {
     stats.sections.push(sec.id);
     try {
@@ -462,16 +420,10 @@ export async function runCrawl({ login, section }) {
     }
   }
 
-  // Step 7: Close browser
   await browser.close();
-
-  // Step 8: Convert links
   convertAllLinks(docsPath);
-
-  // Step 9: Write manifest
   writeManifest(docsPath, stats);
 
-  // Summary
   console.log(`\n=== DONE ===`);
   console.log(`Total pages saved: ${stats.pages}`);
   console.log(`Errors: ${stats.errors.length}`);

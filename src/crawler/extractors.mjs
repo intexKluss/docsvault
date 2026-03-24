@@ -1,8 +1,3 @@
-/**
- * Content extractors for otris DOCUMENTS documentation pages.
- * Converts HTML content to Markdown using a Playwright page.evaluate() call.
- */
-
 export function getContentSelector(type) {
   const selectors = {
     'typedoc': '.col-content',
@@ -21,11 +16,7 @@ export function cleanMarkdown(text) {
     .trim();
 }
 
-/**
- * Build the self-contained evaluate function body.
- * page.evaluate() can't use closures, so we embed the primary selector
- * as a string literal inside the function.
- */
+// page.evaluate() can't use closures, so selector is passed as arg
 function buildEvaluateFn(primarySelector) {
   return function (sel) {
     const contentEl = document.querySelector(sel) ||
@@ -39,14 +30,13 @@ function buildEvaluateFn(primarySelector) {
     function toMarkdown(el) {
       let md = '';
       for (const node of el.childNodes) {
-        if (node.nodeType === 3) { // text
+        if (node.nodeType === 3) {
           const text = node.textContent;
           if (text.trim()) md += text;
-        } else if (node.nodeType === 1) { // element
+        } else if (node.nodeType === 1) {
           const tag = node.tagName.toLowerCase();
           const cls = typeof node.className === 'string' ? node.className : '';
 
-          // Skip irrelevant elements
           if (['script', 'style', 'nav', 'svg', 'wbr', 'button'].includes(tag)) continue;
           if (cls.includes('tsd-breadcrumb')) continue;
           if (cls.includes('tsd-anchor-icon')) continue;
@@ -72,15 +62,12 @@ function buildEvaluateFn(primarySelector) {
             const h = node.querySelector(':scope > h3');
             if (h) md += '\n### ' + h.innerText.trim() + '\n\n';
 
-            // Signature
             const sig = node.querySelector('.tsd-signature');
             if (sig) md += '`' + sig.innerText.trim().replace(/\n\s*/g, ' ') + '`\n\n';
 
-            // Description
             const desc = node.querySelector('.tsd-comment.tsd-typography');
             if (desc) md += desc.innerText.trim() + '\n\n';
 
-            // Parameters
             const params = node.querySelector('.tsd-parameters');
             if (params) {
               md += '**Parameters:**\n\n';
@@ -97,11 +84,9 @@ function buildEvaluateFn(primarySelector) {
               md += '\n';
             }
 
-            // Returns
             const retTitle = node.querySelector('.tsd-returns-title');
             if (retTitle) md += '**Returns:** ' + retTitle.innerText.replace('Returns', '').trim() + '\n\n';
 
-            // Since, See, Example, Deprecated — from tsd-comment sections
             const tagDivs = node.querySelectorAll('.tsd-tag-since, .tsd-tag-see, .tsd-tag-deprecated');
             tagDivs.forEach(td => {
               const h4 = td.querySelector('h4');
@@ -111,7 +96,6 @@ function buildEvaluateFn(primarySelector) {
               if (label && value) md += '**' + label + ':** ' + value + '\n\n';
             });
 
-            // Code examples (pre blocks)
             const pres = node.querySelectorAll('pre');
             pres.forEach(pre => {
               const codeEl = pre.querySelector('code');
@@ -123,17 +107,13 @@ function buildEvaluateFn(primarySelector) {
             continue;
           }
 
-          // Headings
           if (tag === 'h1') md += '\n# ' + node.innerText.trim() + '\n\n';
           else if (tag === 'h2') md += '\n## ' + node.innerText.trim() + '\n\n';
           else if (tag === 'h3') md += '\n### ' + node.innerText.trim() + '\n\n';
           else if (tag === 'h4') md += '\n#### ' + node.innerText.trim() + '\n\n';
           else if (tag === 'h5') md += '\n##### ' + node.innerText.trim() + '\n\n';
 
-          // Paragraphs
           else if (tag === 'p') md += toMarkdown(node) + '\n\n';
-
-          // Code
           else if (tag === 'pre') {
             const codeEl = node.querySelector('code');
             const lang = codeEl?.className?.replace(/.*language-(\w+).*/, '$1') || codeEl?.className || '';
@@ -145,7 +125,6 @@ function buildEvaluateFn(primarySelector) {
             md += '`' + node.textContent + '`';
           }
 
-          // Lists
           else if (tag === 'ul' || tag === 'ol') {
             const items = node.querySelectorAll(':scope > li');
             items.forEach((li, i) => {
@@ -155,7 +134,6 @@ function buildEvaluateFn(primarySelector) {
             md += '\n';
           }
 
-          // Tables
           else if (tag === 'table') {
             const rows = node.querySelectorAll('tr');
             rows.forEach((row, ri) => {
@@ -169,7 +147,6 @@ function buildEvaluateFn(primarySelector) {
             md += '\n';
           }
 
-          // Links
           else if (tag === 'a') {
             const href = node.getAttribute('href') || '';
             const text = node.textContent.trim();
@@ -177,20 +154,18 @@ function buildEvaluateFn(primarySelector) {
             else md += text;
           }
 
-          // Inline formatting
           else if (tag === 'strong' || tag === 'b') md += '**' + node.textContent.trim() + '**';
           else if (tag === 'em' || tag === 'i') md += '*' + node.textContent.trim() + '*';
           else if (tag === 'br') md += '\n';
           else if (tag === 'hr') md += '\n---\n\n';
 
-          // Images
           else if (tag === 'img') {
             const src = node.getAttribute('src') || '';
             const alt = node.getAttribute('alt') || '';
             if (src) md += `![${alt}](${src})`;
           }
 
-          // TypeDoc: accordion sections (Properties, Methods groups)
+          // typedoc accordion sections (Properties, Methods groups)
           else if (tag === 'details') {
             const summary = node.querySelector(':scope > summary');
             if (summary) md += '\n## ' + summary.innerText.trim() + '\n\n';
@@ -201,12 +176,9 @@ function buildEvaluateFn(primarySelector) {
             }
           }
           else if (tag === 'summary') { /* handled by details */ }
-
-          // Definition list
           else if (tag === 'dt') md += '\n**' + node.innerText.trim() + '**\n';
           else if (tag === 'dd') md += toMarkdown(node) + '\n\n';
 
-          // Container elements - recurse
           else if (['div', 'section', 'article', 'main', 'span', 'dl', 'figure', 'blockquote', 'header'].includes(tag)) {
             md += toMarkdown(node);
           }
@@ -219,7 +191,6 @@ function buildEvaluateFn(primarySelector) {
     const title = document.title || '';
     const content = toMarkdown(contentEl);
 
-    // Clean up excessive whitespace
     const cleaned = content
       .replace(/\n{4,}/g, '\n\n\n')
       .replace(/[ \t]+\n/g, '\n')
@@ -229,12 +200,6 @@ function buildEvaluateFn(primarySelector) {
   };
 }
 
-/**
- * Extract content from a Playwright page and convert to Markdown.
- * @param {import('playwright').Page} page - Playwright page object
- * @param {string} type - Doc type key (typedoc, jsdoc, otris-book, properties, manuals)
- * @returns {Promise<{title: string, content: string}>}
- */
 export async function extractFromPage(page, type) {
   const selector = getContentSelector(type);
   return page.evaluate(buildEvaluateFn(selector), selector);
