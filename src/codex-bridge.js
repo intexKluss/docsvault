@@ -37,7 +37,7 @@ export class CodexBridge {
     const id = randomUUID();    
     let destroyed = false;
     let warmedUp = false;
-    let warmingUp = false; // locking gegen parallele warmUp calls
+    let warmingUp = false;
     let activeAbort = null;
     let codex = new Codex({
       codexPathOverride: process.env.CODEX_PATH,

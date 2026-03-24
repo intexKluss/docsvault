@@ -76,7 +76,6 @@ export class ClaudeBridge {
         maxTurns: maxTurns || 6,
         abortController,
         resume,
-        // nicht ueberschreibbar:
         systemPrompt: SYSTEM_PROMPT,
         allowedTools: ALLOWED_TOOLS,
         disallowedTools: DISALLOWED_TOOLS,

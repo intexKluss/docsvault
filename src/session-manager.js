@@ -30,7 +30,6 @@ export class SessionManager {
     if (this.#sessions.size >= this.#config.maxSessions) {
       throw new Error('Max sessions reached');
     }
-    // platzhalter sofort setzen bevor async work startet
     const placeholder = { ready: false, destroyed: false };
     this.#sessions.set(clientId, placeholder);
 
