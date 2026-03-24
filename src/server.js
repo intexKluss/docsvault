@@ -1,4 +1,5 @@
 import { createServer as createHttpServer } from 'node:http';
+import { readFile, writeFile } from 'node:fs/promises';
 import { fileURLToPath } from 'node:url';
 import { dirname, join } from 'node:path';
 import { randomUUID } from 'node:crypto';
@@ -137,6 +138,11 @@ async function handleMessage(ws, manager, req, raw) {
     return;
   }
 
+  if (msg.type === 'report') {
+    await handleReport(ws, msg, req);
+    return;
+  }
+
   if (msg.type !== 'message') return;
 
   const ip = req.socket.remoteAddress || 'unknown';
@@ -176,6 +182,42 @@ async function handleMessage(ws, manager, req, raw) {
     if (ws.readyState === 1) {
       ws.send(JSON.stringify({ type: 'error', message: err.message }));
     }
+  }
+}
+
+// bug reports
+const REPORTS_PATH = join(__dirname, '..', 'reports.json');
+
+async function handleReport(ws, msg, req) {
+  const desc = typeof msg.description === 'string' ? msg.description.trim() : '';
+  if (!desc || desc.length > 5000) {
+    ws.send(JSON.stringify({ type: 'error', message: 'Ungültiger Bug-Report.' }));
+    return;
+  }
+
+  const report = {
+    timestamp: new Date().toISOString(),
+    description: desc,
+    chatContext: Array.isArray(msg.chatContext) ? msg.chatContext.slice(0, 10) : [],
+    clientId: ws.clientId,
+    ip: req.socket.remoteAddress || 'unknown',
+  };
+
+  try {
+    let reports = [];
+    try {
+      const data = await readFile(REPORTS_PATH, 'utf8');
+      reports = JSON.parse(data);
+    } catch {
+      // datei existiert noch nicht
+    }
+    reports.push(report);
+    await writeFile(REPORTS_PATH, JSON.stringify(reports, null, 2));
+    console.log(`[server] bug report saved (${reports.length} total)`);
+    ws.send(JSON.stringify({ type: 'report_saved' }));
+  } catch (err) {
+    console.error(`[server] report save error: ${err.message}`);
+    ws.send(JSON.stringify({ type: 'error', message: 'Report konnte nicht gespeichert werden.' }));
   }
 }
 

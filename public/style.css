@@ -462,6 +462,96 @@ body.landing #chat { display: none !important; }
   to { transform: rotate(360deg); }
 }
 
+/* overlay */
+
+.overlay {
+  position: fixed;
+  inset: 0;
+  background: rgba(0, 0, 0, 0.6);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  z-index: 100;
+  backdrop-filter: blur(2px);
+}
+
+.overlay.hidden {
+  display: none;
+}
+
+.overlay-box {
+  background: #222;
+  border: 1px solid #333;
+  border-radius: 12px;
+  padding: 24px;
+  width: 90%;
+  max-width: 480px;
+}
+
+.overlay-box h3 {
+  font-size: 16px;
+  font-weight: 600;
+  margin-bottom: 8px;
+}
+
+.overlay-desc {
+  font-size: 13px;
+  color: #888;
+  margin-bottom: 16px;
+}
+
+.overlay-box textarea {
+  width: 100%;
+  background: #1a1a1a;
+  border: 1px solid #333;
+  border-radius: 8px;
+  color: #e0e0e0;
+  font-family: inherit;
+  font-size: 14px;
+  padding: 10px 12px;
+  resize: vertical;
+  min-height: 80px;
+}
+
+.overlay-box textarea:focus {
+  outline: none;
+  border-color: #555;
+}
+
+.overlay-actions {
+  display: flex;
+  justify-content: flex-end;
+  gap: 8px;
+  margin-top: 16px;
+}
+
+.overlay-btn {
+  padding: 8px 16px;
+  border-radius: 8px;
+  font-size: 13px;
+  font-weight: 500;
+  transition: background 0.2s;
+}
+
+.overlay-btn:hover {
+  background: #2a2a2a;
+}
+
+.overlay-btn.primary {
+  background: #3b82f6;
+  color: #fff;
+}
+
+.overlay-btn.primary:hover {
+  background: #2563eb;
+}
+
+.overlay-btn.primary:disabled {
+  background: #333;
+  color: #666;
+  cursor: default;
+}
+
 .send-btn.stop-btn {
   background: #d66;
 }
@@ -475,6 +565,12 @@ body.landing #chat { display: none !important; }
 .msg-error {
   font-size: 14px;
   color: #d66;
+  padding: 8px 0;
+}
+
+.msg-system {
+  font-size: 13px;
+  color: #4caf50;
   padding: 8px 0;
 }
 

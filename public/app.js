@@ -32,6 +32,11 @@
   const chatSpeed = document.getElementById('chat-speed');
   const btnInstall = document.getElementById('btn-install');
   const btnNewChat = document.getElementById('btn-new-chat');
+  const btnReport = document.getElementById('btn-report');
+  const reportOverlay = document.getElementById('report-overlay');
+  const reportText = document.getElementById('report-text');
+  const reportSend = document.getElementById('report-send');
+  const reportCancel = document.getElementById('report-cancel');
   const sessionStatus = document.getElementById('session-status');
 
   // marked konfigurieren
@@ -128,6 +133,11 @@
         currentAiMsg = null;
         currentAiText = '';
         setInputEnabled(true);
+        break;
+
+      case 'report_saved':
+        closeReportOverlay();
+        appendSystemMessage('Bug-Report gespeichert. Danke!');
         break;
 
       case 'error':
@@ -400,6 +410,75 @@
   btnNewChat.addEventListener('click', function () {
     location.reload();
   });
+
+  // bug report
+  btnReport.addEventListener('click', function () {
+    openReportOverlay();
+  });
+
+  reportCancel.addEventListener('click', function () {
+    closeReportOverlay();
+  });
+
+  reportSend.addEventListener('click', function () {
+    submitReport();
+  });
+
+  reportText.addEventListener('input', function () {
+    reportSend.disabled = !this.value.trim();
+  });
+
+  reportOverlay.addEventListener('click', function (e) {
+    if (e.target === reportOverlay) closeReportOverlay();
+  });
+
+  function openReportOverlay() {
+    reportText.value = '';
+    reportSend.disabled = true;
+    reportOverlay.classList.remove('hidden');
+    reportText.focus();
+  }
+
+  function closeReportOverlay() {
+    reportOverlay.classList.add('hidden');
+  }
+
+  function submitReport() {
+    var desc = reportText.value.trim();
+    if (!desc || !ws || ws.readyState !== WebSocket.OPEN) return;
+
+    // chat-verlauf als kontext sammeln
+    var context = [];
+    messagesEl.querySelectorAll('.msg-wrap').forEach(function (wrap) {
+      var bubble = wrap.querySelector('.msg-bubble');
+      var content = wrap.querySelector('.msg-content');
+      if (bubble) {
+        context.push({ role: 'user', text: bubble.textContent });
+      } else if (content) {
+        context.push({ role: 'assistant', text: content.textContent.substring(0, 500) });
+      }
+    });
+
+    ws.send(JSON.stringify({
+      type: 'report',
+      description: desc,
+      chatContext: context.slice(-10), // letzte 10 nachrichten
+    }));
+
+    reportSend.disabled = true;
+  }
+
+  // system-nachricht (nicht fehler, nicht ai)
+  function appendSystemMessage(text) {
+    var wrap = document.createElement('div');
+    wrap.className = 'msg-wrap';
+    var msg = document.createElement('div');
+    msg.className = 'msg-system';
+    msg.textContent = text;
+    wrap.appendChild(msg);
+    messagesEl.appendChild(wrap);
+    scrollToBottom();
+  }
 
   // verbindung starten
   connect();
