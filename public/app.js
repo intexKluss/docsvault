@@ -45,6 +45,27 @@
     breaks: true,
   });
 
+  // zufaellige texte
+  var PLACEHOLDERS = [
+    'Wo stehst du auf dem Schlauch?',
+    'Was moechtest du wissen?',
+    'Wie kann ich helfen?',
+    'Stell mir eine Frage zur Doku...',
+    'Was suchst du in der Dokumentation?',
+    'Wobei brauchst du Hilfe?',
+  ];
+
+  var INIT_MESSAGES = [
+    'Wir richten alles fuer dich ein...',
+    'Einen kleinen Moment noch...',
+    'Wird alles vorbereitet...',
+    'Gleich kann es losgehen...',
+  ];
+
+  function randomFrom(arr) {
+    return arr[Math.floor(Math.random() * arr.length)];
+  }
+
   // zustand
   let ws = null;
   let isChat = false;
@@ -78,7 +99,7 @@
 
     ws.onclose = function () {
       if (isChat) {
-        appendError('Verbindung verloren. Bitte Seite neu laden.');
+        appendError('Die Verbindung wurde unterbrochen. Lade die Seite einfach neu.');
       }
     };
 
@@ -89,11 +110,11 @@
   function handleEvent(msg) {
     switch (msg.type) {
       case 'session_init':
-        // session wird gerade erstellt - status anzeigen
         sessionReady = false;
         if (sessionStatus) {
           sessionStatus.classList.remove('ready');
           sessionStatus.classList.add('loading');
+          sessionStatus.querySelector('span').textContent = randomFrom(INIT_MESSAGES);
         }
         break;
 
@@ -110,6 +131,7 @@
           }, 1500);
         }
         landingInput.disabled = false;
+        landingInput.placeholder = randomFrom(PLACEHOLDERS);
         landingInput.focus();
         break;
 
@@ -146,7 +168,7 @@
         break;
 
       case 'busy':
-        appendError(msg.message || 'Bitte warte, bis die aktuelle Anfrage abgeschlossen ist.');
+        appendError(msg.message || 'Einen Moment noch — ich arbeite noch an deiner letzten Frage.');
         setInputEnabled(true);
         break;
     }

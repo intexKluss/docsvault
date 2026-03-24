@@ -74,7 +74,7 @@ export class SessionManager {
     }
     entry.count++;
     if (entry.count > this.#config.rateLimitPerMin) {
-      throw new Error('Rate limit erreicht. Bitte warte kurz.');
+      throw new Error('Du bist gerade etwas zu schnell unterwegs. Warte einen Moment.');
     }
   }
 

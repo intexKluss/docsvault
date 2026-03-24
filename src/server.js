@@ -90,7 +90,7 @@ export async function createServer(opts = {}) {
     }).catch((err) => {
       console.error(`[server] warm-up failed for ${clientId}: ${err.message}`);
       if (ws.readyState === 1) {
-        ws.send(JSON.stringify({ type: 'error', message: 'Session konnte nicht erstellt werden. Bitte Seite neu laden.' }));
+        ws.send(JSON.stringify({ type: 'error', message: 'Da ist leider etwas schiefgelaufen. Lade die Seite einfach neu.' }));
       }
     });
 
@@ -163,7 +163,7 @@ async function handleMessage(ws, manager, req, raw) {
 
   const session = manager.getSession(ws.clientId);
   if (!session || !session.ready) {
-    ws.send(JSON.stringify({ type: 'error', message: 'Session wird noch eingerichtet. Bitte kurz warten.' }));
+    ws.send(JSON.stringify({ type: 'error', message: 'Gleich gehts los — wird noch vorbereitet.' }));
     return;
   }
 
