@@ -15,13 +15,13 @@ const BRIDGE_MODE = process.env.BRIDGE || 'claude';
 
 async function loadBridge() {
   if (BRIDGE_MODE === 'codex') {
-    const { CodexBridge } = await import('./openai-bridge.js');
+    const { CodexBridge } = await import('./codex-bridge.js');
     console.log(`[server] bridge: codex (OpenAI Codex SDK)`);
     return new CodexBridge();
   }
-  const { CodexBridge } = await import('./codex-bridge.js');
+  const { ClaudeBridge } = await import('./claude-bridge.js');
   console.log(`[server] bridge: claude (Claude Agent SDK)`);
-  return new CodexBridge();
+  return new ClaudeBridge();
 }
 
 export async function createServer(opts = {}) {
