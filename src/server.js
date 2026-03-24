@@ -7,6 +7,7 @@ import express from 'express';
 import { WebSocketServer } from 'ws';
 import { SessionManager } from './session-manager.js';
 import { handleSseGet, handleSsePost, handleStreamablePost, initStreamableHttp } from './mcp-handler.js';
+import { createApiRouter } from './api-routes.js';
 
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = dirname(__filename);
@@ -55,6 +56,9 @@ export async function createServer(opts = {}) {
     );
     next();
   });
+
+  // REST API for remote MCP clients
+  app.use(createApiRouter(VAULT_PATH));
 
   // MCP remote endpoint — SSE transport
   app.get('/sse', (req, res) => {
