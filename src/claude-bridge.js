@@ -198,7 +198,9 @@ export class ClaudeBridge {
           const elapsed = ((Date.now() - startTime) / 1000).toFixed(1);
           console.log(`[claude-sdk] fertig in ${elapsed}s`);
 
-          yield { type: 'done' };
+          if (!abort.signal.aborted) {
+            yield { type: 'done' };
+          }
         } catch (err) {
           if (toolRunning) {
             yield { type: 'tool_use', tool: currentToolName, status: 'done' };

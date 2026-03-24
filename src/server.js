@@ -38,8 +38,20 @@ export async function createServer(opts = {}) {
 
   // trust proxy fuer korrekte IP hinter reverse proxy
   if (process.env.TRUST_PROXY) {
-    app.set('trust proxy', process.env.TRUST_PROXY);
+    const val = process.env.TRUST_PROXY;
+    if (['loopback', '1', 'true'].includes(val)) {
+      app.set('trust proxy', val === 'true' ? 'loopback' : val);
+    } else {
+      app.set('trust proxy', val);
+    }
   }
+
+  app.use((req, res, next) => {
+    res.setHeader('Content-Security-Policy',
+      "default-src 'self'; script-src 'self' cdnjs.cloudflare.com; style-src 'self' cdnjs.cloudflare.com 'unsafe-inline'; img-src 'self' data:; connect-src 'self' ws: wss:; font-src 'self' cdnjs.cloudflare.com"
+    );
+    next();
+  });
 
   app.use(express.static(join(__dirname, '..', 'public')));
 
@@ -146,9 +158,11 @@ async function processQueue(ws, manager, req) {
 
 // IP ermitteln (proxy-aware)
 function getClientIp(req) {
-  // express req.ip respektiert trust proxy
-  if (req.ip) return req.ip;
-  return req.socket.remoteAddress || 'unknown';
+  if (process.env.TRUST_PROXY) {
+    const xff = req.headers['x-forwarded-for'];
+    if (xff) return xff.split(',')[0].trim();
+  }
+  return req.socket?.remoteAddress || 'unknown';
 }
 
 async function handleMessage(ws, manager, req, raw) {
@@ -160,24 +174,30 @@ async function handleMessage(ws, manager, req, raw) {
     return;
   }
 
+  const ip = getClientIp(req);
+
   if (msg.type === 'report') {
+    try {
+      manager.checkRateLimit(ip);
+    } catch (err) {
+      ws.send(JSON.stringify({ type: 'error', message: err.message }));
+      return;
+    }
     await handleReport(ws, msg);
     return;
   }
 
   if (msg.type !== 'message') return;
 
-  const ip = getClientIp(req);
-
   try {
-    manager.checkRateLimit(ip);
+    manager.validateMessage(msg.content);
   } catch (err) {
     ws.send(JSON.stringify({ type: 'error', message: err.message }));
     return;
   }
 
   try {
-    manager.validateMessage(msg.content);
+    manager.checkRateLimit(ip);
   } catch (err) {
     ws.send(JSON.stringify({ type: 'error', message: err.message }));
     return;
@@ -198,8 +218,8 @@ async function handleMessage(ws, manager, req, raw) {
   } catch (err) {
     console.error(`[server] query error: ${err.message}`);
     if (ws.readyState === 1) {
-      // generische fehlermeldung, keine internen details leaken
       ws.send(JSON.stringify({ type: 'error', message: 'Fehler bei der Verarbeitung. Bitte versuche es erneut.' }));
+      ws.send(JSON.stringify({ type: 'done' }));
     }
   }
 }

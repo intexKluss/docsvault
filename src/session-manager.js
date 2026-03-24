@@ -40,7 +40,11 @@ export class SessionManager {
       await session.warmUp();
       return session;
     } catch (err) {
+      const session = this.#sessions.get(clientId);
       this.#sessions.delete(clientId);
+      if (session?.destroy) {
+        try { await session.destroy(); } catch {}
+      }
       throw err;
     }
   }

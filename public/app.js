@@ -73,6 +73,8 @@
   let currentAiMsg = null;
   let currentAiText = '';
   let isProcessing = false;
+  let cancelled = false;
+  let messageId = 0;
 
   let textBuffer = '';
   let typewriterTimer = null;
@@ -108,11 +110,13 @@
 
   function handleEvent(msg) {
     if (!msg || typeof msg.type !== 'string') return;
+    if (cancelled) return;
 
     switch (msg.type) {
       case 'session_init':
         sessionReady = false;
         if (sessionStatus) {
+          sessionStatus.classList.remove('hidden');
           sessionStatus.classList.remove('ready');
           sessionStatus.classList.add('loading');
           sessionStatus.querySelector('span').textContent = randomFrom(INIT_MESSAGES);
@@ -121,6 +125,8 @@
 
       case 'session_ready':
         sessionReady = true;
+        cancelled = false;
+        if (isChat) setInputEnabled(true);
         if (sessionStatus) {
           sessionStatus.classList.remove('loading');
           sessionStatus.classList.add('ready');
@@ -155,7 +161,7 @@
         break;
 
       case 'done':
-        finishResponse();
+        finishResponse(messageId);
         break;
 
       case 'report_saved':
@@ -164,14 +170,14 @@
         break;
 
       case 'error':
+        flushTypewriter();
         appendError(typeof msg.message === 'string' ? msg.message : 'Unbekannter Fehler');
+        currentAiMsg = null;
+        currentAiText = '';
+        textBuffer = '';
         setInputEnabled(true);
         break;
 
-      case 'busy':
-        appendError(msg.message || 'Einen Moment noch — ich arbeite noch an deiner letzten Frage.');
-        setInputEnabled(true);
-        break;
     }
   }
 
@@ -188,16 +194,15 @@
     const mode = getActiveSpeed().dataset.mode;
     ws.send(JSON.stringify({ type: 'message', content: text, mode: mode }));
 
-    currentAiMsg = appendAiMessage();
+    messageId++;
+    currentAiMsg = null;
     currentAiText = '';
-    getToolBlock(currentAiMsg);
     userScrolledUp = false;
     scrollToBottom();
 
     setInputEnabled(false);
     chatInput.value = '';
     autoResize(chatInput);
-    chatInput.focus();
   }
 
   function switchToChat() {
@@ -260,23 +265,29 @@
     }
   }
 
-  let finishAttempts = 0;
-  function finishResponse() {
-    if ((textBuffer.length > 0 || typewriterTimer) && finishAttempts++ < 200) {
-      setTimeout(finishResponse, 50);
-      return;
-    }
-    // safety-net: force flush wenn timeout
-    if (textBuffer.length > 0) flushTypewriter();
-    finishAttempts = 0;
+  function finishResponse(msgId) {
+    var attempts = 0;
+    function tryFinish() {
+      if (msgId !== messageId) return;
+      if ((textBuffer.length > 0 || typewriterTimer) && attempts++ < 200) {
+        setTimeout(tryFinish, 50);
+        return;
+      }
+      if (textBuffer.length > 0) flushTypewriter();
 
-    if (currentAiMsg) {
-      finalizeToolBlock(currentAiMsg);
-      highlightCodeBlocks(currentAiMsg);
+      if (currentAiMsg) {
+        if (!currentAiText && !currentAiMsg.querySelector('.tool-block')) {
+          currentAiMsg.remove();
+        } else {
+          finalizeToolBlock(currentAiMsg);
+          highlightCodeBlocks(currentAiMsg);
+        }
+      }
+      currentAiMsg = null;
+      currentAiText = '';
+      setInputEnabled(true);
     }
-    currentAiMsg = null;
-    currentAiText = '';
-    setInputEnabled(true);
+    tryFinish();
   }
 
   function renderAiContent() {
@@ -446,6 +457,9 @@
     isProcessing = !enabled;
     chatInput.disabled = !enabled;
     updateChatSendButton();
+    if (enabled && isChat) {
+      chatInput.focus();
+    }
   }
 
   function updateChatSendButton() {
@@ -462,9 +476,10 @@
 
   function cancelRequest() {
     if (!isProcessing) return;
+    cancelled = true;
+    messageId++;
     flushTypewriter();
     if (currentAiMsg) {
-      // richtige klasse: .tool-detail (nicht .tool-indicator)
       currentAiMsg.querySelectorAll('.tool-detail.running').forEach(function (el) {
         el.className = 'tool-detail done';
         el.innerHTML = SVG_CHECK + '<span>Abgebrochen</span>';
@@ -475,12 +490,11 @@
     }
     currentAiMsg = null;
     currentAiText = '';
+    textBuffer = '';
     if (ws) {
-      ws.onmessage = null;
       ws.onclose = null;
       ws.close();
     }
-    setInputEnabled(true);
     sessionReady = false;
     connect();
   }

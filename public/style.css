@@ -44,11 +44,6 @@ button {
   margin-bottom: 28px;
 }
 
-.logo-svg {
-  width: 64px;
-  height: 64px;
-}
-
 .logo-img {
   width: 80px;
   height: 80px;
@@ -307,11 +302,6 @@ body.landing #chat { display: none !important; }
   display: flex;
   align-items: center;
   gap: 10px;
-}
-
-.header-logo {
-  width: 28px;
-  height: 28px;
 }
 
 .header-logo-img {

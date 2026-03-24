@@ -56,15 +56,24 @@ export class CodexBridge {
         console.log(`[codex-sdk] warming up session ${id}...`);
         const startTime = Date.now();
 
+        const abort = new AbortController();
+        activeAbort = abort;
+
         try {
           await thread.run(SYSTEM_PROMPT + '\n\nAntworte nur mit: Bereit.');
+          if (destroyed) return;
           warmedUp = true;
           const elapsed = ((Date.now() - startTime) / 1000).toFixed(1);
           console.log(`[codex-sdk] warm-up fertig in ${elapsed}s, thread=${thread.id}`);
         } catch (err) {
+          if (abort.signal.aborted) {
+            console.log(`[codex-sdk] warm-up abgebrochen`);
+            return;
+          }
           console.error(`[codex-sdk] warm-up error: ${err.message}`);
           throw err;
         } finally {
+          activeAbort = null;
           warmingUp = false;
         }
       },
@@ -87,7 +96,7 @@ export class CodexBridge {
         activeAbort = abort;
         let toolRunning = false;
         let currentToolName = null;
-        let pendingMessages = [];
+        let lastMessage = null;
 
         try {
           const { events } = await thread.runStreamed(fullPrompt, {
@@ -95,7 +104,7 @@ export class CodexBridge {
           });
 
           for await (const event of events) {
-            if (abort.signal.aborted) break;
+            if (destroyed || abort.signal.aborted) break;
 
             if (event.type === 'item.started' && event.item.type === 'mcp_tool_call') {
               toolRunning = true;
@@ -115,22 +124,24 @@ export class CodexBridge {
                 yield { type: 'tool_use', tool: currentToolName, status: 'done' };
                 toolRunning = false;
               }
-              pendingMessages.push(event.item.text);
+              lastMessage = event.item.text;
             }
 
             if (event.type === 'turn.completed') {
-              if (pendingMessages.length > 0) {
-                yield { type: 'chunk', content: pendingMessages[pendingMessages.length - 1] };
-                pendingMessages = [];
+              if (lastMessage) {
+                yield { type: 'chunk', content: lastMessage };
+                lastMessage = null;
               }
             }
 
             if (event.type === 'error') {
-              yield { type: 'error', message: event.message || 'Unbekannter Fehler' };
+              console.error('[codex] Error:', event.message);
+              yield { type: 'error', message: 'Fehler bei der Verarbeitung. Bitte versuche es erneut.' };
             }
 
             if (event.type === 'turn.failed') {
-              yield { type: 'error', message: event.error?.message || 'Anfrage fehlgeschlagen' };
+              console.error('[codex] Turn failed:', event.error?.message);
+              yield { type: 'error', message: 'Anfrage fehlgeschlagen. Bitte versuche es erneut.' };
             }
           }
 
@@ -154,6 +165,10 @@ export class CodexBridge {
           yield { type: 'error', message: 'Fehler bei der Verarbeitung. Bitte versuche es erneut.' };
         } finally {
           activeAbort = null;
+          if (destroyed) {
+            thread = null;
+            codex = null;
+          }
         }
       },
 
@@ -163,8 +178,6 @@ export class CodexBridge {
         }
         destroyed = true;
         warmedUp = false;
-        thread = null;
-        codex = null;
         console.log(`[codex-sdk] session ${id} destroyed`);
       }
     };
