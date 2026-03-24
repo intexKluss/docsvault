@@ -31,9 +31,12 @@ VERHALTEN:
 
 const MCP_CWD = process.env.MCP_CWD || resolve(__dirname, '..');
 
+const MCP_PORT = process.env.PORT || '3000';
+const MCP_SSE_URL = process.env.MCP_SSE_URL || `http://localhost:${MCP_PORT}/sse`;
+
 const MCP_SERVERS = {
   'otris-docs': {
-    url: 'http://localhost:3000/sse',
+    url: MCP_SSE_URL,
   }
 };
 

@@ -66,7 +66,9 @@ export class CodexBridge {
         activeAbort = abort;
 
         try {
-          await thread.run(SYSTEM_PROMPT + '\n\nAntworte nur mit: Bereit.');
+          await thread.run(SYSTEM_PROMPT + '\n\nAntworte nur mit: Bereit.', {
+            signal: abort.signal,
+          });
           if (destroyed) return;
           warmedUp = true;
           const elapsed = ((Date.now() - startTime) / 1000).toFixed(1);

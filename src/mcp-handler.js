@@ -66,9 +66,13 @@ export async function handleSseGet(req, res, vaultPath) {
 
 export async function handleSsePost(req, res) {
   const sessionId = req.query.sessionId;
+  if (!sessionId || typeof sessionId !== 'string') {
+    res.status(400).json({ error: 'Missing sessionId parameter' });
+    return;
+  }
   const transport = sseSessions.get(sessionId);
   if (!transport) {
-    res.status(400).json({ error: 'No active SSE session for sessionId: ' + sessionId });
+    res.status(400).json({ error: 'No active SSE session' });
     return;
   }
   await transport.handlePostMessage(req, res);
