@@ -136,9 +136,13 @@ button {
 .chat-input {
   position: sticky;
   bottom: 0;
-  padding: 32px 16px 20px;
-  background: linear-gradient(transparent, #1a1a1a 60%);
+  padding: 40px 16px 20px;
   margin: 0 auto;
+  -webkit-backdrop-filter: blur(16px);
+  backdrop-filter: blur(16px);
+  background: linear-gradient(transparent, rgba(26, 26, 26, 0.85) 50%);
+  mask-image: linear-gradient(transparent, black 35%);
+  -webkit-mask-image: linear-gradient(transparent, black 35%);
 }
 
 .input-box {
