@@ -54,7 +54,8 @@ Neue Datei `src/mcp-handler.js`: Erstellt einen `McpServer` (aus `@modelcontextp
 Neue Routen in `server.js`:
 
 - **`GET /sse`** — SSE-Transport via `SSEServerTransport` (aus `@modelcontextprotocol/sdk/server/sse.js`). Deprecated aber breit unterstuetzt.
-- **`POST /message`** — Streamable HTTP via `StreamableHTTPServerTransport` (aus `@modelcontextprotocol/sdk/server/streamableHttp.js`, falls verfuegbar).
+- **`POST /messages`** — SSE Message-Handler (POST-Endpunkt fuer SSE-Clients, Pfad wird vom SSE-Transport vorgegeben).
+- **`POST /mcp`** — Streamable HTTP via `StreamableHTTPServerTransport` (aus `@modelcontextprotocol/sdk/server/streamableHttp.js`, stateless mode).
 
 Beide Endpunkte stellen dieselben 5 Tools bereit:
 - `otris_search` — Volltext-Suche im Vault
