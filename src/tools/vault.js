@@ -8,10 +8,6 @@ function isInsideVault(vaultPath, targetPath) {
   return resolvedTarget.startsWith(resolvedVault + sep) || resolvedTarget === resolvedVault;
 }
 
-/**
- * Returns array of section directory names in vault root.
- * Excludes dotfiles and underscore-prefixed entries.
- */
 export function getSections(vaultPath) {
   try {
     return readdirSync(vaultPath, { withFileTypes: true })
@@ -23,11 +19,6 @@ export function getSections(vaultPath) {
   }
 }
 
-/**
- * Recursively finds all .md files in a section (or subfolder).
- * Returns [{ name, path }] sorted by name.
- * path is relative to vault root without .md extension, using forward slashes.
- */
 export function listFiles(vaultPath, section, subfolder) {
   const searchDir = subfolder
     ? join(vaultPath, section, subfolder)
@@ -61,10 +52,6 @@ function collectMdFiles(dir, vaultRoot, results) {
   }
 }
 
-/**
- * Reads a doc file, parses YAML frontmatter.
- * Returns { title, source, content, truncated } or null if not found.
- */
 export function readDoc(vaultPath, docPath, maxLength = 50000) {
   const filePath = join(vaultPath, docPath + '.md');
 
@@ -113,11 +100,7 @@ function parseFrontmatter(raw) {
   return { frontmatter, body };
 }
 
-/**
- * Full-text search across vault .md files.
- * Tries ripgrep first, falls back to Node.js regex grep.
- * Returns [{ file, title, matches }].
- */
+// tries ripgrep first, falls back to node regex
 export function searchDocs(vaultPath, query, options = {}) {
   const { section, contextLines = 2, maxResults = 10 } = options;
   const searchPath = section ? join(vaultPath, section) : vaultPath;
@@ -146,7 +129,6 @@ function searchWithRipgrep(vaultPath, searchPath, query, contextLines, maxResult
     if (err.status === 1 && err.stdout !== undefined) {
       return [];
     }
-    // rg not found or other error
     throw err;
   }
 
@@ -171,7 +153,6 @@ function parseRipgrepOutput(vaultPath, output) {
     const relPath = relative(vaultPath, absPath).replace(/\.md$/, '').split(sep).join('/');
 
     if (!fileGroups.has(relPath)) {
-      // Read title from frontmatter
       const doc = readDoc(vaultPath, relPath);
       fileGroups.set(relPath, {
         file: relPath,
@@ -203,7 +184,6 @@ function searchWithNode(vaultPath, searchPath, query, contextLines, maxResults) 
 
     for (let i = 0; i < lines.length; i++) {
       if (regex.test(lines[i])) {
-        // Gather context
         const start = Math.max(0, i - contextLines);
         const end = Math.min(lines.length - 1, i + contextLines);
         for (let j = start; j <= end; j++) {
@@ -245,10 +225,6 @@ function escapeRegex(str) {
   return str.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
 }
 
-/**
- * Reads _manifest.json from vault root.
- * Returns parsed JSON or null.
- */
 export function getManifest(vaultPath) {
   const manifestPath = join(vaultPath, '_manifest.json');
   try {
