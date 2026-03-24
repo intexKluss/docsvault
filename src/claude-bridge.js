@@ -1,6 +1,6 @@
 import { randomUUID } from 'node:crypto';
 import { query } from '@anthropic-ai/claude-agent-sdk';
-import { dirname, resolve } from 'node:path';
+import { dirname, join, resolve } from 'node:path';
 import { fileURLToPath } from 'node:url';
 
 const __filename = fileURLToPath(import.meta.url);
@@ -33,7 +33,7 @@ const MCP_CWD = process.env.MCP_CWD || resolve(__dirname, '..');
 
 const MCP_SERVERS = {
   'otris-docs': {
-    command: 'otris-docs-mcp',
+    command: join(__dirname, '..', 'node_modules', '.bin', 'otris-docs-mcp'),
   }
 };
 
