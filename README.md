@@ -1,73 +1,72 @@
 # otris docs web
 
-Web-Chat UI für die otris DOCUMENTS Dokumentation. Nutzt Codex CLI mit der otris-docs-mcp im Hintergrund.
+Web-Chat UI und MCP-Server fuer die otris DOCUMENTS Dokumentation. Nutzt Claude Agent SDK oder OpenAI Codex SDK als AI-Backend. Die Dokumentation (995 Markdown-Seiten) ist im Vault enthalten und wird im Docker-Image gebacken.
 
-## Voraussetzungen
+## Features
 
-- Node.js >= 20
-- [Codex CLI](https://github.com/openai/codex) mit ChatGPT Business Login
-- [otris-docs-mcp](https://github.com/leminkozey/otris-docs-mcp) global installiert
+- **Web-Chat**: Landing Page + Chat-UI mit Typewriter-Effekt, Tool-Fortschrittsanzeige, Speed-Toggle
+- **MCP-Endpoints**: SSE (`/sse`) und Streamable HTTP (`/mcp`) fuer externe MCP-Clients
+- **REST API**: `/api/search`, `/api/read`, `/api/list`, `/api/overview`, `/api/status`
+- **Bridge-Switching**: Claude oder Codex per `BRIDGE` ENV Variable
+- **Sicherheit**: Rate Limiting, Origin-Validation, DOMPurify, Tool-Whitelisting, Prompt-Injection-Schutz
 
-## Setup
+## Quick Start
 
 ```bash
-git clone https://github.com/intexKluss/otris-docs-web.git
-cd otris-docs-web
-git submodule update --init
 npm install
+npm run dev           # Claude Bridge (default)
+npm run dev:codex     # Codex Bridge
 ```
 
-### Codex CLI einloggen
+## Deployment (Docker)
 
 ```bash
-codex
-# → "Sign in with ChatGPT" auswählen
+docker build -t otris-docs .
+docker run -d \
+  --name otris-docs \
+  --restart unless-stopped \
+  -p 3000:3000 \
+  -e BRIDGE=codex \
+  -e ALLOWED_ORIGINS=http://SERVER-IP:3000 \
+  -e ALLOW_NO_ORIGIN=true \
+  otris-docs
 ```
 
-### MCP konfigurieren
+Siehe [INSTALL-SERVER.md](INSTALL-SERVER.md) fuer Details.
 
-In `~/.codex/config.toml`:
+## Fuer Entwickler (MCP-Client)
 
-```toml
-[mcp_servers.otris-docs]
-command = "otris-docs-mcp"
+Verbinde deinen Coding-Agent per MCP mit dem Server:
+
+```json
+{
+  "mcpServers": {
+    "otris-docs": {
+      "url": "http://SERVER-IP:3000/sse"
+    }
+  }
+}
 ```
 
-## Starten
+Siehe [INSTALL-DEVELOPER.md](INSTALL-DEVELOPER.md) fuer alle Optionen.
+
+## Vault aktualisieren
+
+Der Crawler braucht Playwright (Mac, nicht Docker):
 
 ```bash
-npm start
+npm run crawl:login   # Einmalig: Browser-Login
+npm run crawl         # Vault aktualisieren
 ```
 
-Oder mit pm2:
-
-```bash
-pm2 start src/server.js --name otris-docs-web
-```
-
-## Umgebungsvariablen
-
-| Variable | Default | Beschreibung |
-|---|---|---|
-| `PORT` | 3000 | Server-Port |
-| `MAX_SESSIONS` | 50 | Max. gleichzeitige Chat-Sessions |
-| `SESSION_TIMEOUT_MIN` | 30 | Inaktivitäts-Timeout in Minuten |
-| `RATE_LIMIT_PER_MIN` | 10 | Max. Nachrichten pro Minute pro IP |
-| `MAX_MESSAGE_LENGTH` | 2000 | Max. Zeichen pro Nachricht |
-
-## Architektur
-
-```
-Browser
-  │ WebSocket
-Node.js Server (Express)
-  ├── Session Manager (1 Session pro Chat)
-  ├── Codex CLI Sessions (@openai/codex-sdk)
-  └── otris-docs-mcp (Dokumentationssuche)
-```
+Siehe [UPDATE-VAULT.md](UPDATE-VAULT.md) fuer Details.
 
 ## Tests
 
 ```bash
 npm test
 ```
+
+## Architektur
+
+Siehe [ARCHITECTURE.md](ARCHITECTURE.md).
