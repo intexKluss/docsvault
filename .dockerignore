@@ -6,3 +6,8 @@ reports.json
 README.md
 ARCHITECTURE.md
 CLAUDE.md
+src/crawler/
+crawl.mjs
+INSTALL-SERVER.md
+INSTALL-DEVELOPER.md
+UPDATE-VAULT.md

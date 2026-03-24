@@ -11,6 +11,8 @@
     "dev": "node --watch src/server.js",
     "dev:codex": "BRIDGE=codex node --watch src/server.js",
     "dev:claude": "BRIDGE=claude node --watch src/server.js",
+    "crawl": "node crawl.mjs",
+    "crawl:login": "node crawl.mjs --login",
     "test": "node --test"
   },
   "dependencies": {
@@ -18,7 +20,10 @@
     "@modelcontextprotocol/sdk": "^1.27.0",
     "@openai/codex-sdk": "^0.116.0",
     "express": "^5.1.0",
-"ws": "^8.18.0",
+    "ws": "^8.18.0",
     "zod": "^3.23.0"
+  },
+  "devDependencies": {
+    "playwright": "^1.49.0"
   }
 }
