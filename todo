@@ -1,0 +1,14 @@
+wenn man zu oft versucht eine antwort zu bekommen die nicht zum thema orits gehöhren soll der agent die möglichkeit haben die verbindung abzubrechen und den user per ip auf einen timeout setzen das siehtman dann auf der landing mit einer sicheheitswarung das man für x min gespert ist und wennd as noch öferts geschiet dann immer höher setzen
+
+da es bald vom entwicklerteam getestet wird soll eine fedback dierekt eingebaut sein. man drückt auf bug reporten und dann kann man reinschreiben was genau passiert ist so das ich es später reviewen kann.
+
+wenn man lange in einer session ist soll ein popup kommen mit du kannst es fpr dich selber installieren schau dir dsazu die doku an es geht auch ganz schnell!
+das soll auch zeigen das vorteile es gibt wenn man es selber für sich installiert. 
+
+wenn man auch lange in einer ist soll es auch einen timeour geben mit limit erreicht. der aktuellen session. (optional wenn das die wollen( die entwickler entscheiden ob das eingebaut werden soll))
+
+doku zum installieren überprüfen 
+
+error nachrichten die an den user gehen sollen mehr menschlicher und nicht so hart sein wie session wird eingerichtet zu wir richten alles für sie ein.. einen moment.. 
+
+und von wie kann ich dir helfen wo stehst du auf den schlauch usw also vermenshclichte sachen UND ansich unterschiedliceh nachrichten die immer radnom sind
