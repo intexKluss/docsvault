@@ -427,34 +427,101 @@ body.landing #chat { display: none !important; }
   font-weight: 600;
 }
 
-/* tool indicator */
+/* tool block */
 
-.tool-indicator {
+.tool-block {
+  margin-bottom: 8px;
+  border-radius: 8px;
+  background: #1e1e1e;
+  overflow: hidden;
+}
+
+.tool-block-header {
   display: flex;
   align-items: center;
   gap: 8px;
-  padding: 8px 0;
+  padding: 10px 12px;
   font-size: 13px;
-  color: #888;
+  color: #aaa;
+  cursor: pointer;
+  user-select: none;
 }
 
-.tool-indicator svg {
+.tool-block-header:hover {
+  background: #252525;
+}
+
+.tool-block-header svg {
   width: 16px;
   height: 16px;
   flex-shrink: 0;
 }
 
-.tool-indicator.running svg {
+.tool-block-header > svg:first-child {
   animation: spin 1.5s linear infinite;
   color: #7c9dd6;
 }
 
-.tool-indicator.done svg {
+.tool-block.finished .tool-block-header > svg:first-child {
+  animation: none;
   color: #5a9a5a;
 }
 
-.tool-indicator.done {
+.tool-block-label {
+  flex: 1;
+}
+
+.tool-block-chevron {
+  display: flex;
+  transition: transform 0.2s;
+}
+
+.tool-block-chevron svg {
+  width: 14px;
+  height: 14px;
   color: #666;
+}
+
+.tool-block.expanded .tool-block-chevron {
+  transform: rotate(180deg);
+}
+
+.tool-block-details {
+  max-height: 0;
+  overflow: hidden;
+  transition: max-height 0.2s;
+}
+
+.tool-block.expanded .tool-block-details {
+  max-height: 500px;
+}
+
+.tool-detail {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 4px 12px 4px 36px;
+  font-size: 12px;
+  color: #777;
+}
+
+.tool-detail:last-child {
+  padding-bottom: 8px;
+}
+
+.tool-detail svg {
+  width: 14px;
+  height: 14px;
+  flex-shrink: 0;
+}
+
+.tool-detail.running svg {
+  animation: spin 1.5s linear infinite;
+  color: #7c9dd6;
+}
+
+.tool-detail.done svg {
+  color: #5a9a5a;
 }
 
 @keyframes spin {

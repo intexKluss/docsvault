@@ -12,9 +12,19 @@
     otris_status: 'Prüfe Status',
   };
 
+  // done labels
+  const TOOL_DONE_LABELS = {
+    otris_search: 'Dokumentation durchsucht',
+    otris_read: 'Dokument gelesen',
+    otris_list: 'Verzeichnis durchsucht',
+    otris_overview: 'Übersicht geladen',
+    otris_status: 'Status geprüft',
+  };
+
   // svgs
   const SVG_SPINNER = '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="10"/><path d="M12 6v6l4 2"/></svg>';
   const SVG_CHECK = '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polyline points="20 6 9 17 4 12"/></svg>';
+  const SVG_CHEVRON = '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polyline points="6 9 12 15 18 9"/></svg>';
   const SVG_LIGHTNING = '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polygon points="13 2 3 14 12 14 11 22 21 10 12 10 13 2"/></svg>';
   const SVG_SEARCH = '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="11" cy="11" r="8"/><line x1="21" y1="21" x2="16.65" y2="16.65"/></svg>';
   const SVG_SEND = '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><line x1="12" y1="19" x2="12" y2="5"/><polyline points="5 12 12 5 19 12"/></svg>';
@@ -188,6 +198,12 @@
     const mode = getActiveSpeed().dataset.mode;
     ws.send(JSON.stringify({ type: 'message', content: text, mode: mode }));
 
+    // sofort ai-message mit tool-block anzeigen
+    currentAiMsg = appendAiMessage();
+    currentAiText = '';
+    getToolBlock(currentAiMsg);
+    scrollToBottom();
+
     setInputEnabled(false);
     chatInput.value = '';
     autoResize(chatInput);
@@ -262,11 +278,11 @@
   // warten bis typewriter fertig, dann response abschliessen
   function finishResponse() {
     if (textBuffer.length > 0 || typewriterTimer) {
-      // buffer noch nicht leer — warten
       setTimeout(finishResponse, 50);
       return;
     }
     if (currentAiMsg) {
+      finalizeToolBlock(currentAiMsg);
       highlightCodeBlocks(currentAiMsg);
     }
     currentAiMsg = null;
@@ -283,32 +299,77 @@
     }
   }
 
-  // tool-anzeige
+  // tool-anzeige: kollabierter block mit spinner + aufklappbare details
+  function getToolBlock(aiMsg) {
+    var block = aiMsg.querySelector('.tool-block');
+    if (block) return block;
+
+    // neuen block erstellen
+    block = document.createElement('div');
+    block.className = 'tool-block';
+
+    var header = document.createElement('div');
+    header.className = 'tool-block-header';
+    header.innerHTML = SVG_SPINNER + '<span class="tool-block-label">Doku wird durchsucht...</span><span class="tool-block-chevron">' + SVG_CHEVRON + '</span>';
+    header.addEventListener('click', function () {
+      block.classList.toggle('expanded');
+    });
+
+    var details = document.createElement('div');
+    details.className = 'tool-block-details';
+
+    block.appendChild(header);
+    block.appendChild(details);
+
+    var contentEl = aiMsg.querySelector('.msg-content');
+    aiMsg.insertBefore(block, contentEl);
+    return block;
+  }
+
   function handleToolUse(msg) {
     if (!currentAiMsg) return;
-    const label = TOOL_LABELS[msg.tool] || 'Verarbeite Anfrage';
+    var block = getToolBlock(currentAiMsg);
+    var details = block.querySelector('.tool-block-details');
+    var label = TOOL_LABELS[msg.tool] || 'Verarbeite Anfrage';
 
     if (msg.status === 'running') {
-      const indicator = document.createElement('div');
-      indicator.className = 'tool-indicator running';
-      indicator.dataset.tool = msg.tool || 'default';
-      indicator.innerHTML = SVG_SPINNER + '<span>' + label + '...</span>';
-      const contentEl = currentAiMsg.querySelector('.msg-content');
-      currentAiMsg.insertBefore(indicator, contentEl);
+      var item = document.createElement('div');
+      item.className = 'tool-detail running';
+      item.dataset.tool = msg.tool || 'default';
+      item.innerHTML = SVG_SPINNER + '<span>' + label + '...</span>';
+      details.appendChild(item);
     } else if (msg.status === 'done') {
-      const indicators = currentAiMsg.querySelectorAll('.tool-indicator.running[data-tool="' + (msg.tool || 'default') + '"]');
-      const indicator = indicators[indicators.length - 1];
-      if (indicator) {
-        indicator.className = 'tool-indicator done';
-        const finalLabel = msg.tool === 'otris_search' ? 'Dokumentation durchsucht'
-          : msg.tool === 'otris_read' ? 'Dokument gelesen'
-          : msg.tool === 'otris_list' ? 'Verzeichnis durchsucht'
-          : msg.tool === 'otris_overview' ? 'Übersicht geladen'
-          : msg.tool === 'otris_status' ? 'Status geprüft'
-          : 'Anfrage verarbeitet';
-        indicator.innerHTML = SVG_CHECK + '<span>' + finalLabel + '</span>';
+      var items = details.querySelectorAll('.tool-detail.running[data-tool="' + (msg.tool || 'default') + '"]');
+      var item = items[items.length - 1];
+      if (item) {
+        item.className = 'tool-detail done';
+        var doneLabel = TOOL_DONE_LABELS[msg.tool] || 'Anfrage verarbeitet';
+        item.innerHTML = SVG_CHECK + '<span>' + doneLabel + '</span>';
+      }
+
+      // counter aktualisieren
+      var doneCount = details.querySelectorAll('.tool-detail.done').length;
+      var headerLabel = block.querySelector('.tool-block-label');
+      var hasRunning = details.querySelectorAll('.tool-detail.running').length > 0;
+      if (hasRunning) {
+        headerLabel.textContent = 'Doku wird durchsucht... (' + doneCount + ' abgeschlossen)';
       }
     }
+  }
+
+  // tool-block abschliessen (nach done)
+  function finalizeToolBlock(aiMsg) {
+    var block = aiMsg ? aiMsg.querySelector('.tool-block') : null;
+    if (!block) return;
+    block.classList.add('finished');
+    var header = block.querySelector('.tool-block-header');
+    var details = block.querySelector('.tool-block-details');
+    var doneCount = details.querySelectorAll('.tool-detail.done').length;
+    header.innerHTML = SVG_CHECK + '<span class="tool-block-label">' + doneCount + ' Quellen durchsucht</span><span class="tool-block-chevron">' + SVG_CHEVRON + '</span>';
+    // re-attach click handler
+    header.addEventListener('click', function () {
+      block.classList.toggle('expanded');
+    });
   }
 
   // fehler anzeigen

@@ -24,7 +24,9 @@ VERHALTEN:
 - Antworte auf Deutsch, kurz und praezise.
 - Gib Code-Beispiele wenn moeglich.
 - Wenn du eine Frage nicht in der Dokumentation findest, sag das ehrlich.
-- Sage NICHT "ich schaue nach" oder "einen Moment" — rufe einfach das Tool auf und antworte dann mit den Ergebnissen.`;
+- Sage NICHT "ich schaue nach" oder "einen Moment" — rufe einfach das Tool auf und antworte dann mit den Ergebnissen.
+- Erklaere NICHT deinen Suchprozess. Sage NICHT "Ich suche jetzt...", "Die Suche war zu eng...", "Ich hole jetzt...". Gib NUR die fertige Antwort.
+- Mache maximal 3-4 Tool-Aufrufe pro Frage. Suche gezielt, nicht breit.`;
 
 export class CodexBridge {
   async createSession() {
@@ -38,7 +40,7 @@ export class CodexBridge {
     });
 
     const thread = codex.startThread({
-      model: process.env.CODEX_MODEL || 'codex-mini',
+      model: process.env.CODEX_MODEL || 'gpt-5.4',
       workingDirectory: MCP_CWD,
       sandboxMode: 'read-only',
       approvalPolicy: 'never',
@@ -71,6 +73,13 @@ export class CodexBridge {
       async *send(content, mode) {
         if (destroyed) throw new Error('Session destroyed');
 
+        // mode per prompt steuern
+        const modePrefix = mode === 'thorough'
+          ? '[GRÜNDLICH] Nutze mindestens 3-4 verschiedene Tool-Aufrufe. Lies relevante Dokumente komplett. Pruefe ob deine Antwort wirklich korrekt und vollstaendig ist. Gib ausfuehrliche Erklaerungen mit Code-Beispielen.\n\n'
+          : '[SCHNELL] Antworte kurz und praezise. Maximal 2 Tool-Aufrufe. Keine langen Erklaerungen.\n\n';
+
+        const fullPrompt = modePrefix + content;
+
         console.log(`[codex-sdk] mode=${mode}, thread=${thread.id || 'new'}`);
         console.log(`[codex-sdk] prompt: ${content.substring(0, 80)}`);
         const startTime = Date.now();
@@ -79,10 +88,11 @@ export class CodexBridge {
         activeAbort = abort;
         let toolRunning = false;
         let currentToolName = null;
-        let hasChunks = false;
+        let pendingMessages = []; // agent_messages sammeln, nur letzte senden
+        let toolCount = 0;
 
         try {
-          const { events } = await thread.runStreamed(content, {
+          const { events } = await thread.runStreamed(fullPrompt, {
             signal: abort.signal,
           });
 
@@ -92,7 +102,7 @@ export class CodexBridge {
             // mcp tool gestartet
             if (event.type === 'item.started' && event.item.type === 'mcp_tool_call') {
               toolRunning = true;
-              // codex gibt tool-name direkt, z.b. "otris_search"
+              toolCount++;
               currentToolName = event.item.tool || 'otris_search';
               yield { type: 'tool_use', tool: currentToolName, status: 'running' };
             }
@@ -105,14 +115,23 @@ export class CodexBridge {
               }
             }
 
-            // agent text
+            // agent text — sammeln, nicht sofort senden
+            // zwischen-messages (denkprozess) werden ueberschrieben,
+            // nur die letzte message (die echte antwort) wird gesendet
             if (event.type === 'item.completed' && event.item.type === 'agent_message') {
               if (toolRunning) {
                 yield { type: 'tool_use', tool: currentToolName || 'otris_search', status: 'done' };
                 toolRunning = false;
               }
-              hasChunks = true;
-              yield { type: 'chunk', content: event.item.text };
+              pendingMessages.push(event.item.text);
+            }
+
+            // turn fertig — jetzt die letzte message senden
+            if (event.type === 'turn.completed') {
+              if (pendingMessages.length > 0) {
+                // nur die letzte message ist die echte antwort
+                yield { type: 'chunk', content: pendingMessages[pendingMessages.length - 1] };
+              }
             }
 
             // fehler
