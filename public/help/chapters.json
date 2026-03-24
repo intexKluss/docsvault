@@ -5,6 +5,7 @@
   "chapters": [
     { "id": "claude-code", "title": "Claude Code", "file": "chapters/claude-code.md" },
     { "id": "codex-cli", "title": "Codex CLI", "file": "chapters/codex-cli.md" },
-    { "id": "gemini-cli", "title": "Gemini CLI", "file": "chapters/gemini-cli.md" }
+    { "id": "gemini-cli", "title": "Gemini CLI", "file": "chapters/gemini-cli.md" },
+    { "id": "mcp-agent-setup", "title": "MCP mit Coding-Agent", "file": "chapters/mcp-agent-setup.md" }
   ]
 }
