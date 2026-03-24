@@ -6,11 +6,13 @@ import { randomUUID } from 'node:crypto';
 import express from 'express';
 import { WebSocketServer } from 'ws';
 import { SessionManager } from './session-manager.js';
+import { handleSseGet, handleSsePost, handleStreamablePost, initStreamableHttp } from './mcp-handler.js';
 
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = dirname(__filename);
 
 const BRIDGE_MODE = process.env.BRIDGE || 'claude';
+const VAULT_PATH = process.env.VAULT_PATH || join(__dirname, '..', 'vault');
 
 async function loadBridge() {
   if (BRIDGE_MODE === 'codex') {
@@ -33,6 +35,7 @@ export async function createServer(opts = {}) {
 
   const bridge = await loadBridge();
   const manager = new SessionManager(bridge, config);
+  await initStreamableHttp();
 
   const app = express();
 
@@ -52,6 +55,22 @@ export async function createServer(opts = {}) {
     );
     next();
   });
+
+  // MCP remote endpoint — SSE transport
+  app.get('/sse', (req, res) => {
+    handleSseGet(req, res, VAULT_PATH);
+  });
+
+  app.post('/messages', express.json(), (req, res) => {
+    handleSsePost(req, res);
+  });
+
+  // MCP remote endpoint — Streamable HTTP transport
+  app.post('/mcp', express.json(), async (req, res) => {
+    await handleStreamablePost(req, res, VAULT_PATH);
+  });
+  app.get('/mcp', (req, res) => { res.writeHead(405).end(); });
+  app.delete('/mcp', (req, res) => { res.writeHead(405).end(); });
 
   app.use(express.static(join(__dirname, '..', 'public')));
 
