@@ -1,6 +1,6 @@
 # otris-docs-web — Architektur
 
-Web-Chat UI fuer die otris DOCUMENTS Dokumentation. Bot nutzt entweder Claude Agent SDK oder OpenAI Codex CLI und ist ueber das `otris-docs-mcp` Tool mit der Doku verbunden.
+Web-Chat UI fuer die otris DOCUMENTS Dokumentation. Bot nutzt entweder Claude Agent SDK oder OpenAI Codex SDK. Die MCP-Tools (search, read, list, overview, status) sind direkt im Server internalisiert (`src/tools/`).
 
 ## Dateistruktur
 
@@ -10,12 +10,15 @@ src/
   session-manager.js     Session-Lifecycle, Rate Limiting, Validierung
   claude-bridge.js       Bridge zu Claude Agent SDK (@anthropic-ai/claude-agent-sdk)
   codex-bridge.js        Bridge zu OpenAI Codex SDK (@openai/codex-sdk)
+  api-routes.js          REST API fuer externe MCP-Clients
+  mcp-handler.js         MCP SSE + Streamable HTTP Endpoints
+  tools/                 Internalisierte Tool-Handler (vault, search, read, list, overview, status)
 public/
   index.html             Landing + Chat UI
   app.js                 WebSocket Client, UI-Logik, Typewriter, Tool-Anzeige
   style.css              Dark Mode Styling
   logo.png               Intex Logo
-  help/                  Installationshilfe (Submodule)
+  help/                  Installationshilfe
 ```
 
 ## Architektur-Ueberblick
@@ -33,7 +36,10 @@ claude-bridge.js               codex-bridge.js
   query() mit resume             thread.runStreamed()
     |                              |
     v                              v
-otris-docs-mcp (MCP Tools: search, read, list, overview, status)
+src/tools/ (search, read, list, overview, status)
+    |
+    v
+vault/ (995 Markdown-Dateien)
 ```
 
 ## Bridge-Switching
@@ -91,7 +97,11 @@ Kein Reconnect, kein Session-Persist. Jeder Page-Load = neue Session.
 
 ## MCP-Integration
 
-Tools werden ueber `otris-docs-mcp` CLI bereitgestellt:
+Tools sind in `src/tools/` internalisiert und werden ueber drei Wege bereitgestellt:
+1. **Intern (Bridges)**: Claude Bridge verbindet sich per MCP SSE zum eigenen Server
+2. **MCP SSE** (`/sse` + `/messages`): Fuer externe MCP-Clients (z.B. otris-docs-mcp)
+3. **REST API** (`/api/*`): Fuer einfache HTTP-Clients
+4. **MCP Streamable HTTP** (`/mcp`): Alternatives MCP-Transportprotokoll
 
 | Tool | Zweck |
 |---|---|
@@ -120,6 +130,8 @@ Codex Bridge: Nutzt MCP ueber Codex CLI Config.
 | `CODEX_PATH` | — | Pfad zur Codex CLI |
 | `CODEX_MODEL` | `gpt-5.4` | Model fuer Codex Bridge |
 | `MCP_CWD` | Projekt-Root | Arbeitsverzeichnis fuer MCP |
+| `MCP_SSE_URL` | `http://localhost:$PORT/sse` | SSE-URL fuer Claude Bridge MCP-Verbindung |
+| `API_RATE_LIMIT_PER_MIN` | `60` | Max REST API Requests pro Minute/IP |
 
 ## Frontend (app.js)
 

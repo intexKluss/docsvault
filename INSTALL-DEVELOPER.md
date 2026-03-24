@@ -1,20 +1,15 @@
 # MCP Tool fuer Entwickler
 
-Das `otris-docs-mcp` Tool gibt deinem Coding-Agent Zugriff auf die gesamte otris DOCUMENTS Dokumentation. Die Doku liegt auf dem Server — du brauchst keinen eigenen Vault.
+Dein Coding-Agent (Claude Code, Codex CLI, Gemini CLI, etc.) bekommt Zugriff auf die gesamte otris DOCUMENTS Dokumentation. Die Doku liegt auf dem Server — du brauchst keinen eigenen Vault.
 
 ## Voraussetzungen
 
-- Node.js 20+
-- Ein Coding-Agent der MCP unterstuetzt (Claude Code, Codex CLI, etc.)
+- Ein Coding-Agent der MCP unterstuetzt
 - Netzwerkzugriff zum otris-docs Server
 
-## Installation
+## Option 1: Remote MCP (empfohlen)
 
-```bash
-npm install -g otris-docs-mcp
-```
-
-## Konfiguration
+Verbinde deinen Agent direkt per MCP-Netzwerkprotokoll mit dem Server.
 
 ### Claude Code
 
@@ -24,10 +19,7 @@ In `.mcp.json` (im Projektordner oder global in `~/.claude/.mcp.json`):
 {
   "mcpServers": {
     "otris-docs": {
-      "command": "otris-docs-mcp",
-      "env": {
-        "OTRIS_DOCS_URL": "http://SERVER-IP:3000"
-      }
+      "url": "http://SERVER-IP:3000/sse"
     }
   }
 }
@@ -41,22 +33,31 @@ In `~/.codex/config.json` oder `.codex/config.json` im Projektordner:
 {
   "mcpServers": {
     "otris-docs": {
-      "command": "otris-docs-mcp",
-      "env": {
-        "OTRIS_DOCS_URL": "http://SERVER-IP:3000"
-      }
+      "url": "http://SERVER-IP:3000/sse"
     }
   }
 }
 ```
 
-### Andere Agents
+## Option 2: REST API
 
-Umgebungsvariable setzen und den MCP Server starten:
+Fuer Agents oder Tools die kein MCP unterstuetzen, gibt es eine REST API:
 
 ```bash
-export OTRIS_DOCS_URL=http://SERVER-IP:3000
-otris-docs-mcp
+# Suchen
+curl "http://SERVER-IP:3000/api/search?query=DocFile"
+
+# Dokument lesen
+curl "http://SERVER-IP:3000/api/read?path=portalscript-api/classes/DocFile"
+
+# Bereich auflisten
+curl "http://SERVER-IP:3000/api/list?section=portalscript-api"
+
+# Uebersicht
+curl "http://SERVER-IP:3000/api/overview"
+
+# Status
+curl "http://SERVER-IP:3000/api/status"
 ```
 
 `SERVER-IP` immer durch die tatsaechliche Server-Adresse ersetzen.

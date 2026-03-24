@@ -1,14 +1,8 @@
 # Claude Code
 
-## Installation
-
-```bash
-npm install -g otris-docs-mcp
-```
-
 ## Konfiguration
 
-Füge den MCP Server zu deiner Claude Code Konfiguration hinzu.
+Verbinde Claude Code direkt per MCP-Netzwerkprotokoll mit dem otris-docs Server.
 
 ### Option A: Projekt-spezifisch (.mcp.json)
 
@@ -18,7 +12,7 @@ Erstelle eine `.mcp.json` im Projektverzeichnis:
 {
   "mcpServers": {
     "otris-docs": {
-      "command": "otris-docs-mcp"
+      "url": "http://<SERVER-IP>:3000/sse"
     }
   }
 }
@@ -30,14 +24,16 @@ Erstelle eine `.mcp.json` im Projektverzeichnis:
 {
   "mcpServers": {
     "otris-docs": {
-      "command": "otris-docs-mcp"
+      "url": "http://<SERVER-IP>:3000/sse"
     }
   }
 }
 ```
 
+Ersetze `<SERVER-IP>` durch die IP des Servers (z.B. `192.168.2.100`).
+
 ## Verifizierung
 
-Starte Claude Code und prüfe mit `/mcp` ob der Server erkannt wird.
+Starte Claude Code und pruefe mit `/mcp` ob der Server erkannt wird.
 
 Stelle eine Testfrage: "Suche in der otris Doku nach FileType"

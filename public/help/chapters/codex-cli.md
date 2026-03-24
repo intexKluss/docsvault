@@ -1,19 +1,20 @@
 # Codex CLI
 
-## Installation
-
-```bash
-npm install -g otris-docs-mcp
-```
-
 ## Konfiguration
 
-Füge den MCP Server zu `~/.codex/config.toml` hinzu:
+Fuege den MCP Server zu `~/.codex/config.json` hinzu:
 
-```toml
-[mcp_servers.otris-docs]
-command = "otris-docs-mcp"
+```json
+{
+  "mcpServers": {
+    "otris-docs": {
+      "url": "http://<SERVER-IP>:3000/sse"
+    }
+  }
+}
 ```
+
+Ersetze `<SERVER-IP>` durch die IP des Servers (z.B. `192.168.2.100`).
 
 ## Verifizierung
 

@@ -5,7 +5,7 @@ export function handleStatus(vaultPath) {
   if (!existsSync(vaultPath)) {
     return {
       status: 'not_installed',
-      message: 'No documentation found. Run: otris-docs-mcp crawl --login && otris-docs-mcp crawl'
+      message: 'No documentation found. Run: npm run crawl:login && npm run crawl'
     };
   }
 
@@ -36,10 +36,10 @@ export function handleStatus(vaultPath) {
     message = `Documentation is up to date (crawled ${daysOld === 0 ? 'today' : daysOld + ' days ago'}).`;
   } else if (daysOld <= 30) {
     status = 'aging';
-    message = `Documentation is ${daysOld} days old. Consider running: otris-docs-mcp crawl`;
+    message = `Documentation is ${daysOld} days old. Consider running: npm run crawl`;
   } else {
     status = 'stale';
-    message = `Documentation is ${daysOld} days old! Run: otris-docs-mcp crawl`;
+    message = `Documentation is ${daysOld} days old! Run: npm run crawl`;
   }
 
   return {

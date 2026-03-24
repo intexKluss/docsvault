@@ -25,7 +25,7 @@ export async function loginInteractive() {
 
 export function loadAuthState() {
   const authPath = getAuthPath();
-  if (!existsSync(authPath)) throw new Error('No auth state found. Run: otris-docs-mcp crawl --login');
+  if (!existsSync(authPath)) throw new Error('No auth state found. Run: npm run crawl:login');
   return authPath;
 }
 
