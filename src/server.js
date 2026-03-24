@@ -5,11 +5,24 @@ import { dirname, join } from 'node:path';
 import { randomUUID } from 'node:crypto';
 import express from 'express';
 import { WebSocketServer } from 'ws';
-import { CodexBridge } from './codex-bridge.js';
 import { SessionManager } from './session-manager.js';
 
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = dirname(__filename);
+
+// BRIDGE=codex -> OpenAI Codex SDK, BRIDGE=claude (default) -> Claude Agent SDK
+const BRIDGE_MODE = process.env.BRIDGE || 'claude';
+
+async function loadBridge() {
+  if (BRIDGE_MODE === 'codex') {
+    const { CodexBridge } = await import('./openai-bridge.js');
+    console.log(`[server] bridge: codex (OpenAI Codex SDK)`);
+    return new CodexBridge();
+  }
+  const { CodexBridge } = await import('./codex-bridge.js');
+  console.log(`[server] bridge: claude (Claude Agent SDK)`);
+  return new CodexBridge();
+}
 
 export async function createServer(opts = {}) {
   const config = {
@@ -19,7 +32,7 @@ export async function createServer(opts = {}) {
     maxMessageLength: parseInt(process.env.MAX_MESSAGE_LENGTH || '2000', 10),
   };
 
-  const bridge = new CodexBridge();
+  const bridge = await loadBridge();
   const manager = new SessionManager(bridge, config);
 
   const app = express();
