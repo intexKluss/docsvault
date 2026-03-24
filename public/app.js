@@ -1,5 +1,3 @@
-// otris docs assistant - websocket client
-
 (function () {
   'use strict';
 
@@ -367,7 +365,6 @@
     const details = block.querySelector('.tool-block-details');
     const doneCount = details.querySelectorAll('.tool-detail.done').length;
 
-    // alten listener entfernen, neuen setzen
     if (header._toggleExpand) {
       header.removeEventListener('click', header._toggleExpand);
     }
@@ -402,7 +399,6 @@
     });
   }
 
-  // auto-scroll
   let userScrolledUp = false;
 
   messagesEl.addEventListener('wheel', function (e) {
@@ -535,7 +531,6 @@
     btn.disabled = !input.value.trim();
   }
 
-  // event listener
   landingInput.addEventListener('input', function () {
     autoResize(this);
     updateSendBtn(this, landingSend);
