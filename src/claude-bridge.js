@@ -33,7 +33,7 @@ const MCP_CWD = process.env.MCP_CWD || resolve(__dirname, '..');
 
 const MCP_SERVERS = {
   'otris-docs': {
-    command: join(__dirname, '..', 'node_modules', '.bin', 'otris-docs-mcp'),
+    url: 'http://localhost:3000/sse',
   }
 };
 
