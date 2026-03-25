@@ -1,3 +1,19 @@
+# VS Code
+
+## Claude Code Extension
+
+Die Claude Code VS Code Extension nutzt MCP-Server aus `~/.claude.json` (User Scope). Am einfachsten per CLI hinzufügen:
+
+```bash
+claude mcp add --transport sse --scope user otris-docs http://<SERVER-IP>:3000/sse
+```
+
+Danach VS Code neu laden. Der Server erscheint in der MCP-Liste der Extension.
+
+**Wichtig:** `~/.claude/.mcp.json` wird nur von der CLI gelesen, nicht von der VS Code Extension. Immer `--scope user` verwenden oder manuell in `~/.claude.json` eintragen.
+
+---
+
 # VS Code (GitHub Copilot)
 
 ## Voraussetzungen

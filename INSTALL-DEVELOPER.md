@@ -16,10 +16,12 @@ Verbinde deinen Agent direkt per MCP-Netzwerkprotokoll mit dem Server. Keine lok
 Per CLI (empfohlen):
 
 ```bash
-claude mcp add --transport sse otris-docs http://SERVER-IP:3000/sse
+claude mcp add --transport sse --scope user otris-docs http://SERVER-IP:3000/sse
 ```
 
-Oder manuell in `.mcp.json` (im Projektordner oder global in `~/.claude/.mcp.json`):
+`--scope user` schreibt in `~/.claude.json` — damit ist der Server global verfügbar, auch in der VS Code Claude Code Extension.
+
+Oder manuell in `.mcp.json` (im Projektordner, nur CLI):
 
 ```json
 {
