@@ -25,6 +25,8 @@ Der Build dauert unter 30 Sekunden (plus Download beim ersten Mal).
 
 ### 3. Container starten
 
+**Linux/Mac:**
+
 ```bash
 docker run -d \
   --name otris-docs \
@@ -36,6 +38,12 @@ docker run -d \
   -v otris-docs-codex:/home/node/.codex \
   -v $(pwd)/reports.json:/app/reports.json \
   otris-docs
+```
+
+**Windows (PowerShell):**
+
+```powershell
+docker run -d --name otris-docs --restart unless-stopped -p 3000:3000 -e BRIDGE=codex -e ALLOWED_ORIGINS=http://SERVER-IP:3000 -e ALLOW_NO_ORIGIN=true -v otris-docs-codex:/home/node/.codex -v "$(pwd)/reports.json:/app/reports.json" otris-docs
 ```
 
 Ersetzen:
