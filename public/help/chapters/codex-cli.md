@@ -2,16 +2,17 @@
 
 ## Konfiguration
 
-Fuege den MCP Server zu `~/.codex/config.json` hinzu:
+### Option A: CLI-Befehl (empfohlen)
 
-```json
-{
-  "mcpServers": {
-    "otris-docs": {
-      "url": "http://<SERVER-IP>:3000/sse"
-    }
-  }
-}
+```bash
+codex mcp add otris-docs --url http://<SERVER-IP>:3000/mcp
+```
+
+### Option B: Manuell in ~/.codex/config.toml
+
+```toml
+[mcp_servers.otris-docs]
+url = "http://<SERVER-IP>:3000/mcp"
 ```
 
 Ersetze `<SERVER-IP>` durch die IP des Servers (z.B. `192.168.2.100`).
@@ -22,4 +23,4 @@ Ersetze `<SERVER-IP>` durch die IP des Servers (z.B. `192.168.2.100`).
 codex mcp list
 ```
 
-Der Server `otris-docs` sollte in der Liste erscheinen.
+Der Server `otris-docs` sollte in der Liste erscheinen mit Status `enabled`.

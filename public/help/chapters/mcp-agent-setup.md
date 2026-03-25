@@ -52,16 +52,17 @@ Starte Claude Code neu und pruefe mit `/mcp` ob der Server erkannt wird.
 
 ## Codex CLI
 
-Fuege den Server zur Codex-Konfiguration hinzu (`~/.codex/config.json`):
+Per CLI (empfohlen):
 
-```json
-{
-  "mcpServers": {
-    "otris-docs": {
-      "url": "http://<SERVER-IP>:3000/sse"
-    }
-  }
-}
+```bash
+codex mcp add otris-docs --url http://<SERVER-IP>:3000/mcp
+```
+
+Oder manuell in `~/.codex/config.toml`:
+
+```toml
+[mcp_servers.otris-docs]
+url = "http://<SERVER-IP>:3000/mcp"
 ```
 
 Pruefe danach mit `codex mcp list` ob der Server `otris-docs` erscheint.

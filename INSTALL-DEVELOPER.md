@@ -34,16 +34,17 @@ Oder manuell in `.mcp.json` (im Projektordner oder global in `~/.claude/.mcp.jso
 
 ### Codex CLI
 
-In `~/.codex/config.json` oder `.codex/config.json` im Projektordner:
+Per CLI (empfohlen):
 
-```json
-{
-  "mcpServers": {
-    "otris-docs": {
-      "url": "http://SERVER-IP:3000/sse"
-    }
-  }
-}
+```bash
+codex mcp add otris-docs --url http://SERVER-IP:3000/mcp
+```
+
+Oder manuell in `~/.codex/config.toml`:
+
+```toml
+[mcp_servers.otris-docs]
+url = "http://SERVER-IP:3000/mcp"
 ```
 
 ## Option 2: Lokaler MCP-Proxy
