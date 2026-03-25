@@ -59,7 +59,23 @@ Der Web-Chat nutzt die Codex CLI mit ChatGPT-Account (kein API Key noetig). Logi
 docker exec -it otris-docs codex auth login --device-auth
 ```
 
-Es erscheint ein Link und ein Code. Den Link im Browser oeffnen, Code eingeben, mit dem OpenAI/ChatGPT-Account einloggen. Fertig.
+So funktioniert es:
+1. Es erscheint ein Link: `https://auth.openai.com/codex/device`
+2. Diesen Link im Browser oeffnen (von jedem Rechner aus, nicht nur vom Server)
+3. Den angezeigten Code eingeben (z.B. `G794-T9AN6`, laeuft nach 15 Minuten ab)
+4. Mit dem OpenAI/ChatGPT-Account einloggen
+5. Organisation auswaehlen falls gefragt
+6. In der PowerShell/Terminal erscheint "Login successful"
+
+Der Token wird im Volume `otris-docs-codex` gespeichert und ueberlebt Container-Restarts und Rebuilds. Ein erneutes Login ist nur noetig wenn der Token ablaeuft.
+
+**Erneut einloggen** (z.B. nach Token-Ablauf):
+
+```bash
+docker exec -it otris-docs codex auth login --device-auth
+```
+
+Gleicher Befehl wie beim ersten Mal.
 
 **Hinweis:** Ohne Login startet der Server, MCP-Tools und REST API funktionieren, aber der Web-Chat kann keine Antworten generieren.
 
