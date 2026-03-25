@@ -79,9 +79,36 @@ button {
   color: inherit;
 }
 
+/* theme toggle on landing */
+
+.theme-toggle-floating {
+  position: absolute;
+  top: 16px;
+  right: 16px;
+  width: 36px;
+  height: 36px;
+  border-radius: 50%;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  color: var(--text-muted);
+  transition: color 0.2s, background 0.2s;
+}
+
+.theme-toggle-floating:hover {
+  background: var(--bg-elevated);
+  color: var(--text);
+}
+
+.theme-toggle-floating svg {
+  width: 18px;
+  height: 18px;
+}
+
 /* landing */
 
 #landing {
+  position: relative;
   display: flex;
   flex-direction: column;
   align-items: center;
