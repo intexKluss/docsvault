@@ -77,15 +77,6 @@ export async function handleSsePost(req, res) {
   await transport.handlePostMessage(req, res);
 }
 
-export async function initStreamableHttp() {
-  try {
-    await import('@modelcontextprotocol/sdk/server/streamableHttp.js');
-    return true;
-  } catch {
-    return false;
-  }
-}
-
 export async function handleStreamablePost(req, res, vaultPath) {
   let StreamableHTTPServerTransport;
   try {

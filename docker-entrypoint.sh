@@ -1,9 +1,14 @@
 #!/bin/sh
-# MCP-Config in codex config.toml sicherstellen (stdio, kein HTTP overhead)
+# MCP-Config immer frisch schreiben (auth.json bleibt im Volume separat)
 CONFIG="/home/node/.codex/config.toml"
-if ! grep -q "mcp_servers" "$CONFIG" 2>/dev/null; then
-  cat >> "$CONFIG" << 'EOF'
 
+# bestehende config ohne mcp_servers block behalten
+if [ -f "$CONFIG" ]; then
+  sed '/^\[mcp_servers/,$d' "$CONFIG" > "${CONFIG}.tmp"
+  mv "${CONFIG}.tmp" "$CONFIG"
+fi
+
+cat >> "$CONFIG" << 'EOF'
 [mcp_servers.otris-docs]
 command = "node"
 args = ["/app/src/mcp-stdio.js"]
@@ -11,6 +16,5 @@ args = ["/app/src/mcp-stdio.js"]
 [mcp_servers.otris-docs.env]
 VAULT_PATH = "/app/vault"
 EOF
-fi
 
 exec node src/server.js

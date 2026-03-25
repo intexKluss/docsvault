@@ -6,6 +6,11 @@ import { createMcpServer } from './mcp-handler.js';
 const __dirname = dirname(fileURLToPath(import.meta.url));
 const VAULT_PATH = process.env.VAULT_PATH || resolve(__dirname, '..', 'vault');
 
-const server = createMcpServer(VAULT_PATH);
-const transport = new StdioServerTransport();
-await server.connect(transport);
+try {
+  const server = createMcpServer(VAULT_PATH);
+  const transport = new StdioServerTransport();
+  await server.connect(transport);
+} catch (err) {
+  console.error(`[mcp-stdio] failed to start: ${err.message}`);
+  process.exit(1);
+}

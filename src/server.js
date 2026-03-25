@@ -6,7 +6,7 @@ import { randomUUID } from 'node:crypto';
 import express from 'express';
 import { WebSocketServer } from 'ws';
 import { SessionManager } from './session-manager.js';
-import { handleSseGet, handleSsePost, handleStreamablePost, initStreamableHttp } from './mcp-handler.js';
+import { handleSseGet, handleSsePost, handleStreamablePost } from './mcp-handler.js';
 import { createApiRouter } from './api-routes.js';
 
 const __filename = fileURLToPath(import.meta.url);
@@ -36,7 +36,6 @@ export async function createServer(opts = {}) {
 
   const bridge = await loadBridge();
   const manager = new SessionManager(bridge, config);
-  await initStreamableHttp();
 
   const app = express();
 
@@ -63,7 +62,7 @@ export async function createServer(opts = {}) {
     handleSseGet(req, res, VAULT_PATH);
   });
 
-  app.post('/messages', (req, res) => {
+  app.post('/messages', express.json(), (req, res) => {
     handleSsePost(req, res);
   });
 
