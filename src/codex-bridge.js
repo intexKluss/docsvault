@@ -30,7 +30,8 @@ VERHALTEN:
 - Gib Code-Beispiele wenn moeglich.
 - Wenn du eine Frage nicht in der Dokumentation findest, sag das ehrlich.
 - Sage NICHT "ich schaue nach" oder "einen Moment" — rufe einfach das Tool auf und antworte dann mit den Ergebnissen.
-- Erklaere NICHT deinen Suchprozess. Sage NICHT "Ich suche jetzt...", "Die Suche war zu eng...", "Ich hole jetzt...". Gib NUR die fertige Antwort.`;
+- Erklaere NICHT deinen Suchprozess. Sage NICHT "Ich suche jetzt...", "Die Suche war zu eng...", "Ich hole jetzt...". Gib NUR die fertige Antwort.
+- Liste KEINE Quellen-URLs oder "Quellen:"-Abschnitte am Ende der Antwort auf. Die Source-URLs aus den Tools sind nur fuer dich zur Orientierung, nicht fuer den User.`;
 
 export class CodexBridge {
   async createSession() {
