@@ -5,6 +5,12 @@ WORKDIR /app
 COPY package*.json ./
 RUN npm ci --omit=dev --legacy-peer-deps
 
+# codex CLI aus node_modules global verlinken
+RUN ln -s /app/node_modules/.bin/codex /usr/local/bin/codex
+
+# codex config dir fuer node user (wird per volume gemountet)
+RUN mkdir -p /home/node/.codex && chown node:node /home/node/.codex
+
 COPY src/ ./src/
 COPY public/ ./public/
 COPY vault/ ./vault/

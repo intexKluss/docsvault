@@ -31,20 +31,29 @@ docker run -d \
   --restart unless-stopped \
   -p 3000:3000 \
   -e BRIDGE=codex \
-  -e OPENAI_API_KEY=sk-... \
   -e ALLOWED_ORIGINS=http://SERVER-IP:3000 \
   -e ALLOW_NO_ORIGIN=true \
+  -v otris-docs-codex:/home/node/.codex \
   -v $(pwd)/reports.json:/app/reports.json \
   otris-docs
 ```
 
 Ersetzen:
 - `SERVER-IP` → tatsaechliche IP oder Domain des Servers
-- `sk-...` → OpenAI API Key (fuer Codex Bridge)
 
-Das `-v` Volume sorgt dafuer, dass Bug-Reports bei Container-Rebuilds erhalten bleiben.
+Die Volumes sorgen dafuer, dass Codex-Auth und Bug-Reports bei Container-Rebuilds erhalten bleiben.
 
-**Hinweis:** Ohne `OPENAI_API_KEY` startet der Server zwar, aber Chat-Anfragen werden fehlschlagen. Die REST API (Suche, Lesen) funktioniert unabhaengig davon.
+### 4. Codex Login (einmalig)
+
+Der Web-Chat nutzt die Codex CLI mit ChatGPT-Account (kein API Key noetig). Login per Device-Auth:
+
+```bash
+docker exec -it otris-docs codex auth login --device-auth
+```
+
+Es erscheint ein Link und ein Code. Den Link im Browser oeffnen, Code eingeben, mit dem OpenAI/ChatGPT-Account einloggen. Fertig.
+
+**Hinweis:** Ohne Login startet der Server, MCP-Tools und REST API funktionieren, aber der Web-Chat kann keine Antworten generieren.
 
 ### 4. Testen
 
@@ -92,7 +101,7 @@ Details: [INSTALL-DEVELOPER.md](INSTALL-DEVELOPER.md)
 | `PORT` | `3000` | Server-Port |
 | `VAULT_PATH` | `/app/vault` | Pfad zum Vault im Container |
 | `ALLOWED_ORIGINS` | — | Erlaubte Origins fuer WebSocket (kommasepariert) |
-| `OPENAI_API_KEY` | — | OpenAI API Key (noetig fuer Codex Bridge Chat) |
+| `CODEX_MODEL` | `gpt-5.4` | Model fuer Codex Bridge |
 | `ALLOW_NO_ORIGIN` | `false` | Verbindungen ohne Origin-Header erlauben (fuer REST API/MCP Clients noetig) |
 | `MAX_SESSIONS` | `50` | Max gleichzeitige Chat-Sessions |
 | `RATE_LIMIT_PER_MIN` | `10` | WebSocket-Nachrichten pro Minute pro IP |
@@ -144,12 +153,14 @@ docker run -d \
   --restart unless-stopped \
   -p 3000:3000 \
   -e BRIDGE=codex \
-  -e OPENAI_API_KEY=sk-... \
   -e ALLOWED_ORIGINS=http://SERVER-IP:3000 \
   -e ALLOW_NO_ORIGIN=true \
+  -v otris-docs-codex:/home/node/.codex \
   -v $(pwd)/reports.json:/app/reports.json \
   otris-docs
 ```
+
+Die Codex-Auth bleibt im Named Volume `otris-docs-codex` erhalten — kein erneutes Login noetig.
 
 ## Troubleshooting
 
@@ -168,9 +179,10 @@ Pruefen ob `ALLOWED_ORIGINS` korrekt gesetzt ist. Fuer REST API und MCP Clients 
 ### Chat antwortet nicht / Fehler bei Verarbeitung
 
 Der Server startet, aber Chat-Anfragen schlagen fehl:
-- Pruefen ob `OPENAI_API_KEY` gesetzt ist: `docker exec otris-docs env | grep OPENAI`
+- Pruefen ob Codex eingeloggt ist: `docker exec otris-docs codex auth status`
+- Neu einloggen: `docker exec -it otris-docs codex auth login --device-auth`
 - Container-Logs pruefen: `docker logs otris-docs`
-- Die REST API (Suche, Lesen) funktioniert auch ohne API Key — nur der Chat braucht ihn.
+- Die REST API (Suche, Lesen) funktioniert auch ohne Login — nur der Chat braucht ihn.
 
 ### MCP Client verbindet nicht
 
