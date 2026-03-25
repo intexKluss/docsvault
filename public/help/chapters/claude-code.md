@@ -4,7 +4,13 @@
 
 Verbinde Claude Code direkt per MCP-Netzwerkprotokoll mit dem otris-docs Server.
 
-### Option A: Projekt-spezifisch (.mcp.json)
+### Option A: CLI-Befehl (empfohlen)
+
+```bash
+claude mcp add --transport sse otris-docs http://<SERVER-IP>:3000/sse
+```
+
+### Option B: Projekt-spezifisch (.mcp.json)
 
 Erstelle eine `.mcp.json` im Projektverzeichnis:
 
@@ -12,18 +18,20 @@ Erstelle eine `.mcp.json` im Projektverzeichnis:
 {
   "mcpServers": {
     "otris-docs": {
+      "type": "sse",
       "url": "http://<SERVER-IP>:3000/sse"
     }
   }
 }
 ```
 
-### Option B: Global (~/.claude/settings.json)
+### Option C: Global (~/.claude/settings.json)
 
 ```json
 {
   "mcpServers": {
     "otris-docs": {
+      "type": "sse",
       "url": "http://<SERVER-IP>:3000/sse"
     }
   }

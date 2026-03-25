@@ -38,10 +38,17 @@ Siehe [INSTALL-SERVER.md](INSTALL-SERVER.md) fuer Details.
 
 Verbinde deinen Coding-Agent per MCP mit dem Server:
 
+```bash
+claude mcp add --transport sse otris-docs http://SERVER-IP:3000/sse
+```
+
+Oder manuell in `.mcp.json`:
+
 ```json
 {
   "mcpServers": {
     "otris-docs": {
+      "type": "sse",
       "url": "http://SERVER-IP:3000/sse"
     }
   }

@@ -13,12 +13,19 @@ Verbinde deinen Agent direkt per MCP-Netzwerkprotokoll mit dem Server. Keine lok
 
 ### Claude Code
 
-In `.mcp.json` (im Projektordner oder global in `~/.claude/.mcp.json`):
+Per CLI (empfohlen):
+
+```bash
+claude mcp add --transport sse otris-docs http://SERVER-IP:3000/sse
+```
+
+Oder manuell in `.mcp.json` (im Projektordner oder global in `~/.claude/.mcp.json`):
 
 ```json
 {
   "mcpServers": {
     "otris-docs": {
+      "type": "sse",
       "url": "http://SERVER-IP:3000/sse"
     }
   }
