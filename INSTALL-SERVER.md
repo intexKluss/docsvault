@@ -10,7 +10,7 @@
 ### 1. Repo klonen
 
 ```bash
-git clone <repo-url>
+git clone https://github.com/intexKluss/otris-docs-web.git
 cd otris-docs-web
 ```
 
@@ -55,7 +55,7 @@ Es erscheint ein Link und ein Code. Den Link im Browser oeffnen, Code eingeben, 
 
 **Hinweis:** Ohne Login startet der Server, MCP-Tools und REST API funktionieren, aber der Web-Chat kann keine Antworten generieren.
 
-### 4. Testen
+### 5. Testen
 
 ```bash
 # Health Check (sollte {"status":"ok"} zurueckgeben)
@@ -77,14 +77,21 @@ curl -N http://localhost:3000/sse
 docker inspect --format='{{.State.Health.Status}}' otris-docs
 ```
 
-### 5. Entwickler verbinden
+### 6. Entwickler verbinden
 
-Entwickler verbinden ihren Coding-Agent (Claude Code, Codex CLI, etc.) per MCP:
+Entwickler verbinden ihren Coding-Agent per MCP. Claude Code (empfohlen):
+
+```bash
+claude mcp add --transport sse otris-docs http://SERVER-IP:3000/sse
+```
+
+Oder manuell in `.mcp.json`:
 
 ```json
 {
   "mcpServers": {
     "otris-docs": {
+      "type": "sse",
       "url": "http://SERVER-IP:3000/sse"
     }
   }
