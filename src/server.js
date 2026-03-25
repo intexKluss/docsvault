@@ -63,11 +63,11 @@ export async function createServer(opts = {}) {
     handleSseGet(req, res, VAULT_PATH);
   });
 
-  app.post('/messages', express.json(), (req, res) => {
+  app.post('/messages', (req, res) => {
     handleSsePost(req, res);
   });
 
-  app.post('/mcp', express.json(), async (req, res) => {
+  app.post('/mcp', async (req, res) => {
     await handleStreamablePost(req, res, VAULT_PATH);
   });
   app.get('/mcp', (req, res) => { res.writeHead(405).end(); });
