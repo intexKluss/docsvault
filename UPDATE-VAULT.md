@@ -1,6 +1,6 @@
 # Vault aktualisieren
 
-Der Vault enthaelt die gecrawlte otris DOCUMENTS Dokumentation als Markdown-Dateien. Das Crawlen passiert auf dem Mac (braucht Playwright/Browser), nicht auf dem Server.
+Der Vault enthält die gecrawlte otris DOCUMENTS Dokumentation als Markdown-Dateien. Das Crawlen passiert auf dem Mac (braucht Playwright/Browser), nicht auf dem Server.
 
 ## Voraussetzungen
 
@@ -20,13 +20,13 @@ git pull
 
 ### 2. Einmalig: Login-Session erstellen
 
-Oeffnet einen Chromium-Browser zur manuellen Anmeldung:
+Öffnet einen Chromium-Browser zur manuellen Anmeldung:
 
 ```bash
 npm run crawl:login
 ```
 
-Nach dem Login schliesst sich der Browser automatisch. Die Session wird gespeichert.
+Nach dem Login schließt sich der Browser automatisch. Die Session wird gespeichert.
 
 ### 3. Crawler starten
 
@@ -40,7 +40,7 @@ Optional nur eine bestimmte Sektion crawlen:
 node crawl.mjs --section portalscript-api
 ```
 
-### 4. Aenderungen committen und pushen
+### 4. Änderungen committen und pushen
 
 ```bash
 git add vault/

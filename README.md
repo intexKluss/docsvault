@@ -1,11 +1,11 @@
 # otris docs web
 
-Web-Chat UI und MCP-Server fuer die otris DOCUMENTS Dokumentation. Nutzt Claude Agent SDK oder OpenAI Codex SDK als AI-Backend. Die Dokumentation (995 Markdown-Seiten) ist im Vault enthalten und wird im Docker-Image gebacken.
+Web-Chat UI und MCP-Server für die otris DOCUMENTS Dokumentation. Nutzt Claude Agent SDK oder OpenAI Codex SDK als AI-Backend. Die Dokumentation (995 Markdown-Seiten) ist im Vault enthalten und wird im Docker-Image gebacken.
 
 ## Features
 
 - **Web-Chat**: Landing Page + Chat-UI mit Typewriter-Effekt, Tool-Fortschrittsanzeige, Speed-Toggle
-- **MCP-Endpoints**: SSE (`/sse`) und Streamable HTTP (`/mcp`) fuer externe MCP-Clients
+- **MCP-Endpoints**: SSE (`/sse`) und Streamable HTTP (`/mcp`) für externe MCP-Clients
 - **REST API**: `/api/search`, `/api/read`, `/api/list`, `/api/overview`, `/api/status`
 - **Bridge-Switching**: Claude oder Codex per `BRIDGE` ENV Variable
 - **Sicherheit**: Rate Limiting, Origin-Validation, DOMPurify, Tool-Whitelisting, Prompt-Injection-Schutz
@@ -32,9 +32,9 @@ docker run -d \
   otris-docs
 ```
 
-Siehe [INSTALL-SERVER.md](INSTALL-SERVER.md) fuer Details.
+Siehe [INSTALL-SERVER.md](INSTALL-SERVER.md) für Details.
 
-## Fuer Entwickler (MCP-Client)
+## Für Entwickler (MCP-Client)
 
 Verbinde deinen Coding-Agent per MCP mit dem Server:
 
@@ -55,9 +55,9 @@ Oder manuell in `.mcp.json`:
 }
 ```
 
-Siehe [INSTALL-DEVELOPER.md](INSTALL-DEVELOPER.md) fuer alle Optionen.
+Siehe [INSTALL-DEVELOPER.md](INSTALL-DEVELOPER.md) für alle Optionen.
 
-## Nuetzliche Befehle
+## Nützliche Befehle
 
 ### Container
 
@@ -75,8 +75,8 @@ docker inspect --format='{{.State.Health.Status}}' otris-docs   # Health Status
 
 ```bash
 docker exec -it otris-docs codex auth login --device-auth   # Einloggen / Token erneuern
-docker exec otris-docs codex auth status                    # Auth-Status pruefen
-docker exec otris-docs codex mcp list                       # MCP-Server pruefen
+docker exec otris-docs codex auth status                    # Auth-Status prüfen
+docker exec otris-docs codex mcp list                       # MCP-Server prüfen
 ```
 
 ### Bug-Reports auslesen
@@ -93,7 +93,7 @@ docker exec otris-docs wc -l /app/reports.json              # Anzahl Reports
 curl http://SERVER-IP:3000/api/health                       # Health Check
 curl http://SERVER-IP:3000/api/status                       # Vault-Status
 curl "http://SERVER-IP:3000/api/search?query=DocFile"       # Suche testen
-curl "http://SERVER-IP:3000/api/overview"                   # Sektionsuebersicht
+curl "http://SERVER-IP:3000/api/overview"                   # Sektionsübersicht
 ```
 
 ### Komplett neu bauen
@@ -122,7 +122,7 @@ npm run crawl:login   # Einmalig: Browser-Login
 npm run crawl         # Vault aktualisieren
 ```
 
-Siehe [UPDATE-VAULT.md](UPDATE-VAULT.md) fuer Details.
+Siehe [UPDATE-VAULT.md](UPDATE-VAULT.md) für Details.
 
 ## Tests
 

@@ -69,8 +69,8 @@ export class CodexBridge {
         if (typeof content !== 'string' || !content.trim()) throw new Error('Invalid content');
 
         const modePrefix = mode === 'thorough'
-          ? '[GRÜNDLICH] Recherchiere gruendlich. Lies relevante Dokumente komplett. Pruefe ob deine Antwort wirklich korrekt und vollstaendig ist. Gib ausfuehrliche Erklaerungen mit Code-Beispielen.\n\n'
-          : '[SCHNELL] Antworte kurz und praezise. Suche gezielt, nicht breit.\n\n';
+          ? '[GRÜNDLICH] Recherchiere gründlich. Lies relevante Dokumente komplett. Prüfe ob deine Antwort wirklich korrekt und vollständig ist. Gib ausführliche Erklärungen mit Code-Beispielen.\n\n'
+          : '[SCHNELL] Antworte kurz und präzise. Suche gezielt, nicht breit.\n\n';
 
         const fullPrompt = modePrefix + content;
 

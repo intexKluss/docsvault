@@ -20,7 +20,7 @@ cd otris-docs-web
 docker build -t otris-docs .
 ```
 
-Das Image ist ca. 1 GB gross (Node.js + 995 Markdown-Seiten Dokumentation).
+Das Image ist ca. 1 GB groß (Node.js + 995 Markdown-Seiten Dokumentation).
 Der Build dauert unter 30 Sekunden (plus Download beim ersten Mal).
 
 ### 3. Container starten
@@ -47,13 +47,13 @@ docker run -d --name otris-docs --restart unless-stopped -p 3000:3000 -e BRIDGE=
 ```
 
 Ersetzen:
-- `SERVER-IP` → tatsaechliche IP oder Domain des Servers
+- `SERVER-IP` → tatsächliche IP oder Domain des Servers
 
-Die Volumes sorgen dafuer, dass Codex-Auth und Bug-Reports bei Container-Rebuilds erhalten bleiben.
+Die Volumes sorgen dafür, dass Codex-Auth und Bug-Reports bei Container-Rebuilds erhalten bleiben.
 
 ### 4. Codex Login (einmalig)
 
-Der Web-Chat nutzt die Codex CLI mit ChatGPT-Account (kein API Key noetig). Login per Device-Auth:
+Der Web-Chat nutzt die Codex CLI mit ChatGPT-Account (kein API Key nötig). Login per Device-Auth:
 
 ```bash
 docker exec -it otris-docs codex auth login --device-auth
@@ -61,13 +61,13 @@ docker exec -it otris-docs codex auth login --device-auth
 
 So funktioniert es:
 1. Es erscheint ein Link: `https://auth.openai.com/codex/device`
-2. Diesen Link im Browser oeffnen (von jedem Rechner aus, nicht nur vom Server)
-3. Den angezeigten Code eingeben (z.B. `G794-T9AN6`, laeuft nach 15 Minuten ab)
+2. Diesen Link im Browser öffnen (von jedem Rechner aus, nicht nur vom Server)
+3. Den angezeigten Code eingeben (z.B. `G794-T9AN6`, läuft nach 15 Minuten ab)
 4. Mit dem OpenAI/ChatGPT-Account einloggen
-5. Organisation auswaehlen falls gefragt
+5. Organisation auswählen falls gefragt
 6. In der PowerShell/Terminal erscheint "Login successful"
 
-Der Token wird im Volume `otris-docs-codex` gespeichert und ueberlebt Container-Restarts und Rebuilds. Ein erneutes Login ist nur noetig wenn der Token ablaeuft.
+Der Token wird im Volume `otris-docs-codex` gespeichert und überlebt Container-Restarts und Rebuilds. Ein erneutes Login ist nur nötig wenn der Token abläuft.
 
 **Erneut einloggen** (z.B. nach Token-Ablauf):
 
@@ -82,16 +82,16 @@ Gleicher Befehl wie beim ersten Mal.
 ### 5. Testen
 
 ```bash
-# Health Check (sollte {"status":"ok"} zurueckgeben)
+# Health Check (sollte {"status":"ok"} zurückgeben)
 curl http://localhost:3000/api/health
 
-# Vault-Status (zeigt Seitenanzahl, Sektionen, Aktualitaet)
+# Vault-Status (zeigt Seitenanzahl, Sektionen, Aktualität)
 curl http://localhost:3000/api/status
 
 # Suche testen
 curl "http://localhost:3000/api/search?query=DocFile&max_results=3"
 
-# Web UI im Browser oeffnen
+# Web UI im Browser öffnen
 open http://localhost:3000
 
 # MCP SSE Endpoint (Ctrl+C zum Beenden)
@@ -131,9 +131,9 @@ Details: [INSTALL-DEVELOPER.md](INSTALL-DEVELOPER.md)
 | `BRIDGE` | `codex` | AI-Bridge: `codex` oder `claude` |
 | `PORT` | `3000` | Server-Port |
 | `VAULT_PATH` | `/app/vault` | Pfad zum Vault im Container |
-| `ALLOWED_ORIGINS` | — | Erlaubte Origins fuer WebSocket (kommasepariert) |
-| `CODEX_MODEL` | `gpt-5.4` | Model fuer Codex Bridge |
-| `ALLOW_NO_ORIGIN` | `false` | Verbindungen ohne Origin-Header erlauben (fuer REST API/MCP Clients noetig) |
+| `ALLOWED_ORIGINS` | — | Erlaubte Origins für WebSocket (kommasepariert) |
+| `CODEX_MODEL` | `gpt-5.4` | Model für Codex Bridge |
+| `ALLOW_NO_ORIGIN` | `false` | Verbindungen ohne Origin-Header erlauben (für REST API/MCP Clients nötig) |
 | `MAX_SESSIONS` | `50` | Max gleichzeitige Chat-Sessions |
 | `RATE_LIMIT_PER_MIN` | `10` | WebSocket-Nachrichten pro Minute pro IP |
 | `API_RATE_LIMIT_PER_MIN` | `60` | REST API Requests pro Minute pro IP |
@@ -144,23 +144,23 @@ Details: [INSTALL-DEVELOPER.md](INSTALL-DEVELOPER.md)
 
 | Pfad | Typ | Beschreibung |
 |------|-----|--------------|
-| `/` | Web UI | Chat-Oberflaeche |
-| `/help/` | Web UI | Installationshilfe fuer Entwickler |
+| `/` | Web UI | Chat-Oberfläche |
+| `/help/` | Web UI | Installationshilfe für Entwickler |
 | `/api/health` | REST | Health Check |
 | `/api/status` | REST | Vault-Status |
 | `/api/search?query=...` | REST | Volltextsuche |
 | `/api/read?path=...` | REST | Dokument lesen |
 | `/api/list?section=...` | REST | Dateien auflisten |
-| `/api/overview` | REST | Uebersicht aller Sektionen |
-| `/sse` | MCP | SSE-Transport fuer MCP-Clients |
+| `/api/overview` | REST | Übersicht aller Sektionen |
+| `/sse` | MCP | SSE-Transport für MCP-Clients |
 | `/mcp` | MCP | Streamable HTTP-Transport |
 
 ## Sicherheit
 
-- Container laeuft als non-root User (`node`)
+- Container läuft als non-root User (`node`)
 - Built-in Health Check (alle 30s)
-- Rate Limiting fuer WebSocket und REST API
-- Origin-Validierung fuer WebSocket-Verbindungen
+- Rate Limiting für WebSocket und REST API
+- Origin-Validierung für WebSocket-Verbindungen
 - CSP Header auf allen Responses
 
 ## Update
@@ -191,32 +191,32 @@ docker run -d \
   otris-docs
 ```
 
-Die Codex-Auth bleibt im Named Volume `otris-docs-codex` erhalten — kein erneutes Login noetig.
+Die Codex-Auth bleibt im Named Volume `otris-docs-codex` erhalten — kein erneutes Login nötig.
 
 ## Troubleshooting
 
-### Container startet, aber Health Check schlaegt fehl
+### Container startet, aber Health Check schlägt fehl
 
 ```bash
 docker logs otris-docs
 ```
 
-Der Server sollte `Server läuft auf http://localhost:3000` loggen. Wenn nicht, pruefen ob Port 3000 frei ist.
+Der Server sollte `Server läuft auf http://localhost:3000` loggen. Wenn nicht, prüfen ob Port 3000 frei ist.
 
 ### WebSocket verbindet nicht
 
-Pruefen ob `ALLOWED_ORIGINS` korrekt gesetzt ist. Fuer REST API und MCP Clients muss `ALLOW_NO_ORIGIN=true` gesetzt sein.
+Prüfen ob `ALLOWED_ORIGINS` korrekt gesetzt ist. Für REST API und MCP Clients muss `ALLOW_NO_ORIGIN=true` gesetzt sein.
 
 ### Chat antwortet nicht / Fehler bei Verarbeitung
 
 Der Server startet, aber Chat-Anfragen schlagen fehl:
-- Pruefen ob Codex eingeloggt ist: `docker exec otris-docs codex auth status`
+- Prüfen ob Codex eingeloggt ist: `docker exec otris-docs codex auth status`
 - Neu einloggen: `docker exec -it otris-docs codex auth login --device-auth`
-- Container-Logs pruefen: `docker logs otris-docs`
+- Container-Logs prüfen: `docker logs otris-docs`
 - Die REST API (Suche, Lesen) funktioniert auch ohne Login — nur der Chat braucht ihn.
 
 ### MCP Client verbindet nicht
 
-1. Pruefen ob der Server erreichbar ist: `curl http://SERVER-IP:3000/api/health`
-2. Pruefen ob SSE funktioniert: `curl -N http://SERVER-IP:3000/sse`
-3. Firewall-Regeln pruefen (Port 3000 muss offen sein)
+1. Prüfen ob der Server erreichbar ist: `curl http://SERVER-IP:3000/api/health`
+2. Prüfen ob SSE funktioniert: `curl -N http://SERVER-IP:3000/sse`
+3. Firewall-Regeln prüfen (Port 3000 muss offen sein)

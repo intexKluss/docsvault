@@ -2,7 +2,7 @@
 
 ## Konfiguration
 
-Gemini CLI unterstuetzt kein Remote-MCP direkt. Nutze den lokalen MCP-Proxy:
+Gemini CLI unterstützt kein Remote-MCP direkt. Nutze den lokalen MCP-Proxy:
 
 ### 1. Proxy installieren
 

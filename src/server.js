@@ -39,7 +39,7 @@ export async function createServer(opts = {}) {
 
   const app = express();
 
-  // trust proxy fuer korrekte IP hinter reverse proxy
+  // trust proxy für korrekte IP hinter reverse proxy
   if (process.env.TRUST_PROXY) {
     const val = process.env.TRUST_PROXY;
     if (['loopback', '1', 'true'].includes(val)) {

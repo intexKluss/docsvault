@@ -1,15 +1,15 @@
-# MCP Tool fuer Entwickler
+# MCP Tool für Entwickler
 
 Dein Coding-Agent (Claude Code, Codex CLI, Gemini CLI, etc.) bekommt Zugriff auf die gesamte otris DOCUMENTS Dokumentation. Die Doku liegt auf dem Server — du brauchst keinen eigenen Vault.
 
 ## Voraussetzungen
 
-- Ein Coding-Agent der MCP unterstuetzt
+- Ein Coding-Agent der MCP unterstützt
 - Netzwerkzugriff zum otris-docs Server
 
 ## Option 1: Remote MCP (empfohlen)
 
-Verbinde deinen Agent direkt per MCP-Netzwerkprotokoll mit dem Server. Keine lokale Installation noetig.
+Verbinde deinen Agent direkt per MCP-Netzwerkprotokoll mit dem Server. Keine lokale Installation nötig.
 
 ### Claude Code
 
@@ -49,7 +49,7 @@ url = "http://SERVER-IP:3000/mcp"
 
 ## Option 2: Lokaler MCP-Proxy
 
-Fuer Agents die kein Remote-MCP unterstuetzen (z.B. Gemini CLI). Installiert einen lokalen MCP-Server der Anfragen an den otris-docs-web Server weiterleitet.
+Für Agents die kein Remote-MCP unterstützen (z.B. Gemini CLI). Installiert einen lokalen MCP-Server der Anfragen an den otris-docs-web Server weiterleitet.
 
 ```bash
 npm install -g git+ssh://git@github.com:leminkozey/otris-docs-mcp.git
@@ -74,7 +74,7 @@ Details: [otris-docs-mcp Repository](https://github.com/leminkozey/otris-docs-mc
 
 ## Option 3: REST API
 
-Fuer Agents oder Tools die kein MCP unterstuetzen:
+Für Agents oder Tools die kein MCP unterstützen:
 
 ```bash
 curl "http://SERVER-IP:3000/api/search?query=DocFile"
@@ -84,17 +84,17 @@ curl "http://SERVER-IP:3000/api/overview"
 curl "http://SERVER-IP:3000/api/status"
 ```
 
-`SERVER-IP` immer durch die tatsaechliche Server-Adresse ersetzen.
+`SERVER-IP` immer durch die tatsächliche Server-Adresse ersetzen.
 
-## Verfuegbare Tools
+## Verfügbare Tools
 
 | Tool | Beschreibung |
 |------|--------------|
 | `otris_search` | Volltextsuche in der Dokumentation |
 | `otris_read` | Einzelne Dokumentationsseite lesen |
 | `otris_list` | Seiten in einem Bereich auflisten |
-| `otris_overview` | Uebersicht ueber alle Bereiche und Sektionen |
-| `otris_status` | Vault-Status und Aktualitaet pruefen |
+| `otris_overview` | Übersicht über alle Bereiche und Sektionen |
+| `otris_status` | Vault-Status und Aktualität prüfen |
 
 ## Testen
 

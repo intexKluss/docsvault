@@ -43,7 +43,7 @@ export class ClaudeBridge {
     let warmingUp = false;
     let activeAbort = null;
 
-    // security-relevante felder NACH spread, nicht ueberschreibbar
+    // security-relevante felder NACH spread, nicht überschreibbar
     function buildOptions(overrides = {}) {
       const { model, maxTurns, abortController, resume } = overrides;
       return {

@@ -42,6 +42,6 @@ Ersetze `<SERVER-IP>` durch die IP des Servers (z.B. `192.168.2.100`).
 
 ## Verifizierung
 
-Starte Claude Code und pruefe mit `/mcp` ob der Server erkannt wird.
+Starte Claude Code und prüfe mit `/mcp` ob der Server erkannt wird.
 
 Stelle eine Testfrage: "Suche in der otris Doku nach FileType"

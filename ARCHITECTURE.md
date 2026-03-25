@@ -1,6 +1,6 @@
 # otris-docs-web — Architektur
 
-Web-Chat UI fuer die otris DOCUMENTS Dokumentation. Bot nutzt entweder Claude Agent SDK oder OpenAI Codex SDK. Die MCP-Tools (search, read, list, overview, status) sind direkt im Server internalisiert (`src/tools/`).
+Web-Chat UI für die otris DOCUMENTS Dokumentation. Bot nutzt entweder Claude Agent SDK oder OpenAI Codex SDK. Die MCP-Tools (search, read, list, overview, status) sind direkt im Server internalisiert (`src/tools/`).
 
 ## Dateistruktur
 
@@ -10,7 +10,7 @@ src/
   session-manager.js     Session-Lifecycle, Rate Limiting, Validierung
   claude-bridge.js       Bridge zu Claude Agent SDK (@anthropic-ai/claude-agent-sdk)
   codex-bridge.js        Bridge zu OpenAI Codex SDK (@openai/codex-sdk)
-  api-routes.js          REST API fuer externe MCP-Clients
+  api-routes.js          REST API für externe MCP-Clients
   mcp-handler.js         MCP SSE + Streamable HTTP Endpoints
   tools/                 Internalisierte Tool-Handler (vault, search, read, list, overview, status)
 public/
@@ -21,7 +21,7 @@ public/
   help/                  Installationshilfe
 ```
 
-## Architektur-Ueberblick
+## Architektur-Überblick
 
 ```
 Browser (app.js)
@@ -88,19 +88,19 @@ Beide Bridges exportieren das gleiche Interface:
 
 ## Session-Lifecycle
 
-1. **Connect**: Client oeffnet WebSocket → Server sendet `session_init`
+1. **Connect**: Client öffnet WebSocket → Server sendet `session_init`
 2. **Warm-Up**: Bridge erstellt Session, sendet Init-Query → Server sendet `session_ready`
 3. **Chat**: Client sendet `message` → Server streamt `tool_use`/`chunk`/`done`
-4. **Disconnect**: WebSocket schliesst → Session wird sofort destroyed
+4. **Disconnect**: WebSocket schließt → Session wird sofort destroyed
 
 Kein Reconnect, kein Session-Persist. Jeder Page-Load = neue Session.
 
 ## MCP-Integration
 
-Tools sind in `src/tools/` internalisiert und werden ueber drei Wege bereitgestellt:
+Tools sind in `src/tools/` internalisiert und werden über drei Wege bereitgestellt:
 1. **Intern (Bridges)**: Claude Bridge verbindet sich per MCP SSE zum eigenen Server
-2. **MCP SSE** (`/sse` + `/messages`): Fuer externe MCP-Clients (z.B. otris-docs-mcp)
-3. **REST API** (`/api/*`): Fuer einfache HTTP-Clients
+2. **MCP SSE** (`/sse` + `/messages`): Für externe MCP-Clients (z.B. otris-docs-mcp)
+3. **REST API** (`/api/*`): Für einfache HTTP-Clients
 4. **MCP Streamable HTTP** (`/mcp`): Alternatives MCP-Transportprotokoll
 
 | Tool | Zweck |
@@ -108,11 +108,11 @@ Tools sind in `src/tools/` internalisiert und werden ueber drei Wege bereitgeste
 | `otris_search` | Dokumentation durchsuchen |
 | `otris_read` | Dokument lesen |
 | `otris_list` | Verzeichnis durchsuchen |
-| `otris_overview` | Uebersicht laden |
-| `otris_status` | Status pruefen |
+| `otris_overview` | Übersicht laden |
+| `otris_status` | Status prüfen |
 
 Claude Bridge: Explizit als `allowedTools` + `disallowedTools` (alle Built-in Tools gesperrt).
-Codex Bridge: Nutzt MCP ueber Codex CLI Config.
+Codex Bridge: Nutzt MCP über Codex CLI Config.
 
 ## Environment Variables
 
@@ -123,14 +123,14 @@ Codex Bridge: Nutzt MCP ueber Codex CLI Config.
 | `MAX_SESSIONS` | `50` | Max gleichzeitige Sessions |
 | `RATE_LIMIT_PER_MIN` | `10` | Max Messages pro Minute/IP |
 | `MAX_MESSAGE_LENGTH` | `2000` | Max Zeichen pro Nachricht |
-| `TRUST_PROXY` | — | Express trust proxy (fuer Reverse Proxy) |
+| `TRUST_PROXY` | — | Express trust proxy (für Reverse Proxy) |
 | `ALLOW_NO_ORIGIN` | — | WebSocket ohne Origin erlauben |
 | `ALLOWED_ORIGINS` | — | Komma-separierte erlaubte Origins |
 | `CLAUDE_PATH` | — | Pfad zur Claude Code CLI |
 | `CODEX_PATH` | — | Pfad zur Codex CLI |
-| `CODEX_MODEL` | `gpt-5.4` | Model fuer Codex Bridge |
-| `MCP_CWD` | Projekt-Root | Arbeitsverzeichnis fuer MCP |
-| `MCP_SSE_URL` | `http://localhost:$PORT/sse` | SSE-URL fuer Claude Bridge MCP-Verbindung |
+| `CODEX_MODEL` | `gpt-5.4` | Model für Codex Bridge |
+| `MCP_CWD` | Projekt-Root | Arbeitsverzeichnis für MCP |
+| `MCP_SSE_URL` | `http://localhost:$PORT/sse` | SSE-URL für Claude Bridge MCP-Verbindung |
 | `API_RATE_LIMIT_PER_MIN` | `60` | Max REST API Requests pro Minute/IP |
 
 ## Frontend (app.js)
@@ -139,16 +139,16 @@ Codex Bridge: Nutzt MCP ueber Codex CLI Config.
 - **Typewriter-Effekt**: Chunks werden zeichenweise gerendert (3 chars/12ms)
 - **Tool-Block**: Klappbarer Fortschrittsblock ("Doku wird durchsucht..." → "X Quellen durchsucht")
 - **Auto-Scroll**: Stoppt bei manuellem Hochscrollen (wheel/touch), Scroll-to-Bottom Button
-- **Speed Toggle**: Schnell (Lightning) / Gruendlich (Search) — sendet `mode` mit
+- **Speed Toggle**: Schnell (Lightning) / Gründlich (Search) — sendet `mode` mit
 - **Bug-Report**: Overlay-Modal, sammelt letzte 10 Chat-Messages als Kontext
 - **Session-Status**: "Wird vorbereitet..." → "Bereit" mit Fade-Out
 - **Markdown**: marked.js + highlight.js + DOMPurify (XSS-Schutz)
 
 ### Cancel-Mechanismus
-1. Client schliesst WebSocket (`ws.onmessage = null, ws.close()`)
+1. Client schließt WebSocket (`ws.onmessage = null, ws.close()`)
 2. Server erkennt `ws.readyState !== 1` → bricht Generator ab
 3. Bridge: `AbortController.abort()` killt laufende SDK-Query
-4. Client oeffnet neuen WebSocket → neue Session
+4. Client öffnet neuen WebSocket → neue Session
 
 ## Sicherheit
 
