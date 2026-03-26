@@ -62,7 +62,7 @@ export async function createServer(opts = {}) {
     handleSseGet(req, res, VAULT_PATH);
   });
 
-  app.post('/messages', express.json(), (req, res) => {
+  app.post('/messages', (req, res) => {
     handleSsePost(req, res);
   });
 
