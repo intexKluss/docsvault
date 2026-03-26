@@ -20,7 +20,7 @@ Danach VS Code neu laden. Der Server erscheint in der MCP-Liste der Extension.
 
 - VS Code **1.102** oder neuer (empfohlen)
 - GitHub Copilot Extension installiert und eingeloggt
-- Copilot Chat im **Agent Mode** (nicht Ask oder Edit)
+- Copilot Chat im **Agent Mode**
 
 ## Konfiguration
 
@@ -56,7 +56,7 @@ Erstelle eine `.vscode/mcp.json` im Projektverzeichnis:
 
 So ist der Server in jedem Projekt verfügbar, ohne `.vscode/mcp.json` pro Repo.
 
-> **Hinweis:** Die alte Methode über `settings.json` (`"mcp": { "servers": { ... } }`) ist seit VS Code 1.102 deprecated. VS Code bietet automatisch eine Migration zur eigenständigen `mcp.json` an.
+> **Hinweis:** Die alte Methode über `settings.json` (`"mcp": { "servers": { ... } }`) wurde ab VS Code 1.102 durch die eigenständige `mcp.json` ersetzt. VS Code erkennt alte Einträge und bietet automatisch eine Migration an.
 
 Ersetze `<SERVER-IP>` durch die IP des Servers (z.B. `192.168.2.100`).
 
@@ -65,8 +65,10 @@ Ersetze `<SERVER-IP>` durch die IP des Servers (z.B. `192.168.2.100`).
 MCP-Tools funktionieren nur im **Agent Mode** von Copilot Chat:
 
 1. Copilot Chat öffnen (`Ctrl+Alt+I`)
-2. Oben im Chat-Fenster das Dropdown von "Ask" oder "Edit" auf **"Agent"** umstellen
+2. Sicherstellen, dass **Agent** als Modus ausgewählt ist (über den Mode-Picker oben im Chat-Fenster)
 3. Jetzt hat Copilot Zugriff auf die otris-docs Tools
+
+> **Hinweis:** Die Chat-UI wird regelmäßig aktualisiert. Falls kein Mode-Picker sichtbar ist, ist Agent Mode möglicherweise bereits der Standard. Die MCP-Tools werden im Chat als verfügbare Tools angezeigt, sobald der Server verbunden ist.
 
 ## Verifizierung
 
