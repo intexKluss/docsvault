@@ -1,1 +1,5 @@
 vault/** linguist-generated
+
+# shell scripts immer LF (sonst kaputt im Container)
+*.sh text eol=lf
+docker-entrypoint.sh text eol=lf

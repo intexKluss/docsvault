@@ -17,7 +17,7 @@ COPY src/ ./src/
 COPY public/ ./public/
 COPY vault/ ./vault/
 COPY docker-entrypoint.sh ./
-RUN chmod +x docker-entrypoint.sh
+RUN sed -i 's/\r$//' docker-entrypoint.sh && chmod +x docker-entrypoint.sh
 
 USER node
 
