@@ -18,13 +18,13 @@ Danach VS Code neu laden. Der Server erscheint in der MCP-Liste der Extension.
 
 ## Voraussetzungen
 
-- VS Code **1.99** oder neuer
+- VS Code **1.102** oder neuer (empfohlen)
 - GitHub Copilot Extension installiert und eingeloggt
 - Copilot Chat im **Agent Mode** (nicht Ask oder Edit)
 
 ## Konfiguration
 
-### Option A: Projekt-spezifisch (.vscode/mcp.json)
+### Option A: Projekt-spezifisch (.vscode/mcp.json) — empfohlen
 
 Erstelle eine `.vscode/mcp.json` im Projektverzeichnis:
 
@@ -39,24 +39,24 @@ Erstelle eine `.vscode/mcp.json` im Projektverzeichnis:
 }
 ```
 
-### Option B: Global (VS Code User Settings)
+### Option B: Global (User MCP Configuration)
 
-`Ctrl+Shift+P` → "Preferences: Open User Settings (JSON)" und einfügen:
+`Ctrl+Shift+P` → **"MCP: Open User Configuration"** und einfügen:
 
 ```json
 {
-  "mcp": {
-    "servers": {
-      "otris-docs": {
-        "type": "sse",
-        "url": "http://<SERVER-IP>:3000/sse"
-      }
+  "servers": {
+    "otris-docs": {
+      "type": "sse",
+      "url": "http://<SERVER-IP>:3000/sse"
     }
   }
 }
 ```
 
 So ist der Server in jedem Projekt verfügbar, ohne `.vscode/mcp.json` pro Repo.
+
+> **Hinweis:** Die alte Methode über `settings.json` (`"mcp": { "servers": { ... } }`) ist seit VS Code 1.102 deprecated. VS Code bietet automatisch eine Migration zur eigenständigen `mcp.json` an.
 
 Ersetze `<SERVER-IP>` durch die IP des Servers (z.B. `192.168.2.100`).
 
@@ -75,3 +75,12 @@ Im Agent Mode eine Testfrage stellen:
 > Suche in der otris Doku nach FileType
 
 Copilot sollte die MCP-Tools nutzen und Ergebnisse aus der Dokumentation liefern.
+
+## Troubleshooting
+
+Falls der Server als "not connected" angezeigt wird:
+
+1. **Server erreichbar?** — Im Browser `http://<SERVER-IP>:3000/sse` aufrufen, es sollte eine SSE-Verbindung starten
+2. **VS Code neu laden** — `Ctrl+Shift+P` → "Developer: Reload Window"
+3. **MCP Output prüfen** — `Ctrl+Shift+P` → "MCP: List Servers" zeigt den Verbindungsstatus
+4. **Firewall** — Port 3000 muss vom Entwicklerrechner aus erreichbar sein
