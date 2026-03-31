@@ -100,7 +100,7 @@ function parseFrontmatter(raw) {
   return { frontmatter, body };
 }
 
-// tries ripgrep first, falls back to node regex
+// splits query into tokens, searches each, ranks by number of distinct token hits
 export function searchDocs(vaultPath, query, options = {}) {
   const { section, contextLines = 2, maxResults = 10 } = options;
   const searchPath = section ? join(vaultPath, section) : vaultPath;
@@ -111,11 +111,49 @@ export function searchDocs(vaultPath, query, options = {}) {
     return [];
   }
 
-  try {
-    return searchWithRipgrep(vaultPath, searchPath, query, contextLines, maxResults);
-  } catch {
-    return searchWithNode(vaultPath, searchPath, query, contextLines, maxResults);
+  const tokens = query.trim().split(/\s+/).filter(t => t.length >= 2);
+  if (tokens.length === 0) return [];
+
+  // single token or exact phrase: search as-is
+  if (tokens.length === 1) {
+    try {
+      return searchWithRipgrep(vaultPath, searchPath, query, contextLines, maxResults);
+    } catch {
+      return searchWithNode(vaultPath, searchPath, query, contextLines, maxResults);
+    }
   }
+
+  // multi-token: search with OR pattern, then rank by distinct token hits
+  const orPattern = tokens.map(escapeRegex).join('|');
+  let raw;
+  try {
+    raw = searchWithRipgrep(vaultPath, searchPath, orPattern, contextLines, maxResults * 5);
+  } catch {
+    raw = searchWithNode(vaultPath, searchPath, orPattern, contextLines, maxResults * 5);
+  }
+
+  return rankByTokenCoverage(raw, tokens).slice(0, maxResults);
+}
+
+function rankByTokenCoverage(results, tokens) {
+  const tokenRegexes = tokens.map(t => new RegExp(escapeRegex(t), 'i'));
+
+  for (const result of results) {
+    const allText = result.matches.map(m => m.text).join(' ');
+    let hits = 0;
+    for (const re of tokenRegexes) {
+      if (re.test(allText) || re.test(result.title)) hits++;
+    }
+    result._score = hits;
+  }
+
+  results.sort((a, b) => b._score - a._score);
+
+  for (const result of results) {
+    delete result._score;
+  }
+
+  return results;
 }
 
 function searchWithRipgrep(vaultPath, searchPath, query, contextLines, maxResults) {
