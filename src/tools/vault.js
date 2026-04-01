@@ -129,7 +129,7 @@ export function searchDocs(vaultPath, query, options = {}) {
   try {
     raw = searchWithRipgrep(vaultPath, searchPath, orPattern, contextLines, maxResults * 5);
   } catch {
-    raw = searchWithNode(vaultPath, searchPath, orPattern, contextLines, maxResults * 5);
+    raw = searchWithNodeRegex(vaultPath, searchPath, new RegExp(orPattern, 'i'), contextLines, maxResults * 5);
   }
 
   return rankByTokenCoverage(raw, tokens).slice(0, maxResults);
@@ -209,7 +209,10 @@ function parseRipgrepOutput(vaultPath, output) {
 }
 
 function searchWithNode(vaultPath, searchPath, query, contextLines, maxResults) {
-  const regex = new RegExp(escapeRegex(query), 'i');
+  return searchWithNodeRegex(vaultPath, searchPath, new RegExp(escapeRegex(query), 'i'), contextLines, maxResults);
+}
+
+function searchWithNodeRegex(vaultPath, searchPath, regex, contextLines, maxResults) {
   const results = [];
 
   const mdFiles = [];
