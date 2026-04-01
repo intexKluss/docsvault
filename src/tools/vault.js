@@ -124,15 +124,25 @@ export function searchDocs(vaultPath, query, options = {}) {
   }
 
   // multi-token: search with OR pattern, then rank by distinct token hits
+  // use context 0 for ranking pass to keep output size manageable
   const orPattern = tokens.map(escapeRegex).join('|');
   let raw;
   try {
-    raw = searchWithRipgrep(vaultPath, searchPath, orPattern, contextLines, maxResults * 5);
+    raw = searchWithRipgrep(vaultPath, searchPath, orPattern, 0, maxResults * 3);
   } catch {
-    raw = searchWithNodeRegex(vaultPath, searchPath, new RegExp(orPattern, 'i'), contextLines, maxResults * 5);
+    raw = searchWithNodeRegex(vaultPath, searchPath, new RegExp(orPattern, 'i'), 0, maxResults * 3);
   }
 
-  return rankByTokenCoverage(raw, tokens).slice(0, maxResults);
+  const ranked = rankByTokenCoverage(raw, tokens).slice(0, maxResults);
+
+  // trim matches per file to keep response size down
+  for (const result of ranked) {
+    if (result.matches.length > 10) {
+      result.matches = result.matches.slice(0, 10);
+    }
+  }
+
+  return ranked;
 }
 
 function rankByTokenCoverage(results, tokens) {
