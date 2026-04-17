@@ -107,7 +107,22 @@ docker run -d --name otris-docs --restart unless-stopped -p 3000:3000 -e BRIDGE=
 - `SERVER-IP` — tatsaechliche IP oder Domain des Servers (bei Lokal-Test: `localhost`)
 - `/srv/otris/vaults` (Linux) bzw. `C:/dein/pfad/zu/vaults` (Windows) — dein Host-Pfad aus Schritt 3, also wohin du den Vault geklont hast
 
-`/app/vaults` (der Teil **nach** dem `:`) ist Container-intern und bleibt wie er ist.
+**Zum Volume-Format `-v ...`:** Docker erwartet drei Teile getrennt mit `:` — `HOSTPFAD:CONTAINERPFAD:OPTIONEN`.
+
+```
+-v "C:/otris web test/vaults : /app/vaults : ro"
+      └─────────┬──────────┘   └────┬────┘  └┬┘
+            Host-Pfad        Container-Pfad  read-only
+      (dein Windows-Ordner)  (server liest   (optional)
+                              hier die Vaults)
+```
+
+Der **Container-Pfad `/app/vaults`** ist fix — der Server sucht dort die Vaults, darf also nicht geaendert werden. Der **Host-Pfad** ist dein frei waehlbarer Ordner aus Schritt 3. Das `:ro` am Ende ist optional (read-only, verhindert dass der Container in deinen Ordner schreibt).
+
+Analog fuer das zweite Volume `-v otris-docs-codex:/home/node/.codex`:
+- `otris-docs-codex` — named volume (Docker verwaltet das automatisch, keine Host-Datei noetig)
+- `/home/node/.codex` — Container-Pfad wo Codex seine Auth speichert
+- Keine Optionen (read-write)
 
 > **Bug-Reports persistent machen** (optional): Standardmaessig landen Bug-Reports in `/app/reports.json` **im Container** — verschwinden also beim `docker rm`. Wenn du sie ueber Container-Rebuilds erhalten willst, mounte eine Host-Datei drauf:
 > - Host-Datei vorher anlegen: Linux `touch /srv/otris/reports.json` bzw. Windows `New-Item -ItemType File "C:\pfad\reports.json" -Force`
