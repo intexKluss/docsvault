@@ -102,14 +102,17 @@ Gleicher Befehl wie beim ersten Mal.
 ### 6. Testen
 
 ```bash
-# Health Check (sollte {"status":"ok"} zurückgeben)
+# Health Check (zeigt Status + Anzahl Vaults)
 curl http://localhost:3000/api/health
 
-# Vault-Status (zeigt Seitenanzahl, Sektionen, Aktualität)
-curl http://localhost:3000/api/status
+# Liste der konfigurierten Vaults
+curl http://localhost:3000/api/vaults
 
-# Suche testen
-curl "http://localhost:3000/api/search?query=DocFile&max_results=3"
+# Vault-Status des otris-Vaults (Seitenanzahl, Sektionen, Aktualität)
+curl http://localhost:3000/api/otris/status
+
+# Suche testen (Pfad = /api/<toolPrefix>/search)
+curl "http://localhost:3000/api/otris/search?query=DocFile&max_results=3"
 
 # Web UI im Browser öffnen
 open http://localhost:3000
@@ -166,14 +169,17 @@ Details: [INSTALL-DEVELOPER.md](INSTALL-DEVELOPER.md)
 |------|-----|--------------|
 | `/` | Web UI | Chat-Oberfläche |
 | `/help/` | Web UI | Installationshilfe für Entwickler |
-| `/api/health` | REST | Health Check |
-| `/api/status` | REST | Vault-Status |
-| `/api/search?query=...` | REST | Volltextsuche |
-| `/api/read?path=...` | REST | Dokument lesen |
-| `/api/list?section=...` | REST | Dateien auflisten |
-| `/api/overview` | REST | Übersicht aller Sektionen |
+| `/api/health` | REST | Health Check + Vault-Anzahl |
+| `/api/vaults` | REST | Liste aller konfigurierten Vaults |
+| `/api/<prefix>/status` | REST | Vault-Status |
+| `/api/<prefix>/search?query=...` | REST | Volltextsuche im Vault |
+| `/api/<prefix>/read?path=...` | REST | Dokument lesen |
+| `/api/<prefix>/list?section=...` | REST | Dateien auflisten |
+| `/api/<prefix>/overview` | REST | Übersicht aller Sektionen |
 | `/sse` | MCP | SSE-Transport für MCP-Clients |
 | `/mcp` | MCP | Streamable HTTP-Transport |
+
+`<prefix>` ist der `toolPrefix` aus der `_meta.json` des jeweiligen Vaults (Default-Setup: `otris`).
 
 ## Sicherheit
 
