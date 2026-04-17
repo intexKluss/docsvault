@@ -1,13 +1,22 @@
-import { describe, it } from 'node:test';
+import { describe, it, after } from 'node:test';
 import assert from 'node:assert/strict';
 import { join } from 'node:path';
-import { fileURLToPath } from 'node:url';
-import { dirname } from 'node:path';
 import { getSections, listFiles, readDoc, searchDocs, getManifest } from '../src/tools/vault.js';
+import { createTempVaultsRoot } from './helpers/temp-vault.js';
 
-const __filename = fileURLToPath(import.meta.url);
-const __dirname = dirname(__filename);
-const VAULT_PATH = join(__dirname, '..', 'vaults', 'otris');
+// fixture-vault zur laufzeit erzeugen - vault-content liegt nicht mehr im repo
+const { root, cleanup } = createTempVaultsRoot({
+  'otris': {
+    meta: { toolPrefix: 'otris' },
+    files: {
+      'api/DocFile.md': '---\ntitle: DocFile\nsource: https://example.com\n---\n# DocFile\n\nEine Klasse fuer Dateien. Hat function upload() method.',
+      'api/Interface.md': '# Interface\n\nJede Klasse hat Methoden und function-Definitionen.',
+      'howtos/upload.md': '# Upload\n\nSo laedst du etwas hoch. function upload() benutzen.',
+    },
+  },
+});
+const VAULT_PATH = join(root, 'otris');
+after(cleanup);
 
 describe('Vault', () => {
   describe('getSections', () => {
