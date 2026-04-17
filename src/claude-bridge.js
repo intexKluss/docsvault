@@ -3,6 +3,7 @@ import { query } from '@anthropic-ai/claude-agent-sdk';
 import { dirname, join, resolve } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { buildSystemPrompt } from './system-prompt.js';
+import { TOOL_SUFFIXES } from './vault-registry.js';
 
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = dirname(__filename);
@@ -28,7 +29,9 @@ const DISALLOWED_TOOLS = [
 
 export class ClaudeBridge {
   constructor(vaultRegistry) {
-    this.vaultRegistry = vaultRegistry || [];
+    this.vaultRegistry = (vaultRegistry || []).filter(
+      v => v && typeof v.toolPrefix === 'string' && v.toolPrefix.length > 0
+    );
   }
 
   async createSession() {
@@ -41,13 +44,9 @@ export class ClaudeBridge {
 
     const registry = this.vaultRegistry;
     const systemPrompt = buildSystemPrompt(registry);
-    const allowedTools = registry.flatMap(v => [
-      `mcp__otris-docs__${v.toolPrefix}_overview`,
-      `mcp__otris-docs__${v.toolPrefix}_search`,
-      `mcp__otris-docs__${v.toolPrefix}_read`,
-      `mcp__otris-docs__${v.toolPrefix}_list`,
-      `mcp__otris-docs__${v.toolPrefix}_status`,
-    ]);
+    const allowedTools = registry.flatMap(v =>
+      TOOL_SUFFIXES.map(s => `mcp__otris-docs__${v.toolPrefix}_${s}`)
+    );
 
     // security-relevante felder NACH spread, nicht überschreibbar
     function buildOptions(overrides = {}) {

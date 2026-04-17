@@ -11,7 +11,9 @@ const MCP_CWD = resolve(__dirname, '..');
 
 export class CodexBridge {
   constructor(vaultRegistry) {
-    this.vaultRegistry = vaultRegistry || [];
+    this.vaultRegistry = (vaultRegistry || []).filter(
+      v => v && typeof v.toolPrefix === 'string' && v.toolPrefix.length > 0
+    );
   }
 
   async createSession() {
