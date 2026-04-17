@@ -1,7 +1,7 @@
 import { describe, it, after } from 'node:test';
 import assert from 'node:assert/strict';
 import { createTempVaultsRoot } from './helpers/temp-vault.js';
-import { loadVaultRegistry } from '../src/vault-registry.js';
+import { loadVaultRegistry, TOOL_SUFFIXES } from '../src/vault-registry.js';
 import { createMcpServer } from '../src/mcp-handler.js';
 import { handleSearch } from '../src/tools/search.js';
 
@@ -30,11 +30,18 @@ describe('Multi-vault integration', () => {
     assert.deepEqual(registry.map(v => v.toolPrefix).sort(), ['intex_regeln', 'otris']);
   });
 
-  it('creates MCP server with 10 tools', () => {
+  it('creates MCP server with 5 tools per vault using correct prefixes', () => {
     const registry = loadVaultRegistry(root);
     const server = createMcpServer(registry);
+    // uses SDK internal; may break on SDK upgrade
     const tools = server._registeredTools || {};
-    assert.equal(Object.keys(tools).length, 10);
+    assert.equal(Object.keys(tools).length, registry.length * TOOL_SUFFIXES.length);
+
+    for (const prefix of ['otris', 'intex_regeln']) {
+      for (const suffix of TOOL_SUFFIXES) {
+        assert.ok(tools[`${prefix}_${suffix}`], `missing tool ${prefix}_${suffix}`);
+      }
+    }
   });
 
   it('search isolates per-vault content', () => {
