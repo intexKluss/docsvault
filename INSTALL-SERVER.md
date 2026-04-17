@@ -20,10 +20,29 @@ cd otris-docs-web
 docker build -t otris-docs .
 ```
 
-Das Image ist ca. 1 GB groß (Node.js + 995 Markdown-Seiten Dokumentation).
+Das Image ist schlank — der Vault wird nicht mehr mitgebaut, sondern per Volume gemountet.
 Der Build dauert unter 30 Sekunden (plus Download beim ersten Mal).
 
-### 3. Container starten
+### 3. Vaults vorbereiten
+
+Der Container liest Vaults aus `/app/vaults`, gemountet vom Host. Jeder Unterordner ist ein eigener Vault.
+
+```bash
+mkdir -p /srv/otris/vaults/otris
+# otris-Doku dort ablegen (Crawler-Output oder aus altem Container kopiert)
+cp -r ./vault/. /srv/otris/vaults/otris/
+cat > /srv/otris/vaults/otris/_meta.json <<'EOF'
+{
+  "name": "otris DOCUMENTS API",
+  "description": "Komplette otris DOCUMENTS API-Dokumentation.",
+  "toolPrefix": "otris"
+}
+EOF
+```
+
+Weitere Vaults koennen analog angelegt werden — siehe [README.md](README.md#weitere-vaults-hinzufuegen).
+
+### 4. Container starten
 
 **Linux/Mac:**
 
@@ -35,6 +54,7 @@ docker run -d \
   -e BRIDGE=codex \
   -e ALLOWED_ORIGINS=http://SERVER-IP:3000 \
   -e ALLOW_NO_ORIGIN=true \
+  -v /srv/otris/vaults:/app/vaults:ro \
   -v otris-docs-codex:/home/node/.codex \
   -v $(pwd)/reports.json:/app/reports.json \
   otris-docs
@@ -43,15 +63,15 @@ docker run -d \
 **Windows (PowerShell):**
 
 ```powershell
-docker run -d --name otris-docs --restart unless-stopped -p 3000:3000 -e BRIDGE=codex -e ALLOWED_ORIGINS=http://SERVER-IP:3000 -e ALLOW_NO_ORIGIN=true -v otris-docs-codex:/home/node/.codex -v "$(pwd)/reports.json:/app/reports.json" otris-docs
+docker run -d --name otris-docs --restart unless-stopped -p 3000:3000 -e BRIDGE=codex -e ALLOWED_ORIGINS=http://SERVER-IP:3000 -e ALLOW_NO_ORIGIN=true -v /srv/otris/vaults:/app/vaults:ro -v otris-docs-codex:/home/node/.codex -v "$(pwd)/reports.json:/app/reports.json" otris-docs
 ```
 
 Ersetzen:
 - `SERVER-IP` → tatsächliche IP oder Domain des Servers
 
-Die Volumes sorgen dafür, dass Codex-Auth und Bug-Reports bei Container-Rebuilds erhalten bleiben.
+Die Volumes sorgen dafür, dass Vaults, Codex-Auth und Bug-Reports bei Container-Rebuilds erhalten bleiben.
 
-### 4. Codex Login (einmalig)
+### 5. Codex Login (einmalig)
 
 Der Web-Chat nutzt die Codex CLI mit ChatGPT-Account (kein API Key nötig). Login per Device-Auth:
 
@@ -79,7 +99,7 @@ Gleicher Befehl wie beim ersten Mal.
 
 **Hinweis:** Ohne Login startet der Server, MCP-Tools und REST API funktionieren, aber der Web-Chat kann keine Antworten generieren.
 
-### 5. Testen
+### 6. Testen
 
 ```bash
 # Health Check (sollte {"status":"ok"} zurückgeben)
@@ -101,7 +121,7 @@ curl -N http://localhost:3000/sse
 docker inspect --format='{{.State.Health.Status}}' otris-docs
 ```
 
-### 6. Entwickler verbinden
+### 7. Entwickler verbinden
 
 Entwickler verbinden ihren Coding-Agent per MCP. Claude Code (empfohlen):
 
@@ -130,7 +150,7 @@ Details: [INSTALL-DEVELOPER.md](INSTALL-DEVELOPER.md)
 |----------|---------|--------------|
 | `BRIDGE` | `codex` | AI-Bridge: `codex` oder `claude` |
 | `PORT` | `3000` | Server-Port |
-| `VAULT_PATH` | `/app/vault` | Pfad zum Vault im Container |
+| `VAULTS_ROOT` | `/app/vaults` | Wurzel-Verzeichnis der Vaults im Container (Volume-Mount) |
 | `ALLOWED_ORIGINS` | — | Erlaubte Origins für WebSocket (kommasepariert) |
 | `CODEX_MODEL` | `gpt-5.4` | Model für Codex Bridge |
 | `ALLOW_NO_ORIGIN` | `false` | Verbindungen ohne Origin-Header erlauben (für REST API/MCP Clients nötig) |
@@ -169,8 +189,10 @@ Details: [INSTALL-DEVELOPER.md](INSTALL-DEVELOPER.md)
 
 Siehe [UPDATE-VAULT.md](UPDATE-VAULT.md). Kurzfassung:
 1. Auf dem Mac: `npm run crawl` (Playwright)
-2. `git add vault/ && git commit -m "Update vault" && git push`
-3. Auf dem Server: Rebuild (siehe unten)
+2. MD-Dateien ins Host-Verzeichnis kopieren: `cp -r vault/. /srv/otris/vaults/otris/`
+3. Auf dem Server: `docker restart otris-docs`
+
+Kein Rebuild noetig — die Vaults liegen ausserhalb des Images.
 
 ### Code-Update / Rebuild
 
@@ -186,12 +208,13 @@ docker run -d \
   -e BRIDGE=codex \
   -e ALLOWED_ORIGINS=http://SERVER-IP:3000 \
   -e ALLOW_NO_ORIGIN=true \
+  -v /srv/otris/vaults:/app/vaults:ro \
   -v otris-docs-codex:/home/node/.codex \
   -v $(pwd)/reports.json:/app/reports.json \
   otris-docs
 ```
 
-Die Codex-Auth bleibt im Named Volume `otris-docs-codex` erhalten — kein erneutes Login nötig.
+Die Codex-Auth bleibt im Named Volume `otris-docs-codex` erhalten — kein erneutes Login nötig. Die Vaults bleiben ebenfalls erhalten, sie liegen auf dem Host.
 
 ## Troubleshooting
 

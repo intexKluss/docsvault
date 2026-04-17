@@ -21,18 +21,53 @@ npm run dev:codex     # Codex Bridge
 ## Deployment (Docker)
 
 ```bash
-docker build -t otris-docs .
+docker build -t otris-docs-web .
+
+# Vault-Verzeichnis auf dem Host vorbereiten
+mkdir -p /srv/otris/vaults/otris
+# (otris-Vault vom Crawler dorthin legen oder aus altem Container kopieren)
+cp -r ./vault/. /srv/otris/vaults/otris/
+cat > /srv/otris/vaults/otris/_meta.json <<'EOF'
+{
+  "name": "otris DOCUMENTS API",
+  "description": "Komplette otris DOCUMENTS API-Dokumentation.",
+  "toolPrefix": "otris"
+}
+EOF
+
+# Container starten
 docker run -d \
-  --name otris-docs \
-  --restart unless-stopped \
+  -v /srv/otris/vaults:/app/vaults:ro \
   -p 3000:3000 \
-  -e BRIDGE=codex \
-  -e ALLOWED_ORIGINS=http://SERVER-IP:3000 \
-  -e ALLOW_NO_ORIGIN=true \
-  otris-docs
+  --name otris-docs \
+  otris-docs-web
 ```
 
 Siehe [INSTALL-SERVER.md](INSTALL-SERVER.md) für Details.
+
+## Weitere Vaults hinzufuegen
+
+Jeder Unterordner unter dem gemounteten Vaults-Verzeichnis wird zu einem eigenen Vault mit eigenen MCP-Tools (`<prefix>_search`, `<prefix>_read`, `<prefix>_list`, `<prefix>_overview`, `<prefix>_status`).
+
+```bash
+mkdir -p /srv/otris/vaults/intex-regeln
+cat > /srv/otris/vaults/intex-regeln/_meta.json <<'EOF'
+{
+  "name": "Intex Regeln",
+  "description": "Interne Richtlinien und Team-Konventionen.",
+  "toolPrefix": "intex_regeln"
+}
+EOF
+# ... Markdown-Dateien reinkopieren ...
+
+# Container neustarten damit die Tools registriert werden
+docker restart otris-docs
+```
+
+**`_meta.json` Felder (alle optional):**
+- `name` — Anzeigename (Default: Ordnername)
+- `description` — wird in Tool-Beschreibungen eingesetzt, hilft dem LLM beim Tool-Auswahl
+- `toolPrefix` — Prefix fuer Tool-Namen, muss `/^[a-z][a-z0-9_]*$/` matchen (Default: Slug aus Ordnername)
 
 ## Für Entwickler (MCP-Client)
 
@@ -106,12 +141,13 @@ docker run -d --name otris-docs --restart unless-stopped \
   -p 3000:3000 -e BRIDGE=codex \
   -e ALLOWED_ORIGINS=http://SERVER-IP:3000 \
   -e ALLOW_NO_ORIGIN=true \
+  -v /srv/otris/vaults:/app/vaults:ro \
   -v otris-docs-codex:/home/node/.codex \
   -v $(pwd)/reports.json:/app/reports.json \
   otris-docs
 ```
 
-Die Codex-Auth bleibt im Volume `otris-docs-codex` erhalten.
+Die Codex-Auth bleibt im Volume `otris-docs-codex` erhalten. Die Vaults liegen auf dem Host (siehe `-v /srv/otris/vaults`).
 
 ## Vault aktualisieren
 

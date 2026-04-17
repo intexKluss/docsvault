@@ -39,7 +39,10 @@ claude-bridge.js               codex-bridge.js
 src/tools/ (search, read, list, overview, status)
     |
     v
-vault/ (995 Markdown-Dateien)
+vaults/
+  ├── otris/        (via Volume-Mount, 995 MDs, _meta.json)
+  ├── intex-regeln/ (via Volume-Mount, _meta.json)
+  └── ...
 ```
 
 ## Bridge-Switching
@@ -105,11 +108,13 @@ Tools sind in `src/tools/` internalisiert und werden über drei Wege bereitgeste
 
 | Tool | Zweck |
 |---|---|
-| `otris_search` | Dokumentation durchsuchen |
-| `otris_read` | Dokument lesen |
-| `otris_list` | Verzeichnis durchsuchen |
-| `otris_overview` | Übersicht laden |
-| `otris_status` | Status prüfen |
+| `<prefix>_search` | Dokumentation durchsuchen |
+| `<prefix>_read` | Dokument lesen |
+| `<prefix>_list` | Verzeichnis durchsuchen |
+| `<prefix>_overview` | Übersicht laden |
+| `<prefix>_status` | Status prüfen |
+
+> Pro Vault werden diese 5 Tools mit dem `toolPrefix` aus `_meta.json` registriert.
 
 Claude Bridge: Explizit als `allowedTools` + `disallowedTools` (alle Built-in Tools gesperrt).
 Codex Bridge: Nutzt MCP über Codex CLI Config.
@@ -120,6 +125,7 @@ Codex Bridge: Nutzt MCP über Codex CLI Config.
 |---|---|---|
 | `BRIDGE` | `claude` | `claude` oder `codex` |
 | `PORT` | `3000` | Server Port |
+| `VAULTS_ROOT` | `./vaults` | Wurzel-Verzeichnis der Vaults (Volume-Mount) |
 | `MAX_SESSIONS` | `50` | Max gleichzeitige Sessions |
 | `RATE_LIMIT_PER_MIN` | `10` | Max Messages pro Minute/IP |
 | `MAX_MESSAGE_LENGTH` | `2000` | Max Zeichen pro Nachricht |

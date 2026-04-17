@@ -1,74 +1,43 @@
-# Vault aktualisieren
+# Vault-Updates
 
-Der Vault enthält die gecrawlte otris DOCUMENTS Dokumentation als Markdown-Dateien. Das Crawlen passiert auf dem Mac (braucht Playwright/Browser), nicht auf dem Server.
+Vaults liegen ausserhalb des Docker-Images auf dem Host. Der Container wird nur neu gestartet, nicht neu gebaut.
 
-## Voraussetzungen
-
-- Node.js 20+
-- Playwright installiert: `npm install` im Repo (installiert Playwright als devDependency)
-- Playwright Browser: `npx playwright install chromium`
-- Zugang zur otris DOCUMENTS Instanz
-
-## Schritte
-
-### 1. Repo aktuell halten
+## Neuen Vault hinzufuegen
 
 ```bash
-cd otris-docs-web
-git pull
+mkdir -p /srv/otris/vaults/<name>
+cat > /srv/otris/vaults/<name>/_meta.json <<'EOF'
+{
+  "name": "Anzeigename",
+  "description": "Wofuer ist dieser Vault da? Landet in Tool-Descriptions.",
+  "toolPrefix": "name"
+}
+EOF
+# Markdown-Dateien ins Verzeichnis kopieren
+docker restart otris-docs
 ```
 
-### 2. Einmalig: Login-Session erstellen
+## Bestehenden Vault aktualisieren
 
-Öffnet einen Chromium-Browser zur manuellen Anmeldung:
-
-```bash
-npm run crawl:login
-```
-
-Nach dem Login schließt sich der Browser automatisch. Die Session wird gespeichert.
-
-### 3. Crawler starten
+Einfach die MD-Dateien im Host-Verzeichnis aendern/austauschen:
 
 ```bash
+# z.B. neue otris-Doku crawlen
+cd /path/to/otris-docs-web
 npm run crawl
+cp -r vault/. /srv/otris/vaults/otris/
+docker restart otris-docs
 ```
 
-Optional nur eine bestimmte Sektion crawlen:
+Hinweis: Der Crawler schreibt weiterhin in `./vault/` im Repo-Root — das ist nur ein Staging-Bereich. Die eigentliche Live-Quelle ist `/srv/otris/vaults/otris/`. Der `./vault/`-Ordner ist in `.gitignore` und soll nicht mehr committet werden.
+
+## Vault entfernen
 
 ```bash
-node crawl.mjs --section portalscript-api
+rm -rf /srv/otris/vaults/<name>
+docker restart otris-docs
 ```
 
-### 4. Änderungen committen und pushen
+## Warum kein Live-Reload?
 
-```bash
-git add vault/
-git commit -m "Update vault"
-git push
-```
-
-### 5. Server aktualisieren
-
-Auf dem Server:
-
-```bash
-cd otris-docs-web
-git pull
-docker build -t otris-docs .
-docker stop otris-docs && docker rm otris-docs
-docker run -d \
-  --name otris-docs \
-  --restart unless-stopped \
-  -p 3000:3000 \
-  -e BRIDGE=codex \
-  -e ALLOWED_ORIGINS=http://SERVER-IP:3000 \
-  -e ALLOW_NO_ORIGIN=true \
-  otris-docs
-```
-
-## Hinweise
-
-- Der Crawler braucht Playwright (einen echten Browser). Das funktioniert nur auf dem Mac, nicht im Docker-Container.
-- Die Login-Session (`vault/.auth.json`) wird NICHT committet (in `.gitignore`).
-- Nach dem Update sehen alle Nutzer (Web UI + MCP Clients) sofort die neue Doku.
+Mehrere Nutzer koennten sonst unterschiedlichen Tool-Stand sehen. Container-Restart haelt alle Sessions konsistent. Der Restart ist nur ein paar Sekunden.
