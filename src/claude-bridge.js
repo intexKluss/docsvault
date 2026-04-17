@@ -2,7 +2,7 @@ import { randomUUID } from 'node:crypto';
 import { query } from '@anthropic-ai/claude-agent-sdk';
 import { dirname, join, resolve } from 'node:path';
 import { fileURLToPath } from 'node:url';
-import { SYSTEM_PROMPT } from './system-prompt.js';
+import { buildSystemPrompt } from './system-prompt.js';
 
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = dirname(__filename);
@@ -18,14 +18,6 @@ const MCP_SERVERS = {
   }
 };
 
-const ALLOWED_TOOLS = [
-  'mcp__otris-docs__otris_search',
-  'mcp__otris-docs__otris_read',
-  'mcp__otris-docs__otris_list',
-  'mcp__otris-docs__otris_overview',
-  'mcp__otris-docs__otris_status'
-];
-
 const DISALLOWED_TOOLS = [
   'Bash', 'Read', 'Write', 'Edit', 'Glob', 'Grep',
   'Agent', 'TodoWrite', 'WebSearch', 'WebFetch',
@@ -35,6 +27,10 @@ const DISALLOWED_TOOLS = [
 ];
 
 export class ClaudeBridge {
+  constructor(vaultRegistry) {
+    this.vaultRegistry = vaultRegistry || [];
+  }
+
   async createSession() {
     const id = randomUUID();
     let destroyed = false;
@@ -42,6 +38,16 @@ export class ClaudeBridge {
     let warmedUp = false;
     let warmingUp = false;
     let activeAbort = null;
+
+    const registry = this.vaultRegistry;
+    const systemPrompt = buildSystemPrompt(registry);
+    const allowedTools = registry.flatMap(v => [
+      `mcp__otris-docs__${v.toolPrefix}_overview`,
+      `mcp__otris-docs__${v.toolPrefix}_search`,
+      `mcp__otris-docs__${v.toolPrefix}_read`,
+      `mcp__otris-docs__${v.toolPrefix}_list`,
+      `mcp__otris-docs__${v.toolPrefix}_status`,
+    ]);
 
     // security-relevante felder NACH spread, nicht überschreibbar
     function buildOptions(overrides = {}) {
@@ -54,8 +60,8 @@ export class ClaudeBridge {
         maxTurns: maxTurns || 6,
         abortController,
         resume,
-        systemPrompt: SYSTEM_PROMPT,
-        allowedTools: ALLOWED_TOOLS,
+        systemPrompt,
+        allowedTools,
         disallowedTools: DISALLOWED_TOOLS,
       };
     }
