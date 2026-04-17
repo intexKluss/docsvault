@@ -15,16 +15,17 @@ RUN mkdir -p /home/node/.codex && chown node:node /home/node/.codex
 
 COPY src/ ./src/
 COPY public/ ./public/
-COPY vault/ ./vault/
 COPY docker-entrypoint.sh ./
 RUN sed -i 's/\r$//' docker-entrypoint.sh && chmod +x docker-entrypoint.sh
+RUN mkdir -p /app/vaults && chown node:node /app/vaults
+VOLUME ["/app/vaults"]
 
 USER node
 
 EXPOSE 3000
 
 ENV NODE_ENV=production
-ENV VAULT_PATH=/app/vault
+ENV VAULTS_ROOT=/app/vaults
 ENV BRIDGE=codex
 
 HEALTHCHECK --interval=30s --timeout=5s --start-period=10s --retries=3 \

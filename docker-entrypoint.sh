@@ -14,7 +14,7 @@ command = "node"
 args = ["/app/src/mcp-stdio.js"]
 
 [mcp_servers.otris-docs.env]
-VAULT_PATH = "/app/vault"
+VAULTS_ROOT = "/app/vaults"
 EOF
 
 exec node src/server.js
