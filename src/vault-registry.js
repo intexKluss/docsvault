@@ -46,6 +46,8 @@ function hasAnyMarkdown(dir) {
     return false;
   }
   for (const e of entries) {
+    if (e.isSymbolicLink()) continue;
+    // _-Prefix = Meta/Internal (analog _meta.json), nicht Teil des Vault-Inhalts
     if (e.name.startsWith('.') || e.name.startsWith('_')) continue;
     const full = join(dir, e.name);
     if (e.isDirectory()) {
