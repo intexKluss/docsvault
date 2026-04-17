@@ -13,9 +13,12 @@ function registerVaultTools(server, vault) {
   const { toolPrefix, description } = vault;
   const vaultPath = vault.path;
 
+  // Jedes neue Tool hier muss auch in TOOL_SUFFIXES in vault-registry.js ergaenzt werden,
+  // sonst wird es nicht in describeVaults()/System-Prompt auftauchen.
+
   server.tool(
     `${toolPrefix}_overview`,
-    `Get an overview of: ${description} Without parameters, returns a compact summary of all sections with page counts. With a section parameter, returns a detailed listing of all pages grouped by subfolder.`,
+    `Get an overview of: ${description}\n\nWithout parameters, returns a compact summary of all sections with page counts. With a section parameter, returns a detailed listing of all pages grouped by subfolder.`,
     {
       section: z.string().optional().describe('Section name to get detailed listing for'),
     },
@@ -27,7 +30,7 @@ function registerVaultTools(server, vault) {
 
   server.tool(
     `${toolPrefix}_search`,
-    `Full-text search across: ${description} Returns matching files with context lines around each match. Use this to find specific content in this vault.`,
+    `Full-text search across: ${description}\n\nReturns matching files with context lines around each match. Use this to find specific content in this vault.`,
     {
       query: z.string().describe('Search query (case-insensitive text search)'),
       section: z.string().optional().describe('Limit search to a specific section'),
@@ -42,7 +45,7 @@ function registerVaultTools(server, vault) {
 
   server.tool(
     `${toolPrefix}_read`,
-    `Read the full content of a specific page in: ${description} Use the path from the _overview or _search results. Returns title, source URL, and markdown content.`,
+    `Read the full content of a specific page in: ${description}\n\nUse the path from the _overview or _search results. Returns title, source URL, and markdown content.`,
     {
       path: z.string().describe('Document path relative to vault root, without .md extension'),
       max_length: z.number().optional().describe('Maximum content length in characters (default: 50000).'),
@@ -63,7 +66,7 @@ function registerVaultTools(server, vault) {
 
   server.tool(
     `${toolPrefix}_list`,
-    `List all pages in a section or subfolder of: ${description} Returns an array of {name, path} objects.`,
+    `List all pages in a section or subfolder of: ${description}\n\nReturns an array of {name, path} objects.`,
     {
       section: z.string().describe('Section name'),
       subfolder: z.string().optional().describe('Subfolder within the section'),
@@ -76,7 +79,7 @@ function registerVaultTools(server, vault) {
 
   server.tool(
     `${toolPrefix}_status`,
-    `Check the freshness status of: ${description} Returns page count, PDF count, and how old the vault is.`,
+    `Check the freshness status of: ${description}\n\nReturns page count, PDF count, and how old the vault is.`,
     {},
     async () => {
       const result = handleStatus(vaultPath);
