@@ -6,7 +6,7 @@ Web-Chat UI und MCP-Server für die otris DOCUMENTS Dokumentation. Nutzt Claude 
 
 - **Web-Chat**: Landing Page + Chat-UI mit Typewriter-Effekt, Tool-Fortschrittsanzeige, Speed-Toggle
 - **MCP-Endpoints**: SSE (`/sse`) und Streamable HTTP (`/mcp`) für externe MCP-Clients
-- **REST API**: `/api/search`, `/api/read`, `/api/list`, `/api/overview`, `/api/status`
+- **REST API**: `/api/vaults` (Liste), `/api/<prefix>/{search,read,list,overview,status}` pro Vault
 - **Bridge-Switching**: Claude oder Codex per `BRIDGE` ENV Variable
 - **Sicherheit**: Rate Limiting, Origin-Validation, DOMPurify, Tool-Whitelisting, Prompt-Injection-Schutz
 
@@ -125,10 +125,11 @@ docker exec otris-docs wc -l /app/reports.json              # Anzahl Reports
 ### REST API testen
 
 ```bash
-curl http://SERVER-IP:3000/api/health                       # Health Check
-curl http://SERVER-IP:3000/api/status                       # Vault-Status
-curl "http://SERVER-IP:3000/api/search?query=DocFile"       # Suche testen
-curl "http://SERVER-IP:3000/api/overview"                   # Sektionsübersicht
+curl http://SERVER-IP:3000/api/health                       # Health Check + Vault-Anzahl
+curl http://SERVER-IP:3000/api/vaults                       # Konfigurierte Vaults auflisten
+curl http://SERVER-IP:3000/api/otris/status                 # Vault-Status (otris)
+curl "http://SERVER-IP:3000/api/otris/search?query=DocFile" # Suche im otris-Vault
+curl "http://SERVER-IP:3000/api/otris/overview"             # Sektionsuebersicht des otris-Vaults
 ```
 
 ### Komplett neu bauen
