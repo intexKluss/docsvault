@@ -4,6 +4,8 @@ Wenn der otris-docs-web Server im LAN läuft, kannst du deinen Coding-Agent dire
 
 ## Verfügbare Tools nach der Einrichtung
 
+Pro Wissensbereich (Vault) auf dem Server gibt es fünf Tools mit dem Vault-Prefix. Beim Standard-Setup mit nur dem otris-Vault sind das:
+
 | Tool | Funktion |
 |------|----------|
 | `otris_search` | Volltextsuche in der Dokumentation |
@@ -11,6 +13,8 @@ Wenn der otris-docs-web Server im LAN läuft, kannst du deinen Coding-Agent dire
 | `otris_list` | Dokumente auflisten |
 | `otris_overview` | Übersicht über verfügbare Inhalte |
 | `otris_status` | Serverstatus prüfen |
+
+Falls weitere Vaults konfiguriert sind (z.B. `intex-regeln`), kommen entsprechende Tools wie `intex_regeln_search` dazu. Die vollständige Liste liefert `http://<SERVER-IP>:3000/api/vaults`.
 
 ## Claude Code
 
