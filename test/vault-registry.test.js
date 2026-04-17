@@ -1,6 +1,6 @@
 import { describe, it, after } from 'node:test';
 import assert from 'node:assert/strict';
-import { slugify, loadVaultRegistry } from '../src/vault-registry.js';
+import { slugify, loadVaultRegistry, describeVaults } from '../src/vault-registry.js';
 import { createTempVaultsRoot } from './helpers/temp-vault.js';
 
 describe('slugify', () => {
@@ -177,5 +177,25 @@ describe('loadVaultRegistry — validation', () => {
     const registry = loadVaultRegistry(root);
     assert.equal(registry.length, 1);
     assert.equal(registry[0].toolPrefix, 'broken');
+  });
+});
+
+describe('describeVaults', () => {
+  it('returns empty string for empty registry', () => {
+    assert.equal(describeVaults([]), '');
+  });
+
+  it('lists each vault with name, description and tools', () => {
+    const registry = [
+      { name: 'otris DOCUMENTS API', description: 'otris Doku.', toolPrefix: 'otris', path: '/x' },
+      { name: 'Intex Regeln', description: 'Firmenregeln.', toolPrefix: 'intex_regeln', path: '/y' },
+    ];
+    const out = describeVaults(registry);
+    assert.ok(out.includes('otris DOCUMENTS API'));
+    assert.ok(out.includes('otris Doku.'));
+    assert.ok(out.includes('otris_search'));
+    assert.ok(out.includes('otris_read'));
+    assert.ok(out.includes('Intex Regeln'));
+    assert.ok(out.includes('intex_regeln_search'));
   });
 });

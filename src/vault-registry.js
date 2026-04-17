@@ -111,3 +111,16 @@ export function loadVaultRegistry(vaultsRoot) {
   registry.sort((a, b) => a.toolPrefix.localeCompare(b.toolPrefix));
   return registry;
 }
+
+export const TOOL_SUFFIXES = ['search', 'read', 'list', 'overview', 'status'];
+
+export function describeVaults(registry) {
+  if (!registry.length) return '';
+
+  const lines = registry.map(v => {
+    const tools = TOOL_SUFFIXES.map(s => `${v.toolPrefix}_${s}`).join(', ');
+    return `- **${v.name}** — ${v.description}\n  Tools: ${tools}`;
+  });
+
+  return lines.join('\n\n');
+}
