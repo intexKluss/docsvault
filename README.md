@@ -46,6 +46,28 @@ docker run -d \
 
 Siehe [INSTALL-SERVER.md](INSTALL-SERVER.md) für Details.
 
+## Vault-Format: `_meta.json`
+
+Jeder Vault-Ordner kann (sollte!) eine `_meta.json` im Root haben. Der Server liest sie beim Start und nutzt die Werte fuer Tool-Namen und -Beschreibungen:
+
+```json
+{
+  "name": "Anzeigename",
+  "description": "Worum geht's im Vault? Landet in der Tool-Description die der LLM sieht.",
+  "toolPrefix": "mein_vault"
+}
+```
+
+| Feld | Pflicht | Default | Effekt |
+|---|---|---|---|
+| `name` | nein | Ordnername | Anzeigename im System-Prompt und `/api/vaults` |
+| `description` | nein, aber empfohlen | `"Documentation vault '<name>'"` | **Geht in die Tool-Description** — davon haengt ab ob der LLM den Vault richtig auswaehlt |
+| `toolPrefix` | nein | `slugify(Ordnername)` | Prefix fuer Tool-Namen (`<prefix>_search` etc.), muss `/^[a-z][a-z0-9_]*$/` matchen |
+
+Ohne `_meta.json` laeuft der Vault trotzdem, kriegt aber nur generische Defaults — der LLM weiss dann nicht worum's im Vault geht. Deshalb immer dranbauen.
+
+Der otris-Vault hat seine `_meta.json` schon im [otris-docs-vault Repo](https://github.com/intexKluss/otris-docs-vault) drin, da musst du nichts anlegen.
+
 ## Weitere Vaults hinzufuegen
 
 Jeder Unterordner unter dem gemounteten Vaults-Verzeichnis wird zu einem eigenen Vault mit eigenen MCP-Tools (`<prefix>_search`, `<prefix>_read`, `<prefix>_list`, `<prefix>_overview`, `<prefix>_status`).
@@ -56,7 +78,7 @@ Verzeichnis anlegen:
 mkdir -p /srv/otris/vaults/intex-regeln
 ```
 
-`_meta.json` anlegen:
+`_meta.json` anlegen (Linux / bash):
 
 ```bash
 cat > /srv/otris/vaults/intex-regeln/_meta.json <<'EOF'
@@ -73,11 +95,6 @@ Markdown-Dateien reinkopieren, dann Container neustarten:
 ```bash
 docker restart otris-docs
 ```
-
-**`_meta.json` Felder (alle optional):**
-- `name` — Anzeigename (Default: Ordnername)
-- `description` — wird in Tool-Beschreibungen eingesetzt, hilft dem LLM beim Tool-Auswahl
-- `toolPrefix` — Prefix fuer Tool-Namen, muss `/^[a-z][a-z0-9_]*$/` matchen (Default: Slug aus Ordnername)
 
 ## Für Entwickler (MCP-Client)
 
