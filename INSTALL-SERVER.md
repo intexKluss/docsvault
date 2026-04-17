@@ -82,7 +82,7 @@ Markdown-Dateien ins Verzeichnis legen — siehe [README.md](README.md#vault-for
 
 ### 4. Container starten
 
-**Linux/Mac:**
+**Linux/Mac** — `$(pwd)` = aktuelles Arbeitsverzeichnis (Bash expandiert das vor dem `docker run`):
 
 ```bash
 docker run -d \
@@ -98,14 +98,24 @@ docker run -d \
   otris-docs
 ```
 
-**Windows (PowerShell):**
+**Windows (PowerShell)** — keine `$(pwd)`-Syntax, hier absolute Pfade und Forward-Slashes fuer Docker:
 
 ```powershell
-docker run -d --name otris-docs --restart unless-stopped -p 3000:3000 -e BRIDGE=codex -e ALLOWED_ORIGINS=http://SERVER-IP:3000 -e ALLOW_NO_ORIGIN=true -v /srv/otris/vaults:/app/vaults:ro -v otris-docs-codex:/home/node/.codex -v "$(pwd)/reports.json:/app/reports.json" otris-docs
+docker run -d --name otris-docs --restart unless-stopped -p 3000:3000 -e BRIDGE=codex -e ALLOWED_ORIGINS=http://SERVER-IP:3000 -e ALLOW_NO_ORIGIN=true -v "C:/dein/pfad/zu/vaults:/app/vaults:ro" -v otris-docs-codex:/home/node/.codex -v "C:/dein/pfad/zu/reports.json:/app/reports.json" otris-docs
 ```
 
-Ersetzen:
-- `SERVER-IP` → tatsächliche IP oder Domain des Servers
+Vorher `reports.json` als leere Datei anlegen (sonst mountet Docker es als Ordner):
+
+```powershell
+New-Item -ItemType File "C:\dein\pfad\zu\reports.json" -Force
+```
+
+**Diese Platzhalter musst du im `docker run` ersetzen:**
+- `SERVER-IP` — tatsaechliche IP oder Domain des Servers (bei Lokal-Test: `localhost`)
+- `/srv/otris/vaults` (Linux) bzw. `C:/dein/pfad/zu/vaults` (Windows) — dein Host-Pfad aus Schritt 3, also wohin du den Vault geklont hast
+- `$(pwd)/reports.json` (Linux) bzw. `C:/dein/pfad/zu/reports.json` (Windows) — Pfad zur reports.json-Datei (irgendwo schreibbar)
+
+`/app/vaults` und `/app/reports.json` (der Teil **nach** dem `:`) sind Container-intern und bleiben wie sie sind.
 
 Die Volumes sorgen dafür, dass Vaults, Codex-Auth und Bug-Reports bei Container-Rebuilds erhalten bleiben.
 
