@@ -25,21 +25,25 @@ Der Build dauert unter 30 Sekunden (plus Download beim ersten Mal).
 
 ### 3. Vaults vorbereiten
 
-Die Vaults liegen **auf dem Host** und werden beim Container-Start per `-v` ins Container-Verzeichnis `/app/vaults` gemountet. Jeder Unterordner im Host-Vaults-Verzeichnis ist ein eigener Vault mit eigener `_meta.json`.
+**Das Konzept:** Der Container selbst enthaelt keinen Vault. Er liest sie zur Laufzeit aus einem Verzeichnis auf dem **Host**, das per `-v` in den Container-Pfad `/app/vaults` gemountet wird.
 
-> `/app/vaults` existiert nur **im Container** (wird vom Dockerfile angelegt) — nicht auf deinem Host. Du brauchst nichts manuell anzulegen, `git clone` macht das selber.
+- **Der Host-Pfad ist frei waehlbar.** Auf Linux-Servern ist `/srv/otris/vaults` Konvention. Auf einem Windows-Dev-Rechner kann es z.B. `C:\otris-test\vaults` sein. Wichtig ist nur: derselbe Pfad muss in Schritt 4 beim `docker run -v <HOSTPFAD>:/app/vaults` auftauchen.
+- **Kein `mkdir`, kein `cd` noetig.** `git clone URL TARGET-PFAD` legt alle Parent-Ordner automatisch an.
+- **`/app/vaults` existiert nur im Container** — vom Dockerfile angelegt, nicht auf deinem Host.
 
-**otris-Vault aufs Host-System klonen** (Zugriff aufs [otris-docs-vault](https://github.com/intexKluss/otris-docs-vault) Repo noetig):
+**otris-Vault aufs Host-System klonen** (Zugriff aufs [otris-docs-vault](https://github.com/intexKluss/otris-docs-vault) Repo noetig) — ausfuehrbar aus einem beliebigen Arbeitsverzeichnis:
 
 ```bash
 git clone https://github.com/intexKluss/otris-docs-vault.git /srv/otris/vaults/otris
 ```
 
-Git legt den `vaults/`-Parent-Ordner automatisch mit an. Danach liegen `_meta.json` plus die 995 Markdown-Seiten unter `/srv/otris/vaults/otris/`.
+Danach liegen `_meta.json` plus die 995 Markdown-Seiten unter `/srv/otris/vaults/otris/`.
 
-> **Windows / lokaler Test:** `/srv/otris/vaults` ist ein Linux-Server-Pfad. Auf Windows klonst du dahin wo's dir passt (z.B. `C:\otris\vaults\otris`) und passt im `docker run -v ...` den Host-Teil entsprechend an. Eine komplette Windows-Schritt-fuer-Schritt-Anleitung fuer lokales Testing gibt's separat als `otris-local-setup.md` (aus dem Entwickler-Umfeld).
+> **Windows-Variante** (PowerShell): `git clone https://github.com/intexKluss/otris-docs-vault.git C:\otris-test\vaults\otris`. Im `docker run -v` in Schritt 4 dann `C:/otris-test/vaults:/app/vaults` (Forward-Slashes!).
+>
+> **Falls der Ziel-Ordner nicht beschreibbar ist** (z.B. `/srv/` gehoert root): entweder `sudo git clone ...` oder ein anderes Verzeichnis waehlen (z.B. `/home/<user>/otris-vaults/otris`).
 
-**Weitere Vaults hinzufuegen** — manuell oder per Git-Clone, z.B.:
+**Weitere Vaults hinzufuegen** — manuell, z.B.:
 
 ```bash
 mkdir -p /srv/otris/vaults/intex-regeln
@@ -55,7 +59,7 @@ cat > /srv/otris/vaults/intex-regeln/_meta.json <<'EOF'
 EOF
 ```
 
-Markdown-Dateien ins Verzeichnis legen — siehe [README.md](README.md#weitere-vaults-hinzufuegen) fuer Details zum `_meta.json`-Format.
+Markdown-Dateien ins Verzeichnis legen — siehe [README.md](README.md#vault-format-_metajson) fuer Details zum `_meta.json`-Format.
 
 ### 4. Container starten
 
