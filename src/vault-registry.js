@@ -36,6 +36,27 @@ function buildEntry(folderName, vaultDir, meta) {
   return { name, description, toolPrefix, path: vaultDir };
 }
 
+const TOOL_PREFIX_PATTERN = /^[a-z][a-z0-9_]*$/;
+
+function hasAnyMarkdown(dir) {
+  let entries;
+  try {
+    entries = readdirSync(dir, { withFileTypes: true });
+  } catch {
+    return false;
+  }
+  for (const e of entries) {
+    if (e.name.startsWith('.') || e.name.startsWith('_')) continue;
+    const full = join(dir, e.name);
+    if (e.isDirectory()) {
+      if (hasAnyMarkdown(full)) return true;
+    } else if (e.isFile() && e.name.toLowerCase().endsWith('.md')) {
+      return true;
+    }
+  }
+  return false;
+}
+
 export function loadVaultRegistry(vaultsRoot) {
   const absRoot = resolve(vaultsRoot);
 
@@ -52,14 +73,37 @@ export function loadVaultRegistry(vaultsRoot) {
     return [];
   }
 
-  const registry = [];
-  for (const entry of topLevel) {
-    if (!entry.isDirectory()) continue;
-    if (entry.name.startsWith('.')) continue;
+  // stabile Reihenfolge fuer Kollisionsaufloesung (Folder-Name alphabetisch)
+  const folders = topLevel
+    .filter(e => e.isDirectory() && !e.name.startsWith('.'))
+    .map(e => e.name)
+    .sort();
 
-    const vaultDir = join(absRoot, entry.name);
+  const registry = [];
+  const seenPrefixes = new Map(); // toolPrefix -> folderName
+
+  for (const folderName of folders) {
+    const vaultDir = join(absRoot, folderName);
     const meta = safeReadMeta(vaultDir);
-    registry.push(buildEntry(entry.name, vaultDir, meta));
+    const entry = buildEntry(folderName, vaultDir, meta);
+
+    if (!TOOL_PREFIX_PATTERN.test(entry.toolPrefix)) {
+      console.warn(`[vault-registry] skip '${folderName}': invalid toolPrefix '${entry.toolPrefix}' (must match /^[a-z][a-z0-9_]*$/)`);
+      continue;
+    }
+
+    if (seenPrefixes.has(entry.toolPrefix)) {
+      console.warn(`[vault-registry] skip '${folderName}': toolPrefix '${entry.toolPrefix}' already used by '${seenPrefixes.get(entry.toolPrefix)}'`);
+      continue;
+    }
+
+    if (!hasAnyMarkdown(vaultDir)) {
+      console.warn(`[vault-registry] skip '${folderName}': no .md files found`);
+      continue;
+    }
+
+    seenPrefixes.set(entry.toolPrefix, folderName);
+    registry.push(entry);
   }
 
   registry.sort((a, b) => a.toolPrefix.localeCompare(b.toolPrefix));

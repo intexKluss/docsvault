@@ -93,3 +93,89 @@ describe('loadVaultRegistry — basic scan', () => {
     assert.equal(registry[0].toolPrefix, 'otris');
   });
 });
+
+describe('loadVaultRegistry — validation', () => {
+  it('skips vault with invalid toolPrefix (starts with digit)', () => {
+    const { root, cleanup } = createTempVaultsRoot({
+      'bad': { meta: { toolPrefix: '2fa' }, files: { 'a.md': '#' } },
+      'good': { meta: { toolPrefix: 'good' }, files: { 'a.md': '#' } },
+    });
+    after(cleanup);
+    const registry = loadVaultRegistry(root);
+    assert.equal(registry.length, 1);
+    assert.equal(registry[0].toolPrefix, 'good');
+  });
+
+  it('skips vault with invalid toolPrefix (uppercase)', () => {
+    const { root, cleanup } = createTempVaultsRoot({
+      'bad': { meta: { toolPrefix: 'BadOne' }, files: { 'a.md': '#' } },
+    });
+    after(cleanup);
+    assert.equal(loadVaultRegistry(root).length, 0);
+  });
+
+  it('skips vault when derived slug is invalid (folder name all digits)', () => {
+    const { root, cleanup } = createTempVaultsRoot({
+      '2024-notes': { files: { 'a.md': '#' } },
+    });
+    after(cleanup);
+    assert.equal(loadVaultRegistry(root).length, 0);
+  });
+
+  it('skips second vault on toolPrefix collision (alphabetic order by folder)', () => {
+    const { root, cleanup } = createTempVaultsRoot({
+      'a-first': { meta: { toolPrefix: 'shared' }, files: { 'a.md': '#' } },
+      'b-second': { meta: { toolPrefix: 'shared' }, files: { 'a.md': '#' } },
+    });
+    after(cleanup);
+    const registry = loadVaultRegistry(root);
+    assert.equal(registry.length, 1);
+    assert.ok(registry[0].path.endsWith('a-first'));
+  });
+
+  it('skips vault with no markdown files', () => {
+    const { root, cleanup } = createTempVaultsRoot({
+      'empty': { meta: { toolPrefix: 'empty' }, files: {} },
+      'full': { meta: { toolPrefix: 'full' }, files: { 'a.md': '#' } },
+    });
+    after(cleanup);
+    const registry = loadVaultRegistry(root);
+    assert.deepEqual(registry.map(v => v.toolPrefix), ['full']);
+  });
+
+  it('finds nested markdown (recursive check)', () => {
+    const { root, cleanup } = createTempVaultsRoot({
+      'nested': {
+        meta: { toolPrefix: 'nested' },
+        files: { 'sec/subsec/deep.md': '# deep' },
+      },
+    });
+    after(cleanup);
+    assert.equal(loadVaultRegistry(root).length, 1);
+  });
+
+  it('returns empty registry when VAULTS_ROOT does not exist', () => {
+    assert.deepEqual(loadVaultRegistry('/absolutely/not/a/path'), []);
+  });
+
+  it('handles _meta.json that is not a JSON object (array)', () => {
+    const { root, cleanup } = createTempVaultsRoot({
+      'arr': { meta: '[1,2,3]', files: { 'a.md': '#' } },
+    });
+    after(cleanup);
+    const registry = loadVaultRegistry(root);
+    assert.equal(registry.length, 1);
+    assert.equal(registry[0].toolPrefix, 'arr');
+    assert.equal(registry[0].name, 'arr');
+  });
+
+  it('handles invalid JSON in _meta.json', () => {
+    const { root, cleanup } = createTempVaultsRoot({
+      'broken': { meta: '{nope', files: { 'a.md': '#' } },
+    });
+    after(cleanup);
+    const registry = loadVaultRegistry(root);
+    assert.equal(registry.length, 1);
+    assert.equal(registry[0].toolPrefix, 'broken');
+  });
+});
