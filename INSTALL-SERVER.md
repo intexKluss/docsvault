@@ -31,17 +31,36 @@ Der Build dauert unter 30 Sekunden (plus Download beim ersten Mal).
 - **Kein `mkdir`, kein `cd` noetig.** `git clone URL TARGET-PFAD` legt alle Parent-Ordner automatisch an.
 - **`/app/vaults` existiert nur im Container** — vom Dockerfile angelegt, nicht auf deinem Host.
 
-**otris-Vault aufs Host-System klonen** (Zugriff aufs [otris-docs-vault](https://github.com/intexKluss/otris-docs-vault) Repo noetig) — ausfuehrbar aus einem beliebigen Arbeitsverzeichnis:
+**Empfehlung** — einen Ordner nach oben gehen (raus aus `otris-docs-web/`) und die Vaults als Sibling anlegen. Dann sind Server-Code und Vaults sauber nebeneinander:
 
 ```bash
-git clone https://github.com/intexKluss/otris-docs-vault.git /srv/otris/vaults/otris
+cd ..
 ```
 
-Danach liegen `_meta.json` plus die 995 Markdown-Seiten unter `/srv/otris/vaults/otris/`.
+```bash
+git clone https://github.com/intexKluss/otris-docs-vault.git vaults/otris
+```
 
-> **Windows-Variante** (PowerShell): `git clone https://github.com/intexKluss/otris-docs-vault.git C:\otris-test\vaults\otris`. Im `docker run -v` in Schritt 4 dann `C:/otris-test/vaults:/app/vaults` (Forward-Slashes!).
+Ergibt folgende Struktur:
+
+```
+<dein-arbeitsordner>/
+├── otris-docs-web/      <- der gerade geklonte Server-Code
+└── vaults/
+    └── otris/           <- der Vault mit _meta.json + 995 MDs
+```
+
+> **Server-Setup (Linux-Konvention):** Vaults oft unter `/srv/otris/vaults/` — ausfuehrbar aus beliebigem Arbeitsverzeichnis:
+> ```bash
+> git clone https://github.com/intexKluss/otris-docs-vault.git /srv/otris/vaults/otris
+> ```
+> Falls `/srv/` root gehoert: `sudo git clone ...` oder ein anderes Verzeichnis waehlen (z.B. `/home/<user>/otris-vaults/otris`).
 >
-> **Falls der Ziel-Ordner nicht beschreibbar ist** (z.B. `/srv/` gehoert root): entweder `sudo git clone ...` oder ein anderes Verzeichnis waehlen (z.B. `/home/<user>/otris-vaults/otris`).
+> **Windows-Variante** (PowerShell):
+> ```powershell
+> git clone https://github.com/intexKluss/otris-docs-vault.git C:\otris-test\vaults\otris
+> ```
+> Im `docker run -v` in Schritt 4 dann `C:/otris-test/vaults:/app/vaults` (Forward-Slashes).
 
 **Weitere Vaults hinzufuegen** — manuell, z.B.:
 
