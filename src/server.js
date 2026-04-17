@@ -13,11 +13,8 @@ import { loadVaultRegistry, TOOL_SUFFIXES } from './vault-registry.js';
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = dirname(__filename);
 
-const BRIDGE_MODE = process.env.BRIDGE || 'claude';
-const VAULTS_ROOT = process.env.VAULTS_ROOT || join(__dirname, '..', 'vaults');
-
-async function loadBridge(vaultRegistry) {
-  if (BRIDGE_MODE === 'codex') {
+async function loadBridge(bridgeMode, vaultRegistry) {
+  if (bridgeMode === 'codex') {
     const { CodexBridge } = await import('./codex-bridge.js');
     console.log(`[server] bridge: codex (OpenAI Codex SDK)`);
     return new CodexBridge(vaultRegistry);
@@ -27,11 +24,15 @@ async function loadBridge(vaultRegistry) {
   return new ClaudeBridge(vaultRegistry);
 }
 
-if (process.env.VAULT_PATH && !process.env.VAULTS_ROOT) {
-  console.warn('[server] VAULT_PATH is deprecated — use VAULTS_ROOT (pointing to the parent dir containing vault folders).');
-}
-
 export async function createServer(opts = {}) {
+  // env vars erst zur laufzeit lesen, damit tests VAULTS_ROOT ueberschreiben koennen
+  const bridgeMode = process.env.BRIDGE || 'claude';
+  const vaultsRoot = process.env.VAULTS_ROOT || join(__dirname, '..', 'vaults');
+
+  if (process.env.VAULT_PATH && !process.env.VAULTS_ROOT) {
+    console.warn('[server] VAULT_PATH is deprecated — use VAULTS_ROOT (pointing to the parent dir containing vault folders).');
+  }
+
   const config = {
     port: opts.port ?? parseInt(process.env.PORT || '3000', 10),
     maxSessions: parseInt(process.env.MAX_SESSIONS || '50', 10),
@@ -39,9 +40,9 @@ export async function createServer(opts = {}) {
     maxMessageLength: parseInt(process.env.MAX_MESSAGE_LENGTH || '2000', 10),
   };
 
-  const vaultRegistry = loadVaultRegistry(VAULTS_ROOT);
+  const vaultRegistry = loadVaultRegistry(vaultsRoot);
   if (vaultRegistry.length === 0) {
-    console.warn(`[server] WARNING: no vaults found under ${VAULTS_ROOT} — LLM will have no tools.`);
+    console.warn(`[server] WARNING: no vaults found under ${vaultsRoot} — LLM will have no tools.`);
   } else {
     console.log(`[server] loaded ${vaultRegistry.length} vault(s): ${vaultRegistry.map(v => v.toolPrefix).join(', ')}`);
     if (vaultRegistry.length > 20) {
@@ -49,7 +50,7 @@ export async function createServer(opts = {}) {
     }
   }
 
-  const bridge = await loadBridge(vaultRegistry);
+  const bridge = await loadBridge(bridgeMode, vaultRegistry);
   const manager = new SessionManager(bridge, config);
 
   const app = express();

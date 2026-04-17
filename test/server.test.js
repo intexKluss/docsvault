@@ -1,12 +1,26 @@
 import { describe, it, before, after } from 'node:test';
 import assert from 'node:assert/strict';
 import { createServer } from '../src/server.js';
+import { createTempVaultsRoot } from './helpers/temp-vault.js';
+
+// server.test nutzt einen fixture-vault (otris-Content liegt nicht mehr im repo)
+const { root: TEST_VAULTS_ROOT, cleanup: cleanupTestVaults } = createTempVaultsRoot({
+  'otris': {
+    meta: { name: 'otris', description: 'Test otris vault', toolPrefix: 'otris' },
+    files: {
+      'portalscript-api/DocFile.md': '# DocFile\n\nEine Klasse fuer Dateien.',
+      'portalscript-api/FileType.md': '# FileType\n\nDateityp-Klasse.',
+      'howtos/upload.md': '# Upload\n\nDoc-Upload Anleitung.',
+    },
+  },
+});
 
 describe('Server', () => {
   let server, port, baseUrl;
 
   before(async () => {
     process.env.ALLOW_NO_ORIGIN = 'true';
+    process.env.VAULTS_ROOT = TEST_VAULTS_ROOT;
     const result = await createServer({ port: 0 });
     server = result.server;
     port = result.port;
@@ -15,6 +29,8 @@ describe('Server', () => {
 
   after(() => {
     delete process.env.ALLOW_NO_ORIGIN;
+    delete process.env.VAULTS_ROOT;
+    cleanupTestVaults();
     server.close();
     // force exit — bridge warmup keeps event loop alive
     setTimeout(() => process.exit(0), 500);
