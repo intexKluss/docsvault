@@ -20,22 +20,29 @@ npm run dev:codex     # Codex Bridge
 
 ## Deployment (Docker)
 
+Image bauen:
+
 ```bash
 docker build -t otris-docs-web .
+```
 
-# Vault-Verzeichnis auf dem Host vorbereiten
-mkdir -p /srv/otris/vaults/otris
-# (otris-Vault vom Crawler dorthin legen oder aus altem Container kopieren)
-cp -r ./vault/. /srv/otris/vaults/otris/
-cat > /srv/otris/vaults/otris/_meta.json <<'EOF'
-{
-  "name": "otris DOCUMENTS API",
-  "description": "Komplette otris DOCUMENTS API-Dokumentation.",
-  "toolPrefix": "otris"
-}
-EOF
+otris-Vault aufs Host-System klonen (Zugriff aufs [otris-docs-vault](https://github.com/intexKluss/otris-docs-vault) Repo noetig):
 
-# Container starten
+```bash
+mkdir -p /srv/otris/vaults
+```
+
+```bash
+cd /srv/otris/vaults
+```
+
+```bash
+git clone https://github.com/intexKluss/otris-docs-vault.git otris
+```
+
+Container starten:
+
+```bash
 docker run -d \
   -v /srv/otris/vaults:/app/vaults:ro \
   -p 3000:3000 \
@@ -49,8 +56,15 @@ Siehe [INSTALL-SERVER.md](INSTALL-SERVER.md) für Details.
 
 Jeder Unterordner unter dem gemounteten Vaults-Verzeichnis wird zu einem eigenen Vault mit eigenen MCP-Tools (`<prefix>_search`, `<prefix>_read`, `<prefix>_list`, `<prefix>_overview`, `<prefix>_status`).
 
+Verzeichnis anlegen:
+
 ```bash
 mkdir -p /srv/otris/vaults/intex-regeln
+```
+
+`_meta.json` anlegen:
+
+```bash
 cat > /srv/otris/vaults/intex-regeln/_meta.json <<'EOF'
 {
   "name": "Intex Regeln",
@@ -58,9 +72,11 @@ cat > /srv/otris/vaults/intex-regeln/_meta.json <<'EOF'
   "toolPrefix": "intex_regeln"
 }
 EOF
-# ... Markdown-Dateien reinkopieren ...
+```
 
-# Container neustarten damit die Tools registriert werden
+Markdown-Dateien reinkopieren, dann Container neustarten:
+
+```bash
 docker restart otris-docs
 ```
 

@@ -25,22 +25,40 @@ Der Build dauert unter 30 Sekunden (plus Download beim ersten Mal).
 
 ### 3. Vaults vorbereiten
 
-Der Container liest Vaults aus `/app/vaults`, gemountet vom Host. Jeder Unterordner ist ein eigener Vault.
+Der Container liest Vaults aus `/app/vaults`, gemountet vom Host. Jeder Unterordner ist ein eigener Vault mit eigener `_meta.json`.
+
+**Host-Verzeichnis anlegen:**
 
 ```bash
-mkdir -p /srv/otris/vaults/otris
-# otris-Doku dort ablegen (Crawler-Output oder aus altem Container kopiert)
-cp -r ./vault/. /srv/otris/vaults/otris/
-cat > /srv/otris/vaults/otris/_meta.json <<'EOF'
+mkdir -p /srv/otris/vaults
+cd /srv/otris/vaults
+```
+
+**otris-Vault klonen** (Zugriff aufs [otris-docs-vault](https://github.com/intexKluss/otris-docs-vault) Repo noetig):
+
+```bash
+git clone https://github.com/intexKluss/otris-docs-vault.git otris
+```
+
+Danach liegt `_meta.json` plus die 995 Markdown-Seiten unter `/srv/otris/vaults/otris/`.
+
+**Weitere Vaults hinzufuegen** — manuell oder per Git-Clone, z.B.:
+
+```bash
+mkdir -p /srv/otris/vaults/intex-regeln
+```
+
+```bash
+cat > /srv/otris/vaults/intex-regeln/_meta.json <<'EOF'
 {
-  "name": "otris DOCUMENTS API",
-  "description": "Komplette otris DOCUMENTS API-Dokumentation.",
-  "toolPrefix": "otris"
+  "name": "Intex Regeln",
+  "description": "Interne Richtlinien und Team-Konventionen.",
+  "toolPrefix": "intex_regeln"
 }
 EOF
 ```
 
-Weitere Vaults koennen analog angelegt werden — siehe [README.md](README.md#weitere-vaults-hinzufuegen).
+Markdown-Dateien ins Verzeichnis legen — siehe [README.md](README.md#weitere-vaults-hinzufuegen) fuer Details zum `_meta.json`-Format.
 
 ### 4. Container starten
 
@@ -193,10 +211,21 @@ Details: [INSTALL-DEVELOPER.md](INSTALL-DEVELOPER.md)
 
 ### Vault aktualisieren (neue Doku-Version)
 
-Siehe [UPDATE-VAULT.md](UPDATE-VAULT.md). Kurzfassung:
-1. Auf dem Mac: `npm run crawl` (Playwright)
-2. MD-Dateien ins Host-Verzeichnis kopieren: `cp -r vault/. /srv/otris/vaults/otris/`
-3. Auf dem Server: `docker restart otris-docs`
+Der otris-Vault liegt im [otris-docs-vault](https://github.com/intexKluss/otris-docs-vault) Repo. Update-Workflow auf dem Server:
+
+```bash
+cd /srv/otris/vaults/otris
+```
+
+```bash
+git pull
+```
+
+```bash
+docker restart otris-docs
+```
+
+Details zum Neu-Crawlen und Pushen des Vault-Repos: [UPDATE-VAULT.md](UPDATE-VAULT.md).
 
 Kein Rebuild noetig — die Vaults liegen ausserhalb des Images.
 
