@@ -8,7 +8,7 @@ import { WebSocketServer } from 'ws';
 import { SessionManager } from './session-manager.js';
 import { handleSseGet, handleSsePost, handleStreamablePost } from './mcp-handler.js';
 import { createApiRouter } from './api-routes.js';
-import { loadVaultRegistry } from './vault-registry.js';
+import { loadVaultRegistry, TOOL_SUFFIXES } from './vault-registry.js';
 
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = dirname(__filename);
@@ -27,6 +27,10 @@ async function loadBridge(vaultRegistry) {
   return new ClaudeBridge(vaultRegistry);
 }
 
+if (process.env.VAULT_PATH && !process.env.VAULTS_ROOT) {
+  console.warn('[server] VAULT_PATH is deprecated — use VAULTS_ROOT (pointing to the parent dir containing vault folders).');
+}
+
 export async function createServer(opts = {}) {
   const config = {
     port: opts.port ?? parseInt(process.env.PORT || '3000', 10),
@@ -41,7 +45,7 @@ export async function createServer(opts = {}) {
   } else {
     console.log(`[server] loaded ${vaultRegistry.length} vault(s): ${vaultRegistry.map(v => v.toolPrefix).join(', ')}`);
     if (vaultRegistry.length > 20) {
-      console.warn(`[server] WARNING: ${vaultRegistry.length} vaults = ${vaultRegistry.length * 5} tools — some agents may hit tool-count limits.`);
+      console.warn(`[server] WARNING: ${vaultRegistry.length} vaults = ${vaultRegistry.length * TOOL_SUFFIXES.length} tools — some agents may hit tool-count limits.`);
     }
   }
 
