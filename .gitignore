@@ -6,4 +6,4 @@ Thumbs.db
 reports.json
 .mcp.json
 todo
-vault/.auth.json
+vaults/*/.auth.json

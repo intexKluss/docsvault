@@ -8,22 +8,23 @@ import { WebSocketServer } from 'ws';
 import { SessionManager } from './session-manager.js';
 import { handleSseGet, handleSsePost, handleStreamablePost } from './mcp-handler.js';
 import { createApiRouter } from './api-routes.js';
+import { loadVaultRegistry } from './vault-registry.js';
 
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = dirname(__filename);
 
 const BRIDGE_MODE = process.env.BRIDGE || 'claude';
-const VAULT_PATH = process.env.VAULT_PATH || join(__dirname, '..', 'vault');
+const VAULTS_ROOT = process.env.VAULTS_ROOT || join(__dirname, '..', 'vaults');
 
-async function loadBridge() {
+async function loadBridge(vaultRegistry) {
   if (BRIDGE_MODE === 'codex') {
     const { CodexBridge } = await import('./codex-bridge.js');
     console.log(`[server] bridge: codex (OpenAI Codex SDK)`);
-    return new CodexBridge();
+    return new CodexBridge(vaultRegistry);
   }
   const { ClaudeBridge } = await import('./claude-bridge.js');
   console.log(`[server] bridge: claude (Claude Agent SDK)`);
-  return new ClaudeBridge();
+  return new ClaudeBridge(vaultRegistry);
 }
 
 export async function createServer(opts = {}) {
@@ -34,7 +35,17 @@ export async function createServer(opts = {}) {
     maxMessageLength: parseInt(process.env.MAX_MESSAGE_LENGTH || '2000', 10),
   };
 
-  const bridge = await loadBridge();
+  const vaultRegistry = loadVaultRegistry(VAULTS_ROOT);
+  if (vaultRegistry.length === 0) {
+    console.warn(`[server] WARNING: no vaults found under ${VAULTS_ROOT} — LLM will have no tools.`);
+  } else {
+    console.log(`[server] loaded ${vaultRegistry.length} vault(s): ${vaultRegistry.map(v => v.toolPrefix).join(', ')}`);
+    if (vaultRegistry.length > 20) {
+      console.warn(`[server] WARNING: ${vaultRegistry.length} vaults = ${vaultRegistry.length * 5} tools — some agents may hit tool-count limits.`);
+    }
+  }
+
+  const bridge = await loadBridge(vaultRegistry);
   const manager = new SessionManager(bridge, config);
 
   const app = express();
@@ -56,10 +67,10 @@ export async function createServer(opts = {}) {
     next();
   });
 
-  app.use(createApiRouter(VAULT_PATH));
+  app.use(createApiRouter(vaultRegistry));
 
   app.get('/sse', (req, res) => {
-    handleSseGet(req, res, VAULT_PATH);
+    handleSseGet(req, res, vaultRegistry);
   });
 
   app.post('/messages', (req, res) => {
@@ -67,7 +78,7 @@ export async function createServer(opts = {}) {
   });
 
   app.post('/mcp', async (req, res) => {
-    await handleStreamablePost(req, res, VAULT_PATH);
+    await handleStreamablePost(req, res, vaultRegistry);
   });
   app.get('/mcp', (req, res) => { res.writeHead(405).end(); });
   app.delete('/mcp', (req, res) => { res.writeHead(405).end(); });
