@@ -3,6 +3,8 @@ node_modules
 docs
 test
 reports.json
+vault
+vaults
 README.md
 ARCHITECTURE.md
 CLAUDE.md

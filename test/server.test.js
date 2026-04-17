@@ -45,69 +45,77 @@ describe('Server', () => {
       assert.equal(data.status, 'ok');
     });
 
-    it('GET /api/status returns vault status', async () => {
-      const res = await fetch(`${baseUrl}/api/status`);
+    it('GET /api/vaults lists available vaults', async () => {
+      const res = await fetch(`${baseUrl}/api/vaults`);
+      assert.equal(res.status, 200);
+      const data = await res.json();
+      assert.ok(Array.isArray(data.vaults));
+      assert.ok(data.vaults.some(v => v.toolPrefix === 'otris'));
+    });
+
+    it('GET /api/otris/status returns vault status', async () => {
+      const res = await fetch(`${baseUrl}/api/otris/status`);
       assert.equal(res.status, 200);
       const data = await res.json();
       assert.ok(data.status);
     });
 
-    it('GET /api/search requires query param', async () => {
-      const res = await fetch(`${baseUrl}/api/search`);
+    it('GET /api/otris/search requires query param', async () => {
+      const res = await fetch(`${baseUrl}/api/otris/search`);
       assert.equal(res.status, 400);
     });
 
-    it('GET /api/search works with valid query', async () => {
-      const res = await fetch(`${baseUrl}/api/search?query=DocFile`);
+    it('GET /api/otris/search works with valid query', async () => {
+      const res = await fetch(`${baseUrl}/api/otris/search?query=DocFile`);
       assert.equal(res.status, 200);
       const data = await res.json();
       assert.ok(Array.isArray(data));
     });
 
-    it('GET /api/search clamps max_results', async () => {
-      const res = await fetch(`${baseUrl}/api/search?query=test&max_results=999999`);
+    it('GET /api/otris/search clamps max_results', async () => {
+      const res = await fetch(`${baseUrl}/api/otris/search?query=test&max_results=999999`);
       assert.equal(res.status, 200);
     });
 
-    it('GET /api/search handles non-numeric max_results', async () => {
-      const res = await fetch(`${baseUrl}/api/search?query=test&max_results=abc`);
+    it('GET /api/otris/search handles non-numeric max_results', async () => {
+      const res = await fetch(`${baseUrl}/api/otris/search?query=test&max_results=abc`);
       assert.equal(res.status, 200);
     });
 
-    it('GET /api/read requires path param', async () => {
-      const res = await fetch(`${baseUrl}/api/read`);
+    it('GET /api/otris/read requires path param', async () => {
+      const res = await fetch(`${baseUrl}/api/otris/read`);
       assert.equal(res.status, 400);
     });
 
-    it('GET /api/read returns 404 for missing doc', async () => {
-      const res = await fetch(`${baseUrl}/api/read?path=nonexistent/doc`);
+    it('GET /api/otris/read returns 404 for missing doc', async () => {
+      const res = await fetch(`${baseUrl}/api/otris/read?path=nonexistent/doc`);
       assert.equal(res.status, 404);
     });
 
-    it('GET /api/list requires section param', async () => {
-      const res = await fetch(`${baseUrl}/api/list`);
+    it('GET /api/otris/list requires section param', async () => {
+      const res = await fetch(`${baseUrl}/api/otris/list`);
       assert.equal(res.status, 400);
     });
 
-    it('GET /api/overview works without params', async () => {
-      const res = await fetch(`${baseUrl}/api/overview`);
+    it('GET /api/otris/overview works without params', async () => {
+      const res = await fetch(`${baseUrl}/api/otris/overview`);
       assert.equal(res.status, 200);
       const data = await res.json();
       assert.ok(data.text);
     });
 
-    it('GET /api/search rejects empty query', async () => {
-      const res = await fetch(`${baseUrl}/api/search?query=`);
+    it('GET /api/otris/search rejects empty query', async () => {
+      const res = await fetch(`${baseUrl}/api/otris/search?query=`);
       assert.equal(res.status, 400);
     });
 
-    it('GET /api/search rejects whitespace query', async () => {
-      const res = await fetch(`${baseUrl}/api/search?query=%20%20`);
+    it('GET /api/otris/search rejects whitespace query', async () => {
+      const res = await fetch(`${baseUrl}/api/otris/search?query=%20%20`);
       assert.equal(res.status, 400);
     });
 
-    it('GET /api/list returns array for valid section', async () => {
-      const res = await fetch(`${baseUrl}/api/list?section=portalscript-api`);
+    it('GET /api/otris/list returns array for valid section', async () => {
+      const res = await fetch(`${baseUrl}/api/otris/list?section=portalscript-api`);
       assert.equal(res.status, 200);
       const data = await res.json();
       assert.ok(Array.isArray(data));

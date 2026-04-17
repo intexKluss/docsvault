@@ -2,12 +2,21 @@ import { StdioServerTransport } from '@modelcontextprotocol/sdk/server/stdio.js'
 import { dirname, resolve } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { createMcpServer } from './mcp-handler.js';
+import { loadVaultRegistry } from './vault-registry.js';
 
 const __dirname = dirname(fileURLToPath(import.meta.url));
-const VAULT_PATH = process.env.VAULT_PATH || resolve(__dirname, '..', 'vault');
+const VAULTS_ROOT = process.env.VAULTS_ROOT || resolve(__dirname, '..', 'vaults');
+
+if (process.env.VAULT_PATH && !process.env.VAULTS_ROOT) {
+  console.error('[mcp-stdio] VAULT_PATH is deprecated — use VAULTS_ROOT (pointing to the parent dir containing vault folders).');
+}
 
 try {
-  const server = createMcpServer(VAULT_PATH);
+  const registry = loadVaultRegistry(VAULTS_ROOT);
+  if (registry.length === 0) {
+    console.error(`[mcp-stdio] WARNING: no vaults found under ${VAULTS_ROOT}`);
+  }
+  const server = createMcpServer(registry);
   const transport = new StdioServerTransport();
   await server.connect(transport);
 } catch (err) {

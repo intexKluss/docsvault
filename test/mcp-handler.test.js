@@ -1,16 +1,44 @@
 import { describe, it } from 'node:test';
 import assert from 'node:assert/strict';
-import { createMcpServer, initStreamableHttp } from '../src/mcp-handler.js';
+import { createMcpServer } from '../src/mcp-handler.js';
+
+const REGISTRY = [
+  { name: 'otris',       description: 'otris Docs',   toolPrefix: 'otris',        path: '/tmp/otris' },
+  { name: 'Intex Regeln',description: 'Firmenregeln', toolPrefix: 'intex_regeln', path: '/tmp/intex' },
+];
 
 describe('MCP Handler', () => {
-  it('creates MCP server with all 5 tools', () => {
-    const server = createMcpServer('./vault');
+  it('accepts a vault registry', () => {
+    const server = createMcpServer(REGISTRY);
     assert.ok(server);
     assert.ok(typeof server.tool === 'function');
   });
 
-  it('initStreamableHttp resolves to boolean', async () => {
-    const result = await initStreamableHttp();
-    assert.equal(typeof result, 'boolean');
+  it('registers 5 tools per vault', () => {
+    // MCP server exposes registered tools via _registeredTools or listTools
+    const server = createMcpServer(REGISTRY);
+    const tools = server._registeredTools || {};
+    const names = Object.keys(tools);
+
+    for (const prefix of ['otris', 'intex_regeln']) {
+      for (const suffix of ['search', 'read', 'list', 'overview', 'status']) {
+        assert.ok(names.includes(`${prefix}_${suffix}`), `missing ${prefix}_${suffix}`);
+      }
+    }
+    assert.equal(names.length, 10);
+  });
+
+  it('includes vault description in tool description', () => {
+    const server = createMcpServer(REGISTRY);
+    const tools = server._registeredTools || {};
+    assert.ok(tools['otris_search']?.description?.includes('otris Docs'));
+    assert.ok(tools['intex_regeln_search']?.description?.includes('Firmenregeln'));
+  });
+
+  it('handles empty registry', () => {
+    const server = createMcpServer([]);
+    assert.ok(server);
+    const tools = server._registeredTools || {};
+    assert.equal(Object.keys(tools).length, 0);
   });
 });

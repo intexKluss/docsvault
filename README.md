@@ -6,7 +6,7 @@ Web-Chat UI und MCP-Server für die otris DOCUMENTS Dokumentation. Nutzt Claude 
 
 - **Web-Chat**: Landing Page + Chat-UI mit Typewriter-Effekt, Tool-Fortschrittsanzeige, Speed-Toggle
 - **MCP-Endpoints**: SSE (`/sse`) und Streamable HTTP (`/mcp`) für externe MCP-Clients
-- **REST API**: `/api/search`, `/api/read`, `/api/list`, `/api/overview`, `/api/status`
+- **REST API**: `/api/vaults` (Liste), `/api/<prefix>/{search,read,list,overview,status}` pro Vault
 - **Bridge-Switching**: Claude oder Codex per `BRIDGE` ENV Variable
 - **Sicherheit**: Rate Limiting, Origin-Validation, DOMPurify, Tool-Whitelisting, Prompt-Injection-Schutz
 
@@ -21,18 +21,53 @@ npm run dev:codex     # Codex Bridge
 ## Deployment (Docker)
 
 ```bash
-docker build -t otris-docs .
+docker build -t otris-docs-web .
+
+# Vault-Verzeichnis auf dem Host vorbereiten
+mkdir -p /srv/otris/vaults/otris
+# (otris-Vault vom Crawler dorthin legen oder aus altem Container kopieren)
+cp -r ./vault/. /srv/otris/vaults/otris/
+cat > /srv/otris/vaults/otris/_meta.json <<'EOF'
+{
+  "name": "otris DOCUMENTS API",
+  "description": "Komplette otris DOCUMENTS API-Dokumentation.",
+  "toolPrefix": "otris"
+}
+EOF
+
+# Container starten
 docker run -d \
-  --name otris-docs \
-  --restart unless-stopped \
+  -v /srv/otris/vaults:/app/vaults:ro \
   -p 3000:3000 \
-  -e BRIDGE=codex \
-  -e ALLOWED_ORIGINS=http://SERVER-IP:3000 \
-  -e ALLOW_NO_ORIGIN=true \
-  otris-docs
+  --name otris-docs \
+  otris-docs-web
 ```
 
 Siehe [INSTALL-SERVER.md](INSTALL-SERVER.md) für Details.
+
+## Weitere Vaults hinzufuegen
+
+Jeder Unterordner unter dem gemounteten Vaults-Verzeichnis wird zu einem eigenen Vault mit eigenen MCP-Tools (`<prefix>_search`, `<prefix>_read`, `<prefix>_list`, `<prefix>_overview`, `<prefix>_status`).
+
+```bash
+mkdir -p /srv/otris/vaults/intex-regeln
+cat > /srv/otris/vaults/intex-regeln/_meta.json <<'EOF'
+{
+  "name": "Intex Regeln",
+  "description": "Interne Richtlinien und Team-Konventionen.",
+  "toolPrefix": "intex_regeln"
+}
+EOF
+# ... Markdown-Dateien reinkopieren ...
+
+# Container neustarten damit die Tools registriert werden
+docker restart otris-docs
+```
+
+**`_meta.json` Felder (alle optional):**
+- `name` — Anzeigename (Default: Ordnername)
+- `description` — wird in Tool-Beschreibungen eingesetzt, hilft dem LLM beim Tool-Auswahl
+- `toolPrefix` — Prefix fuer Tool-Namen, muss `/^[a-z][a-z0-9_]*$/` matchen (Default: Slug aus Ordnername)
 
 ## Für Entwickler (MCP-Client)
 
@@ -90,10 +125,11 @@ docker exec otris-docs wc -l /app/reports.json              # Anzahl Reports
 ### REST API testen
 
 ```bash
-curl http://SERVER-IP:3000/api/health                       # Health Check
-curl http://SERVER-IP:3000/api/status                       # Vault-Status
-curl "http://SERVER-IP:3000/api/search?query=DocFile"       # Suche testen
-curl "http://SERVER-IP:3000/api/overview"                   # Sektionsübersicht
+curl http://SERVER-IP:3000/api/health                       # Health Check + Vault-Anzahl
+curl http://SERVER-IP:3000/api/vaults                       # Konfigurierte Vaults auflisten
+curl http://SERVER-IP:3000/api/otris/status                 # Vault-Status (otris)
+curl "http://SERVER-IP:3000/api/otris/search?query=DocFile" # Suche im otris-Vault
+curl "http://SERVER-IP:3000/api/otris/overview"             # Sektionsuebersicht des otris-Vaults
 ```
 
 ### Komplett neu bauen
@@ -106,12 +142,13 @@ docker run -d --name otris-docs --restart unless-stopped \
   -p 3000:3000 -e BRIDGE=codex \
   -e ALLOWED_ORIGINS=http://SERVER-IP:3000 \
   -e ALLOW_NO_ORIGIN=true \
+  -v /srv/otris/vaults:/app/vaults:ro \
   -v otris-docs-codex:/home/node/.codex \
   -v $(pwd)/reports.json:/app/reports.json \
   otris-docs
 ```
 
-Die Codex-Auth bleibt im Volume `otris-docs-codex` erhalten.
+Die Codex-Auth bleibt im Volume `otris-docs-codex` erhalten. Die Vaults liegen auf dem Host (siehe `-v /srv/otris/vaults`).
 
 ## Vault aktualisieren
 

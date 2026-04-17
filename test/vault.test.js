@@ -7,7 +7,7 @@ import { getSections, listFiles, readDoc, searchDocs, getManifest } from '../src
 
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = dirname(__filename);
-const VAULT_PATH = join(__dirname, '..', 'vault');
+const VAULT_PATH = join(__dirname, '..', 'vaults', 'otris');
 
 describe('Vault', () => {
   describe('getSections', () => {

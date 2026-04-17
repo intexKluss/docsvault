@@ -9,51 +9,101 @@ import { handleStatus } from './tools/status.js';
 
 const sseSessions = new Map();
 
-export function createMcpServer(vaultPath) {
+function registerVaultTools(server, vault) {
+  const { toolPrefix, description } = vault;
+  const vaultPath = vault.path;
+
+  // Jedes neue Tool hier muss auch in TOOL_SUFFIXES in vault-registry.js ergaenzt werden,
+  // sonst wird es nicht in describeVaults()/System-Prompt auftauchen.
+
+  server.tool(
+    `${toolPrefix}_overview`,
+    `Get an overview of: ${description}\n\nWithout parameters, returns a compact summary of all sections with page counts. With a section parameter, returns a detailed listing of all pages grouped by subfolder.`,
+    {
+      section: z.string().optional().describe(`Section name to get detailed listing for. Use exact names as shown by ${toolPrefix}_overview.`),
+    },
+    async (params) => {
+      const result = handleOverview(vaultPath, params);
+      return { content: [{ type: 'text', text: result }] };
+    }
+  );
+
+  server.tool(
+    `${toolPrefix}_search`,
+    `Full-text search across: ${description}\n\nReturns matching files with context lines around each match. Use this to find specific content in this vault.`,
+    {
+      query: z.string().describe('Search query (case-insensitive text search)'),
+      section: z.string().optional().describe(`Limit search to a specific section. Use exact names as shown by ${toolPrefix}_overview.`),
+      max_results: z.number().optional().describe('Maximum number of results (default: 10)'),
+      context_lines: z.number().optional().describe('Number of context lines around each match (default: 3)'),
+    },
+    async (params) => {
+      const results = handleSearch(vaultPath, params);
+      return { content: [{ type: 'text', text: JSON.stringify(results, null, 2) }] };
+    }
+  );
+
+  server.tool(
+    `${toolPrefix}_read`,
+    `Read the full content of a specific page in: ${description}\n\nIMPORTANT: Always use the exact path from ${toolPrefix}_search or ${toolPrefix}_list results — never guess or construct paths yourself, as filenames may contain typos or unexpected spelling.`,
+    {
+      path: z.string().describe(`Exact document path from ${toolPrefix}_search or ${toolPrefix}_list results, without .md extension.`),
+      max_length: z.number().optional().describe('Maximum content length in characters (default: 50000).'),
+    },
+    async (params) => {
+      const result = handleRead(vaultPath, params);
+      if (result.error) {
+        return { content: [{ type: 'text', text: result.error }], isError: true };
+      }
+      let text = '';
+      if (result.title) text += `# ${result.title}\n\n`;
+      if (result.source) text += `Source: ${result.source}\n\n`;
+      text += result.content;
+      if (result.truncated) text += '\n\n⚠️ Content was truncated.';
+      return { content: [{ type: 'text', text }] };
+    }
+  );
+
+  server.tool(
+    `${toolPrefix}_list`,
+    `List all pages in a section or subfolder of: ${description}\n\nReturns an array of {name, path} objects.`,
+    {
+      section: z.string().describe(`Section name. Use exact names as shown by ${toolPrefix}_overview.`),
+      subfolder: z.string().optional().describe('Subfolder within the section'),
+    },
+    async (params) => {
+      const files = handleList(vaultPath, params);
+      return { content: [{ type: 'text', text: JSON.stringify(files, null, 2) }] };
+    }
+  );
+
+  server.tool(
+    `${toolPrefix}_status`,
+    `Check the freshness status of: ${description}\n\nReturns page count, PDF count, and how old the vault is.`,
+    {},
+    async () => {
+      const result = handleStatus(vaultPath);
+      return { content: [{ type: 'text', text: JSON.stringify(result, null, 2) }] };
+    }
+  );
+}
+
+export function createMcpServer(vaultRegistry) {
   const server = new McpServer({
     name: 'otris-docs-mcp',
-    version: '0.1.0',
+    version: '0.2.0',
   });
 
-  server.tool('otris_overview', 'Get an overview of the otris DOCUMENTS documentation vault. Without parameters, returns a compact summary of all sections with page counts. With a section parameter, returns a detailed listing of all pages grouped by subfolder.', { section: z.string().optional().describe('Section name to get detailed listing for (e.g. "Portalscript API", "HowTos", "Gadget API"). Use exact names as shown by otris_overview.') }, async (params) => {
-    const result = handleOverview(vaultPath, params);
-    return { content: [{ type: 'text', text: result }] };
-  });
-
-  server.tool('otris_search', 'Full-text search across the otris DOCUMENTS documentation. Returns matching files with context lines around each match. Use this to find specific API methods, classes, properties, or howto content.', { query: z.string().describe('Search query (case-insensitive text search)'), section: z.string().optional().describe('Limit search to a specific section (e.g. "Portalscript API", "HowTos", "Gadget API"). Use exact names as shown by otris_overview.'), max_results: z.number().optional().describe('Maximum number of results (default: 10)'), context_lines: z.number().optional().describe('Number of context lines around each match (default: 3)') }, async (params) => {
-    const results = handleSearch(vaultPath, params);
-    return { content: [{ type: 'text', text: JSON.stringify(results, null, 2) }] };
-  });
-
-  server.tool('otris_read', 'Read the full content of a specific documentation page. IMPORTANT: Always use the exact path from otris_search or otris_list results — never guess or construct paths yourself, as filenames may contain typos or unexpected spelling.', { path: z.string().describe('Exact document path from otris_search/otris_list results, without .md extension (e.g. "Portalscript API/classes/DocFile")'), max_length: z.number().optional().describe('Maximum content length in characters (default: 50000). Content beyond this is truncated.') }, async (params) => {
-    const result = handleRead(vaultPath, params);
-    if (result.error) {
-      return { content: [{ type: 'text', text: result.error }], isError: true };
-    }
-    let text = '';
-    if (result.title) text += `# ${result.title}\n\n`;
-    if (result.source) text += `Source: ${result.source}\n\n`;
-    text += result.content;
-    if (result.truncated) text += '\n\n⚠️ Content was truncated.';
-    return { content: [{ type: 'text', text }] };
-  });
-
-  server.tool('otris_list', 'List all documentation pages in a section or subfolder. Returns an array of {name, path} objects. Use this to enumerate available pages before reading them.', { section: z.string().describe('Section name (e.g. "Portalscript API", "HowTos", "Gadget API", "Properties"). Use exact names as shown by otris_overview.'), subfolder: z.string().optional().describe('Subfolder within the section (e.g. "classes", "interfaces")') }, async (params) => {
-    const files = handleList(vaultPath, params);
-    return { content: [{ type: 'text', text: JSON.stringify(files, null, 2) }] };
-  });
-
-  server.tool('otris_status', 'Check the status of the local otris DOCUMENTS documentation vault. Returns freshness, page count, PDF count, and whether an update is recommended.', {}, async () => {
-    const result = handleStatus(vaultPath);
-    return { content: [{ type: 'text', text: JSON.stringify(result, null, 2) }] };
-  });
+  for (const vault of vaultRegistry) {
+    registerVaultTools(server, vault);
+  }
 
   return server;
 }
 
-export async function handleSseGet(req, res, vaultPath) {
+export async function handleSseGet(req, res, vaultRegistry) {
   const transport = new SSEServerTransport('/messages', res);
-  const server = createMcpServer(vaultPath);
+  const server = createMcpServer(vaultRegistry);
 
   sseSessions.set(transport.sessionId, transport);
   res.on('close', () => {
@@ -77,7 +127,7 @@ export async function handleSsePost(req, res) {
   await transport.handlePostMessage(req, res);
 }
 
-export async function handleStreamablePost(req, res, vaultPath) {
+export async function handleStreamablePost(req, res, vaultRegistry) {
   let StreamableHTTPServerTransport;
   try {
     const mod = await import('@modelcontextprotocol/sdk/server/streamableHttp.js');
@@ -88,7 +138,7 @@ export async function handleStreamablePost(req, res, vaultPath) {
   }
 
   const transport = new StreamableHTTPServerTransport({ sessionIdGenerator: undefined });
-  const server = createMcpServer(vaultPath);
+  const server = createMcpServer(vaultRegistry);
   await server.connect(transport);
   await transport.handleRequest(req, res);
 }

@@ -2,7 +2,7 @@ import { randomUUID } from 'node:crypto';
 import { Codex } from '@openai/codex-sdk';
 import { dirname, resolve } from 'node:path';
 import { fileURLToPath } from 'node:url';
-import { SYSTEM_PROMPT } from './system-prompt.js';
+import { buildSystemPrompt } from './system-prompt.js';
 
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = dirname(__filename);
@@ -10,8 +10,15 @@ const __dirname = dirname(__filename);
 const MCP_CWD = resolve(__dirname, '..');
 
 export class CodexBridge {
+  constructor(vaultRegistry) {
+    this.vaultRegistry = (vaultRegistry || []).filter(
+      v => v && typeof v.toolPrefix === 'string' && v.toolPrefix.length > 0
+    );
+  }
+
   async createSession() {
-    const id = randomUUID();    
+    const id = randomUUID();
+    const systemPrompt = buildSystemPrompt(this.vaultRegistry);
     let destroyed = false;
     let warmedUp = false;
     let warmingUp = false;
@@ -43,7 +50,7 @@ export class CodexBridge {
         activeAbort = abort;
 
         try {
-          await thread.run(SYSTEM_PROMPT + '\n\nAntworte nur mit: Bereit.', {
+          await thread.run(systemPrompt + '\n\nAntworte nur mit: Bereit.', {
             signal: abort.signal,
           });
           if (destroyed) return;
