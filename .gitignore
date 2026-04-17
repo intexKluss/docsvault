@@ -7,4 +7,5 @@ reports.json
 .mcp.json
 todo
 vault/
-vaults/*/.auth.json
+vaults/
+
