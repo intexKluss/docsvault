@@ -1,4 +1,4 @@
-import { Router, json } from 'express';
+import { Router } from 'express';
 import { handleSearch } from './tools/search.js';
 import { handleRead } from './tools/read.js';
 import { handleList } from './tools/list.js';
@@ -37,16 +37,11 @@ function apiRateLimit(req, res, next) {
   next();
 }
 
-export function createApiRouter(vaultPath) {
-  const router = Router();
+function registerVaultRoutes(router, vault) {
+  const base = `/api/${vault.toolPrefix}`;
+  const vaultPath = vault.path;
 
-  router.use('/api', apiRateLimit);
-
-  router.get('/api/health', (req, res) => {
-    res.json({ status: 'ok' });
-  });
-
-  router.get('/api/search', (req, res) => {
+  router.get(`${base}/search`, (req, res) => {
     const { query, section } = req.query;
     if (!query || typeof query !== 'string' || !query.trim()) {
       return res.status(400).json({ error: 'query parameter required' });
@@ -60,20 +55,20 @@ export function createApiRouter(vaultPath) {
     res.json(results);
   });
 
-  router.get('/api/read', (req, res) => {
-    const { path } = req.query;
-    if (!path || typeof path !== 'string' || !path.trim()) {
+  router.get(`${base}/read`, (req, res) => {
+    const { path: docPath } = req.query;
+    if (!docPath || typeof docPath !== 'string' || !docPath.trim()) {
       return res.status(400).json({ error: 'path parameter required' });
     }
     const result = handleRead(vaultPath, {
-      path: path.trim(),
+      path: docPath.trim(),
       max_length: clampInt(req.query.max_length, 1, 200000, 50000),
     });
     if (result.error) return res.status(404).json(result);
     res.json(result);
   });
 
-  router.get('/api/list', (req, res) => {
+  router.get(`${base}/list`, (req, res) => {
     const { section, subfolder } = req.query;
     if (!section || typeof section !== 'string' || !section.trim()) {
       return res.status(400).json({ error: 'section parameter required' });
@@ -85,16 +80,40 @@ export function createApiRouter(vaultPath) {
     res.json(files);
   });
 
-  router.get('/api/overview', (req, res) => {
+  router.get(`${base}/overview`, (req, res) => {
     const { section } = req.query;
     const result = handleOverview(vaultPath, { section: section || undefined });
     res.json({ text: result });
   });
 
-  router.get('/api/status', (req, res) => {
+  router.get(`${base}/status`, (req, res) => {
     const result = handleStatus(vaultPath);
     res.json(result);
   });
+}
+
+export function createApiRouter(vaultRegistry) {
+  const router = Router();
+
+  router.use('/api', apiRateLimit);
+
+  router.get('/api/health', (req, res) => {
+    res.json({ status: 'ok', vaults: vaultRegistry.length });
+  });
+
+  router.get('/api/vaults', (req, res) => {
+    res.json({
+      vaults: vaultRegistry.map(v => ({
+        toolPrefix: v.toolPrefix,
+        name: v.name,
+        description: v.description,
+      })),
+    });
+  });
+
+  for (const vault of vaultRegistry) {
+    registerVaultRoutes(router, vault);
+  }
 
   router.use('/api', (err, req, res, next) => {
     console.error(`[api] error: ${err.message}`);
