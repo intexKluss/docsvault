@@ -171,7 +171,6 @@ docker run -d --name otris-docs --restart unless-stopped \
   -e ALLOW_NO_ORIGIN=true \
   -v /srv/otris/vaults:/app/vaults:ro \
   -v otris-docs-codex:/home/node/.codex \
-  -v $(pwd)/reports.json:/app/reports.json \
   otris-docs
 ```
 

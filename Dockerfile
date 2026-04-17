@@ -20,6 +20,9 @@ RUN sed -i 's/\r$//' docker-entrypoint.sh && chmod +x docker-entrypoint.sh
 RUN mkdir -p /app/vaults && chown node:node /app/vaults
 VOLUME ["/app/vaults"]
 
+# reports.json als leere JSONL-Datei anlegen — wird beim Betrieb gefuellt
+RUN touch /app/reports.json && chown node:node /app/reports.json
+
 USER node
 
 EXPOSE 3000

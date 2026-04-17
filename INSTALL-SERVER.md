@@ -82,7 +82,7 @@ Markdown-Dateien ins Verzeichnis legen — siehe [README.md](README.md#vault-for
 
 ### 4. Container starten
 
-**Linux/Mac** — `$(pwd)` = aktuelles Arbeitsverzeichnis (Bash expandiert das vor dem `docker run`):
+**Linux/Mac:**
 
 ```bash
 docker run -d \
@@ -94,28 +94,24 @@ docker run -d \
   -e ALLOW_NO_ORIGIN=true \
   -v /srv/otris/vaults:/app/vaults:ro \
   -v otris-docs-codex:/home/node/.codex \
-  -v $(pwd)/reports.json:/app/reports.json \
   otris-docs
 ```
 
-**Windows (PowerShell)** — keine `$(pwd)`-Syntax, hier absolute Pfade und Forward-Slashes fuer Docker:
+**Windows (PowerShell)** — absolute Pfade, Forward-Slashes fuer Docker:
 
 ```powershell
-docker run -d --name otris-docs --restart unless-stopped -p 3000:3000 -e BRIDGE=codex -e ALLOWED_ORIGINS=http://SERVER-IP:3000 -e ALLOW_NO_ORIGIN=true -v "C:/dein/pfad/zu/vaults:/app/vaults:ro" -v otris-docs-codex:/home/node/.codex -v "C:/dein/pfad/zu/reports.json:/app/reports.json" otris-docs
-```
-
-Vorher `reports.json` als leere Datei anlegen (sonst mountet Docker es als Ordner):
-
-```powershell
-New-Item -ItemType File "C:\dein\pfad\zu\reports.json" -Force
+docker run -d --name otris-docs --restart unless-stopped -p 3000:3000 -e BRIDGE=codex -e ALLOWED_ORIGINS=http://SERVER-IP:3000 -e ALLOW_NO_ORIGIN=true -v "C:/dein/pfad/zu/vaults:/app/vaults:ro" -v otris-docs-codex:/home/node/.codex otris-docs
 ```
 
 **Diese Platzhalter musst du im `docker run` ersetzen:**
 - `SERVER-IP` — tatsaechliche IP oder Domain des Servers (bei Lokal-Test: `localhost`)
 - `/srv/otris/vaults` (Linux) bzw. `C:/dein/pfad/zu/vaults` (Windows) — dein Host-Pfad aus Schritt 3, also wohin du den Vault geklont hast
-- `$(pwd)/reports.json` (Linux) bzw. `C:/dein/pfad/zu/reports.json` (Windows) — Pfad zur reports.json-Datei (irgendwo schreibbar)
 
-`/app/vaults` und `/app/reports.json` (der Teil **nach** dem `:`) sind Container-intern und bleiben wie sie sind.
+`/app/vaults` (der Teil **nach** dem `:`) ist Container-intern und bleibt wie er ist.
+
+> **Bug-Reports persistent machen** (optional): Standardmaessig landen Bug-Reports in `/app/reports.json` **im Container** — verschwinden also beim `docker rm`. Wenn du sie ueber Container-Rebuilds erhalten willst, mounte eine Host-Datei drauf:
+> - Host-Datei vorher anlegen: Linux `touch /srv/otris/reports.json` bzw. Windows `New-Item -ItemType File "C:\pfad\reports.json" -Force`
+> - Beim `docker run` ergaenzen: `-v /srv/otris/reports.json:/app/reports.json` (Linux) bzw. `-v "C:/pfad/reports.json:/app/reports.json"` (Windows)
 
 Die Volumes sorgen dafür, dass Vaults, Codex-Auth und Bug-Reports bei Container-Rebuilds erhalten bleiben.
 
@@ -275,7 +271,6 @@ docker run -d \
   -e ALLOW_NO_ORIGIN=true \
   -v /srv/otris/vaults:/app/vaults:ro \
   -v otris-docs-codex:/home/node/.codex \
-  -v $(pwd)/reports.json:/app/reports.json \
   otris-docs
 ```
 
