@@ -29,16 +29,10 @@ docker build -t otris-docs-web .
 otris-Vault aufs Host-System klonen (Zugriff aufs [otris-docs-vault](https://github.com/intexKluss/otris-docs-vault) Repo noetig):
 
 ```bash
-mkdir -p /srv/otris/vaults
+git clone https://github.com/intexKluss/otris-docs-vault.git /srv/otris/vaults/otris
 ```
 
-```bash
-cd /srv/otris/vaults
-```
-
-```bash
-git clone https://github.com/intexKluss/otris-docs-vault.git otris
-```
+Git legt `vaults/` automatisch mit an.
 
 Container starten:
 

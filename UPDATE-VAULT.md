@@ -6,20 +6,10 @@ Der otris-Vault hat sein eigenes Repo: [otris-docs-vault](https://github.com/int
 
 ## otris-Vault: Erst-Einrichtung
 
-Verzeichnis anlegen:
+Repo klonen (Git legt den `vaults/`-Parent automatisch mit an):
 
 ```bash
-mkdir -p /srv/otris/vaults
-```
-
-Repo klonen:
-
-```bash
-cd /srv/otris/vaults
-```
-
-```bash
-git clone https://github.com/intexKluss/otris-docs-vault.git otris
+git clone https://github.com/intexKluss/otris-docs-vault.git /srv/otris/vaults/otris
 ```
 
 Container starten oder neustarten:

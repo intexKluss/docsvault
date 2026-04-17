@@ -27,20 +27,13 @@ Der Build dauert unter 30 Sekunden (plus Download beim ersten Mal).
 
 Der Container liest Vaults aus `/app/vaults`, gemountet vom Host. Jeder Unterordner ist ein eigener Vault mit eigener `_meta.json`.
 
-**Host-Verzeichnis anlegen:**
-
-```bash
-mkdir -p /srv/otris/vaults
-cd /srv/otris/vaults
-```
-
 **otris-Vault klonen** (Zugriff aufs [otris-docs-vault](https://github.com/intexKluss/otris-docs-vault) Repo noetig):
 
 ```bash
-git clone https://github.com/intexKluss/otris-docs-vault.git otris
+git clone https://github.com/intexKluss/otris-docs-vault.git /srv/otris/vaults/otris
 ```
 
-Danach liegt `_meta.json` plus die 995 Markdown-Seiten unter `/srv/otris/vaults/otris/`.
+Git legt den `vaults/`-Parent-Ordner automatisch mit an. Danach liegen `_meta.json` plus die 995 Markdown-Seiten unter `/srv/otris/vaults/otris/`.
 
 **Weitere Vaults hinzufuegen** — manuell oder per Git-Clone, z.B.:
 
