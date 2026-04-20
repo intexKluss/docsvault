@@ -1,21 +1,28 @@
 (function () {
   'use strict';
 
+  // labels werden pro tool-suffix (search/read/list/overview/status) gemapped,
+  // damit auch vaults mit anderem prefix als otris (z.b. intex_regeln_search) funktionieren
   const TOOL_LABELS = {
-    otris_search: 'Durchsuche Dokumentation',
-    otris_read: 'Lese Dokument',
-    otris_list: 'Durchsuche Verzeichnis',
-    otris_overview: 'Lade Übersicht',
-    otris_status: 'Prüfe Status',
+    search: 'Durchsuche Dokumentation',
+    read: 'Lese Dokument',
+    list: 'Durchsuche Verzeichnis',
+    overview: 'Lade Übersicht',
+    status: 'Prüfe Status',
   };
 
   const TOOL_DONE_LABELS = {
-    otris_search: 'Dokumentation durchsucht',
-    otris_read: 'Dokument gelesen',
-    otris_list: 'Verzeichnis durchsucht',
-    otris_overview: 'Übersicht geladen',
-    otris_status: 'Status geprüft',
+    search: 'Dokumentation durchsucht',
+    read: 'Dokument gelesen',
+    list: 'Verzeichnis durchsucht',
+    overview: 'Übersicht geladen',
+    status: 'Status geprüft',
   };
+
+  function toolLabel(name, map) {
+    const m = name && name.match(/_(search|read|list|overview|status)$/);
+    return m ? map[m[1]] : null;
+  }
 
   const SVG_SPINNER = '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="10"/><path d="M12 6v6l4 2"/></svg>';
   const SVG_CHECK = '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polyline points="20 6 9 17 4 12"/></svg>';
@@ -331,7 +338,7 @@
     if (!currentAiMsg) return;
     const block = getToolBlock(currentAiMsg);
     const details = block.querySelector('.tool-block-details');
-    const label = TOOL_LABELS[msg.tool] || 'Verarbeite Anfrage';
+    const label = toolLabel(msg.tool, TOOL_LABELS) || 'Verarbeite Anfrage';
 
     if (msg.status === 'running') {
       const item = document.createElement('div');
@@ -346,7 +353,7 @@
       const item = items[items.length - 1];
       if (item) {
         item.className = 'tool-detail done';
-        const doneLabel = TOOL_DONE_LABELS[msg.tool] || 'Anfrage verarbeitet';
+        const doneLabel = toolLabel(msg.tool, TOOL_DONE_LABELS) || 'Anfrage verarbeitet';
         item.innerHTML = SVG_CHECK + '<span>' + doneLabel + '</span>';
       }
 

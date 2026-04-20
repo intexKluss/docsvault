@@ -7,7 +7,7 @@ Seit Gemini CLI Remote-MCP unterstuetzt, ist kein lokaler Proxy mehr noetig — 
 ### Option A: CLI-Befehl (empfohlen)
 
 ```bash
-gemini mcp add --transport sse otris-docs http://<SERVER-IP>:3000/sse
+gemini mcp add --transport sse docsvault http://<SERVER-IP>:3000/sse
 ```
 
 ### Option B: Manuell in ~/.gemini/settings.json
@@ -17,7 +17,7 @@ User-Scope (global, in jedem Projekt verfuegbar):
 ```json
 {
   "mcpServers": {
-    "otris-docs": {
+    "docsvault": {
       "url": "http://<SERVER-IP>:3000/sse"
     }
   }
@@ -36,6 +36,6 @@ Ersetze `<SERVER-IP>` durch die IP des Servers (z.B. `192.168.2.100`).
 gemini mcp list
 ```
 
-Der Server `otris-docs` sollte in der Liste erscheinen.
+Der Server `docsvault` sollte in der Liste erscheinen.
 
 Starte Gemini CLI und stelle eine Testfrage zur otris Dokumentation oder Intex-Regeln — die Tools werden automatisch genutzt.

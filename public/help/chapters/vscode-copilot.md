@@ -5,7 +5,7 @@
 Die Claude Code VS Code Extension nutzt MCP-Server aus `~/.claude.json` (User Scope). Am einfachsten per CLI hinzufügen:
 
 ```bash
-claude mcp add --transport sse --scope user otris-docs http://<SERVER-IP>:3000/sse
+claude mcp add --transport sse --scope user docsvault http://<SERVER-IP>:3000/sse
 ```
 
 Danach VS Code neu laden. Der Server erscheint in der MCP-Liste der Extension.
@@ -31,7 +31,7 @@ Erstelle eine `.vscode/mcp.json` im Projektverzeichnis:
 ```json
 {
   "servers": {
-    "otris-docs": {
+    "docsvault": {
       "type": "sse",
       "url": "http://<SERVER-IP>:3000/sse"
     }
@@ -46,7 +46,7 @@ Erstelle eine `.vscode/mcp.json` im Projektverzeichnis:
 ```json
 {
   "servers": {
-    "otris-docs": {
+    "docsvault": {
       "type": "sse",
       "url": "http://<SERVER-IP>:3000/sse"
     }
@@ -66,7 +66,7 @@ MCP-Tools funktionieren nur im **Agent Mode** von Copilot Chat:
 
 1. Copilot Chat öffnen (`Ctrl+Alt+I`)
 2. Sicherstellen, dass **Agent** als Modus ausgewählt ist (über den Mode-Picker oben im Chat-Fenster)
-3. Jetzt hat Copilot Zugriff auf die otris-docs Tools
+3. Jetzt hat Copilot Zugriff auf die docsvault Tools
 
 > **Hinweis:** Die Chat-UI wird regelmäßig aktualisiert. Falls kein Mode-Picker sichtbar ist, ist Agent Mode möglicherweise bereits der Standard. Die MCP-Tools werden im Chat als verfügbare Tools angezeigt, sobald der Server verbunden ist.
 

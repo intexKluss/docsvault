@@ -1,4 +1,4 @@
-# otris docs web
+# docsvault
 
 Web-Chat UI und MCP-Server für die otris DOCUMENTS Dokumentation. Nutzt Claude Agent SDK oder OpenAI Codex SDK als AI-Backend. Die Dokumentation (995 Markdown-Seiten) ist im Vault enthalten und wird im Docker-Image gebacken.
 
@@ -23,7 +23,7 @@ npm run dev:codex     # Codex Bridge
 Image bauen:
 
 ```bash
-docker build -t otris-docs-web .
+docker build -t docsvault .
 ```
 
 otris-Vault aufs Host-System klonen (Zugriff aufs [otris-docs-vault](https://github.com/intexKluss/otris-docs-vault) Repo noetig):
@@ -40,8 +40,8 @@ Container starten:
 docker run -d \
   -v /srv/otris/vaults:/app/vaults:ro \
   -p 3000:3000 \
-  --name otris-docs \
-  otris-docs-web
+  --name docsvault \
+  docsvault
 ```
 
 Siehe [INSTALL-SERVER.md](INSTALL-SERVER.md) für Details.
@@ -93,7 +93,7 @@ EOF
 Markdown-Dateien reinkopieren, dann Container neustarten:
 
 ```bash
-docker restart otris-docs
+docker restart docsvault
 ```
 
 ## Für Entwickler (MCP-Client)
@@ -101,7 +101,7 @@ docker restart otris-docs
 Verbinde deinen Coding-Agent per MCP mit dem Server:
 
 ```bash
-claude mcp add --transport sse otris-docs http://SERVER-IP:3000/sse
+claude mcp add --transport sse docsvault http://SERVER-IP:3000/sse
 ```
 
 Oder manuell in `.mcp.json`:
@@ -109,7 +109,7 @@ Oder manuell in `.mcp.json`:
 ```json
 {
   "mcpServers": {
-    "otris-docs": {
+    "docsvault": {
       "type": "sse",
       "url": "http://SERVER-IP:3000/sse"
     }
@@ -124,29 +124,29 @@ Siehe [INSTALL-DEVELOPER.md](INSTALL-DEVELOPER.md) für alle Optionen.
 ### Container
 
 ```bash
-docker logs otris-docs                    # Logs anzeigen
-docker logs otris-docs --tail 50          # Letzte 50 Zeilen
-docker logs otris-docs -f                 # Logs live verfolgen
-docker restart otris-docs                 # Neustart
-docker stop otris-docs                    # Stoppen
-docker start otris-docs                   # Starten
-docker inspect --format='{{.State.Health.Status}}' otris-docs   # Health Status
+docker logs docsvault                    # Logs anzeigen
+docker logs docsvault --tail 50          # Letzte 50 Zeilen
+docker logs docsvault -f                 # Logs live verfolgen
+docker restart docsvault                 # Neustart
+docker stop docsvault                    # Stoppen
+docker start docsvault                   # Starten
+docker inspect --format='{{.State.Health.Status}}' docsvault   # Health Status
 ```
 
 ### Codex Auth
 
 ```bash
-docker exec -it otris-docs codex auth login --device-auth   # Einloggen / Token erneuern
-docker exec otris-docs codex auth status                    # Auth-Status prüfen
-docker exec otris-docs codex mcp list                       # MCP-Server prüfen
+docker exec -it docsvault codex auth login --device-auth   # Einloggen / Token erneuern
+docker exec docsvault codex auth status                    # Auth-Status prüfen
+docker exec docsvault codex mcp list                       # MCP-Server prüfen
 ```
 
 ### Bug-Reports auslesen
 
 ```bash
-docker exec otris-docs cat /app/reports.json                # Alle Reports anzeigen
-docker exec otris-docs tail -5 /app/reports.json            # Letzte 5 Reports
-docker exec otris-docs wc -l /app/reports.json              # Anzahl Reports
+docker exec docsvault cat /app/reports.json                # Alle Reports anzeigen
+docker exec docsvault tail -5 /app/reports.json            # Letzte 5 Reports
+docker exec docsvault wc -l /app/reports.json              # Anzahl Reports
 ```
 
 ### REST API testen
@@ -162,19 +162,19 @@ curl "http://SERVER-IP:3000/api/otris/overview"             # Sektionsuebersicht
 ### Komplett neu bauen
 
 ```bash
-docker stop otris-docs; docker rm otris-docs
+docker stop docsvault; docker rm docsvault
 git pull
-docker build -t otris-docs .
-docker run -d --name otris-docs --restart unless-stopped \
+docker build -t docsvault .
+docker run -d --name docsvault --restart unless-stopped \
   -p 3000:3000 -e BRIDGE=codex \
   -e ALLOWED_ORIGINS=http://SERVER-IP:3000 \
   -e ALLOW_NO_ORIGIN=true \
   -v /srv/otris/vaults:/app/vaults:ro \
-  -v otris-docs-codex:/home/node/.codex \
-  otris-docs
+  -v docsvault-codex:/home/node/.codex \
+  docsvault
 ```
 
-Die Codex-Auth bleibt im Volume `otris-docs-codex` erhalten. Die Vaults liegen auf dem Host (siehe `-v /srv/otris/vaults`).
+Die Codex-Auth bleibt im Volume `docsvault-codex` erhalten. Die Vaults liegen auf dem Host (siehe `-v /srv/otris/vaults`).
 
 ## Vault aktualisieren
 

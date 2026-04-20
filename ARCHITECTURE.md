@@ -1,4 +1,4 @@
-# otris-docs-web — Architektur
+# docsvault — Architektur
 
 Web-Chat UI für die otris DOCUMENTS Dokumentation. Bot nutzt entweder Claude Agent SDK oder OpenAI Codex SDK. Die MCP-Tools (search, read, list, overview, status) sind direkt im Server internalisiert (`src/tools/`).
 
@@ -159,7 +159,7 @@ Codex Bridge: Nutzt MCP über Codex CLI Config.
 ## Sicherheit
 
 - **Prompt Injection**: System-Prompt mit strikten Regeln, Social-Engineering-Abwehr
-- **Tool-Whitelist**: Nur otris-docs MCP Tools erlaubt, alle Built-in Tools gesperrt
+- **Tool-Whitelist**: Nur docsvault MCP Tools erlaubt, alle Built-in Tools gesperrt
 - **Rate Limiting**: IP-basiert, proxy-aware via `trust proxy`
 - **WebSocket**: Origin-Validierung, 16KB Payload-Limit, Heartbeat
 - **XSS**: DOMPurify auf allen Markdown-Outputs, `CSS.escape` in Selektoren

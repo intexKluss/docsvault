@@ -1,6 +1,6 @@
 # MCP mit deinem Coding-Agent nutzen
 
-Wenn der otris-docs-web Server im LAN läuft, kannst du deinen Coding-Agent direkt damit verbinden — ohne lokale Installation. Der Agent bekommt dann direkten Zugriff auf otris-Dokumentation: suchen, lesen, auflisten.
+Wenn der docsvault Server im LAN läuft, kannst du deinen Coding-Agent direkt damit verbinden — ohne lokale Installation. Der Agent bekommt dann direkten Zugriff auf otris-Dokumentation: suchen, lesen, auflisten.
 
 ## Verfügbare Tools nach der Einrichtung
 
@@ -21,7 +21,7 @@ Falls weitere Vaults konfiguriert sind (z.B. `intex-regeln`), kommen entsprechen
 ### Option A: CLI-Befehl (empfohlen)
 
 ```bash
-claude mcp add --transport sse otris-docs http://<SERVER-IP>:3000/sse
+claude mcp add --transport sse docsvault http://<SERVER-IP>:3000/sse
 ```
 
 ### Option B: Projekt-spezifisch (.mcp.json)
@@ -31,7 +31,7 @@ Erstelle eine `.mcp.json` im Projektverzeichnis:
 ```json
 {
   "mcpServers": {
-    "otris-docs": {
+    "docsvault": {
       "type": "sse",
       "url": "http://<SERVER-IP>:3000/sse"
     }
@@ -44,7 +44,7 @@ Erstelle eine `.mcp.json` im Projektverzeichnis:
 ```json
 {
   "mcpServers": {
-    "otris-docs": {
+    "docsvault": {
       "type": "sse",
       "url": "http://<SERVER-IP>:3000/sse"
     }
@@ -59,18 +59,18 @@ Starte Claude Code neu und prüfe mit `/mcp` ob der Server erkannt wird.
 Per CLI (empfohlen):
 
 ```bash
-codex mcp add otris-docs --url http://<SERVER-IP>:3000/mcp
+codex mcp add docsvault --url http://<SERVER-IP>:3000/mcp
 ```
 
 Oder manuell in `~/.codex/config.toml`:
 
 ```toml
-[mcp_servers.otris-docs]
+[mcp_servers.docsvault]
 url = "http://<SERVER-IP>:3000/mcp"
 ```
 
-Prüfe danach mit `codex mcp list` ob der Server `otris-docs` erscheint.
+Prüfe danach mit `codex mcp list` ob der Server `docsvault` erscheint.
 
 ## Hinweis
 
-Ersetze `<SERVER-IP>` durch die tatsächliche LAN-IP des Servers, auf dem otris-docs-web läuft (z.B. `192.168.2.100`).
+Ersetze `<SERVER-IP>` durch die tatsächliche LAN-IP des Servers, auf dem docsvault läuft (z.B. `192.168.2.100`).

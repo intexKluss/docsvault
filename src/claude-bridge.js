@@ -14,7 +14,7 @@ const MCP_PORT = process.env.PORT || '3000';
 const MCP_SSE_URL = process.env.MCP_SSE_URL || `http://localhost:${MCP_PORT}/sse`;
 
 const MCP_SERVERS = {
-  'otris-docs': {
+  'docsvault': {
     url: MCP_SSE_URL,
   }
 };
@@ -45,7 +45,7 @@ export class ClaudeBridge {
     const registry = this.vaultRegistry;
     const systemPrompt = buildSystemPrompt(registry);
     const allowedTools = registry.flatMap(v =>
-      TOOL_SUFFIXES.map(s => `mcp__otris-docs__${v.toolPrefix}_${s}`)
+      TOOL_SUFFIXES.map(s => `mcp__docsvault__${v.toolPrefix}_${s}`)
     );
 
     // security-relevante felder NACH spread, nicht überschreibbar
@@ -138,7 +138,7 @@ export class ClaudeBridge {
               for (const block of message.message.content) {
                 if (block.type === 'tool_use' && !toolRunning) {
                   toolRunning = true;
-                  currentToolName = block.name?.replace('mcp__otris-docs__', '') || 'unknown';
+                  currentToolName = block.name?.replace('mcp__docsvault__', '') || 'unknown';
                   yield { type: 'tool_use', tool: currentToolName, status: 'running' };
                 }
                 if (block.type === 'text' && block.text) {

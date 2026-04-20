@@ -15,7 +15,7 @@ git clone https://github.com/intexKluss/otris-docs-vault.git /srv/otris/vaults/o
 Container starten oder neustarten:
 
 ```bash
-docker restart otris-docs
+docker restart docsvault
 ```
 
 ## otris-Vault aktualisieren (neue Doku-Version einspielen)
@@ -31,7 +31,7 @@ git pull
 ```
 
 ```bash
-docker restart otris-docs
+docker restart docsvault
 ```
 
 Fertig — kein Rebuild noetig.
@@ -41,14 +41,14 @@ Fertig — kein Rebuild noetig.
 Nur wenn eine neue otris-Doku-Version vom Crawler gezogen werden soll:
 
 ```bash
-cd /path/to/otris-docs-web
+cd /path/to/docsvault
 ```
 
 ```bash
 npm run crawl
 ```
 
-Output landet in `./vault/` — das ist ein lokaler Staging-Ordner (in `.gitignore`, wird **nicht** in otris-docs-web committet).
+Output landet in `./vault/` — das ist ein lokaler Staging-Ordner (in `.gitignore`, wird **nicht** in docsvault committet).
 
 Content ins Vault-Repo spiegeln:
 
@@ -97,7 +97,7 @@ EOF
 Markdown-Dateien reinlegen, dann Container neustarten:
 
 ```bash
-docker restart otris-docs
+docker restart docsvault
 ```
 
 ## Bestehenden Non-otris-Vault aktualisieren
@@ -105,7 +105,7 @@ docker restart otris-docs
 Dateien im Host-Verzeichnis aendern/austauschen, dann:
 
 ```bash
-docker restart otris-docs
+docker restart docsvault
 ```
 
 ## Vault entfernen
@@ -115,7 +115,7 @@ rm -rf /srv/otris/vaults/<name>
 ```
 
 ```bash
-docker restart otris-docs
+docker restart docsvault
 ```
 
 ## Warum kein Live-Reload?

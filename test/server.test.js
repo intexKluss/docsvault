@@ -42,7 +42,7 @@ describe('Server', () => {
       assert.equal(res.status, 200);
       const text = await res.text();
       assert.ok(text.includes('<!DOCTYPE html>'));
-      assert.ok(text.includes('otris docs assistant'));
+      assert.ok(text.includes('docsvault'));
     });
 
     it('sets CSP header', async () => {

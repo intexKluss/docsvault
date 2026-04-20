@@ -10,14 +10,14 @@
 ### 1. Repo klonen
 
 ```bash
-git clone https://github.com/intexKluss/otris-docs-web.git
-cd otris-docs-web
+git clone https://github.com/intexKluss/docsvault.git
+cd docsvault
 ```
 
 ### 2. Docker Image bauen
 
 ```bash
-docker build -t otris-docs .
+docker build -t docsvault .
 ```
 
 Das Image ist schlank — der Vault wird nicht mehr mitgebaut, sondern per Volume gemountet.
@@ -31,7 +31,7 @@ Der Build dauert unter 30 Sekunden (plus Download beim ersten Mal).
 - **Kein `mkdir`, kein `cd` noetig.** `git clone URL TARGET-PFAD` legt alle Parent-Ordner automatisch an.
 - **`/app/vaults` existiert nur im Container** — vom Dockerfile angelegt, nicht auf deinem Host.
 
-**Empfehlung** — einen Ordner nach oben gehen (raus aus `otris-docs-web/`) und die Vaults als Sibling anlegen. Dann sind Server-Code und Vaults sauber nebeneinander:
+**Empfehlung** — einen Ordner nach oben gehen (raus aus `docsvault/`) und die Vaults als Sibling anlegen. Dann sind Server-Code und Vaults sauber nebeneinander:
 
 ```bash
 cd ..
@@ -45,7 +45,7 @@ Ergibt folgende Struktur:
 
 ```
 <dein-arbeitsordner>/
-├── otris-docs-web/      <- der gerade geklonte Server-Code
+├── docsvault/      <- der gerade geklonte Server-Code
 └── vaults/
     └── otris/           <- der Vault mit _meta.json + 995 MDs
 ```
@@ -86,21 +86,21 @@ Markdown-Dateien ins Verzeichnis legen — siehe [README.md](README.md#vault-for
 
 ```bash
 docker run -d \
-  --name otris-docs \
+  --name docsvault \
   --restart unless-stopped \
   -p 3000:3000 \
   -e BRIDGE=codex \
   -e ALLOWED_ORIGINS=http://SERVER-IP:3000 \
   -e ALLOW_NO_ORIGIN=true \
   -v /srv/otris/vaults:/app/vaults:ro \
-  -v otris-docs-codex:/home/node/.codex \
-  otris-docs
+  -v docsvault-codex:/home/node/.codex \
+  docsvault
 ```
 
 **Windows (PowerShell)** — absolute Pfade, Forward-Slashes fuer Docker:
 
 ```powershell
-docker run -d --name otris-docs --restart unless-stopped -p 3000:3000 -e BRIDGE=codex -e ALLOWED_ORIGINS=http://SERVER-IP:3000 -e ALLOW_NO_ORIGIN=true -v "C:/dein/pfad/zu/vaults:/app/vaults:ro" -v otris-docs-codex:/home/node/.codex otris-docs
+docker run -d --name docsvault --restart unless-stopped -p 3000:3000 -e BRIDGE=codex -e ALLOWED_ORIGINS=http://SERVER-IP:3000 -e ALLOW_NO_ORIGIN=true -v "C:/dein/pfad/zu/vaults:/app/vaults:ro" -v docsvault-codex:/home/node/.codex docsvault
 ```
 
 **Diese Platzhalter musst du im `docker run` ersetzen:**
@@ -119,8 +119,8 @@ docker run -d --name otris-docs --restart unless-stopped -p 3000:3000 -e BRIDGE=
 
 Der **Container-Pfad `/app/vaults`** ist fix — der Server sucht dort die Vaults, darf also nicht geaendert werden. Der **Host-Pfad** ist dein frei waehlbarer Ordner aus Schritt 3. Das `:ro` am Ende ist optional (read-only, verhindert dass der Container in deinen Ordner schreibt).
 
-Analog fuer das zweite Volume `-v otris-docs-codex:/home/node/.codex`:
-- `otris-docs-codex` — named volume (Docker verwaltet das automatisch, keine Host-Datei noetig)
+Analog fuer das zweite Volume `-v docsvault-codex:/home/node/.codex`:
+- `docsvault-codex` — named volume (Docker verwaltet das automatisch, keine Host-Datei noetig)
 - `/home/node/.codex` — Container-Pfad wo Codex seine Auth speichert
 - Keine Optionen (read-write)
 
@@ -135,7 +135,7 @@ Die Volumes sorgen dafür, dass Vaults, Codex-Auth und Bug-Reports bei Container
 Der Web-Chat nutzt die Codex CLI mit ChatGPT-Account (kein API Key nötig). Login per Device-Auth:
 
 ```bash
-docker exec -it otris-docs codex auth login --device-auth
+docker exec -it docsvault codex auth login --device-auth
 ```
 
 So funktioniert es:
@@ -146,12 +146,12 @@ So funktioniert es:
 5. Organisation auswählen falls gefragt
 6. In der PowerShell/Terminal erscheint "Login successful"
 
-Der Token wird im Volume `otris-docs-codex` gespeichert und überlebt Container-Restarts und Rebuilds. Ein erneutes Login ist nur nötig wenn der Token abläuft.
+Der Token wird im Volume `docsvault-codex` gespeichert und überlebt Container-Restarts und Rebuilds. Ein erneutes Login ist nur nötig wenn der Token abläuft.
 
 **Erneut einloggen** (z.B. nach Token-Ablauf):
 
 ```bash
-docker exec -it otris-docs codex auth login --device-auth
+docker exec -it docsvault codex auth login --device-auth
 ```
 
 Gleicher Befehl wie beim ersten Mal.
@@ -180,7 +180,7 @@ open http://localhost:3000
 curl -N http://localhost:3000/sse
 
 # Docker Health Status
-docker inspect --format='{{.State.Health.Status}}' otris-docs
+docker inspect --format='{{.State.Health.Status}}' docsvault
 ```
 
 ### 7. Entwickler verbinden
@@ -188,7 +188,7 @@ docker inspect --format='{{.State.Health.Status}}' otris-docs
 Entwickler verbinden ihren Coding-Agent per MCP. Claude Code (empfohlen):
 
 ```bash
-claude mcp add --transport sse otris-docs http://SERVER-IP:3000/sse
+claude mcp add --transport sse docsvault http://SERVER-IP:3000/sse
 ```
 
 Oder manuell in `.mcp.json`:
@@ -196,7 +196,7 @@ Oder manuell in `.mcp.json`:
 ```json
 {
   "mcpServers": {
-    "otris-docs": {
+    "docsvault": {
       "type": "sse",
       "url": "http://SERVER-IP:3000/sse"
     }
@@ -263,7 +263,7 @@ git pull
 ```
 
 ```bash
-docker restart otris-docs
+docker restart docsvault
 ```
 
 Details zum Neu-Crawlen und Pushen des Vault-Repos: [UPDATE-VAULT.md](UPDATE-VAULT.md).
@@ -273,30 +273,30 @@ Kein Rebuild noetig — die Vaults liegen ausserhalb des Images.
 ### Code-Update / Rebuild
 
 ```bash
-cd otris-docs-web
+cd docsvault
 git pull
-docker build -t otris-docs .
-docker stop otris-docs && docker rm otris-docs
+docker build -t docsvault .
+docker stop docsvault && docker rm docsvault
 docker run -d \
-  --name otris-docs \
+  --name docsvault \
   --restart unless-stopped \
   -p 3000:3000 \
   -e BRIDGE=codex \
   -e ALLOWED_ORIGINS=http://SERVER-IP:3000 \
   -e ALLOW_NO_ORIGIN=true \
   -v /srv/otris/vaults:/app/vaults:ro \
-  -v otris-docs-codex:/home/node/.codex \
-  otris-docs
+  -v docsvault-codex:/home/node/.codex \
+  docsvault
 ```
 
-Die Codex-Auth bleibt im Named Volume `otris-docs-codex` erhalten — kein erneutes Login nötig. Die Vaults bleiben ebenfalls erhalten, sie liegen auf dem Host.
+Die Codex-Auth bleibt im Named Volume `docsvault-codex` erhalten — kein erneutes Login nötig. Die Vaults bleiben ebenfalls erhalten, sie liegen auf dem Host.
 
 ## Troubleshooting
 
 ### Container startet, aber Health Check schlägt fehl
 
 ```bash
-docker logs otris-docs
+docker logs docsvault
 ```
 
 Der Server sollte `Server läuft auf http://localhost:3000` loggen. Wenn nicht, prüfen ob Port 3000 frei ist.
@@ -308,9 +308,9 @@ Prüfen ob `ALLOWED_ORIGINS` korrekt gesetzt ist. Für REST API und MCP Clients 
 ### Chat antwortet nicht / Fehler bei Verarbeitung
 
 Der Server startet, aber Chat-Anfragen schlagen fehl:
-- Prüfen ob Codex eingeloggt ist: `docker exec otris-docs codex auth status`
-- Neu einloggen: `docker exec -it otris-docs codex auth login --device-auth`
-- Container-Logs prüfen: `docker logs otris-docs`
+- Prüfen ob Codex eingeloggt ist: `docker exec docsvault codex auth status`
+- Neu einloggen: `docker exec -it docsvault codex auth login --device-auth`
+- Container-Logs prüfen: `docker logs docsvault`
 - Die REST API (Suche, Lesen) funktioniert auch ohne Login — nur der Chat braucht ihn.
 
 ### MCP Client verbindet nicht

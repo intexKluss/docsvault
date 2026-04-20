@@ -9,11 +9,11 @@ if [ -f "$CONFIG" ]; then
 fi
 
 cat >> "$CONFIG" << 'EOF'
-[mcp_servers.otris-docs]
+[mcp_servers.docsvault]
 command = "node"
 args = ["/app/src/mcp-stdio.js"]
 
-[mcp_servers.otris-docs.env]
+[mcp_servers.docsvault.env]
 VAULTS_ROOT = "/app/vaults"
 EOF
 

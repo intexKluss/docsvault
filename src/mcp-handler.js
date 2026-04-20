@@ -90,7 +90,7 @@ function registerVaultTools(server, vault) {
 
 export function createMcpServer(vaultRegistry) {
   const server = new McpServer({
-    name: 'otris-docs-mcp',
+    name: 'docsvault',
     version: '0.2.0',
   });
 

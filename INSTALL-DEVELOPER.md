@@ -7,7 +7,7 @@ Welche Vaults der Server bereitstellt siehst du unter `http://SERVER-IP:3000/api
 ## Voraussetzungen
 
 - Ein Coding-Agent der MCP unterstützt
-- Netzwerkzugriff zum otris-docs Server
+- Netzwerkzugriff zum docsvault Server
 
 ## Option 1: Remote MCP (empfohlen)
 
@@ -18,7 +18,7 @@ Verbinde deinen Agent direkt per MCP-Netzwerkprotokoll mit dem Server. Keine lok
 Per CLI (empfohlen):
 
 ```bash
-claude mcp add --transport sse --scope user otris-docs http://SERVER-IP:3000/sse
+claude mcp add --transport sse --scope user docsvault http://SERVER-IP:3000/sse
 ```
 
 `--scope user` schreibt in `~/.claude.json` — damit ist der Server global verfügbar, auch in der VS Code Claude Code Extension.
@@ -28,7 +28,7 @@ Oder manuell in `.mcp.json` (im Projektordner, nur CLI):
 ```json
 {
   "mcpServers": {
-    "otris-docs": {
+    "docsvault": {
       "type": "sse",
       "url": "http://SERVER-IP:3000/sse"
     }
@@ -41,13 +41,13 @@ Oder manuell in `.mcp.json` (im Projektordner, nur CLI):
 Per CLI (empfohlen):
 
 ```bash
-codex mcp add otris-docs --url http://SERVER-IP:3000/mcp
+codex mcp add docsvault --url http://SERVER-IP:3000/mcp
 ```
 
 Oder manuell in `~/.codex/config.toml`:
 
 ```toml
-[mcp_servers.otris-docs]
+[mcp_servers.docsvault]
 url = "http://SERVER-IP:3000/mcp"
 ```
 
@@ -56,7 +56,7 @@ url = "http://SERVER-IP:3000/mcp"
 Per CLI (empfohlen):
 
 ```bash
-gemini mcp add --transport sse otris-docs http://SERVER-IP:3000/sse
+gemini mcp add --transport sse docsvault http://SERVER-IP:3000/sse
 ```
 
 Oder manuell in `~/.gemini/settings.json`:
@@ -64,7 +64,7 @@ Oder manuell in `~/.gemini/settings.json`:
 ```json
 {
   "mcpServers": {
-    "otris-docs": {
+    "docsvault": {
       "url": "http://SERVER-IP:3000/sse"
     }
   }
@@ -80,7 +80,7 @@ Projekt-spezifisch in `.vscode/mcp.json`:
 ```json
 {
   "servers": {
-    "otris-docs": {
+    "docsvault": {
       "type": "sse",
       "url": "http://SERVER-IP:3000/sse"
     }
@@ -94,7 +94,7 @@ Oder global in den VS Code User Settings (`Ctrl+Shift+P` → "Preferences: Open 
 {
   "mcp": {
     "servers": {
-      "otris-docs": {
+      "docsvault": {
         "type": "sse",
         "url": "http://SERVER-IP:3000/sse"
       }

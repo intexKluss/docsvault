@@ -2,12 +2,12 @@
 
 ## Konfiguration
 
-Verbinde Claude Code direkt per MCP-Netzwerkprotokoll mit dem otris-docs Server.
+Verbinde Claude Code direkt per MCP-Netzwerkprotokoll mit dem docsvault Server.
 
 ### Option A: CLI-Befehl (empfohlen)
 
 ```bash
-claude mcp add --transport sse otris-docs http://<SERVER-IP>:3000/sse
+claude mcp add --transport sse docsvault http://<SERVER-IP>:3000/sse
 ```
 
 ### Option B: Projekt-spezifisch (.mcp.json)
@@ -17,7 +17,7 @@ Erstelle eine `.mcp.json` im Projektverzeichnis:
 ```json
 {
   "mcpServers": {
-    "otris-docs": {
+    "docsvault": {
       "type": "sse",
       "url": "http://<SERVER-IP>:3000/sse"
     }
@@ -28,7 +28,7 @@ Erstelle eine `.mcp.json` im Projektverzeichnis:
 ### Option C: Global (CLI → ~/.claude.json)
 
 ```bash
-claude mcp add --transport sse --scope user otris-docs http://<SERVER-IP>:3000/sse
+claude mcp add --transport sse --scope user docsvault http://<SERVER-IP>:3000/sse
 ```
 
 Das schreibt den Server in `~/.claude.json` und ist dann in jedem Projekt und in der VS Code Extension verfügbar.
@@ -40,7 +40,7 @@ Nur für die CLI, nicht für die VS Code Extension:
 ```json
 {
   "mcpServers": {
-    "otris-docs": {
+    "docsvault": {
       "type": "sse",
       "url": "http://<SERVER-IP>:3000/sse"
     }
