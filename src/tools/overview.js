@@ -1,6 +1,6 @@
 import { getSections, listFiles, getManifest } from './vault.js';
 
-export function handleOverview(vaultPath, params) {
+export function handleOverview(vaultPath, params, vaultName = 'Documentation') {
   const { section } = params;
 
   if (section) {
@@ -24,8 +24,8 @@ export function handleOverview(vaultPath, params) {
 
   const manifest = getManifest(vaultPath);
   const sections = getSections(vaultPath);
-  let out = `# otris DOCUMENTS Documentation`;
-  if (manifest?.crawledAt) out += ` (crawled: ${manifest.crawledAt.split('T')[0]})`;
+  let out = `# ${vaultName}`;
+  if (manifest?.crawledAt) out += ` (updated: ${manifest.crawledAt.split('T')[0]})`;
   out += '\n\n';
   for (const sec of sections.sort()) {
     const files = listFiles(vaultPath, sec);

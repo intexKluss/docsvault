@@ -23,7 +23,7 @@ function registerVaultTools(server, vault) {
       section: z.string().optional().describe(`Section name to get detailed listing for. Use exact names as shown by ${toolPrefix}_overview.`),
     },
     async (params) => {
-      const result = handleOverview(vaultPath, params);
+      const result = handleOverview(vaultPath, params, vault.name);
       return { content: [{ type: 'text', text: result }] };
     }
   );

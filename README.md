@@ -178,14 +178,9 @@ Die Codex-Auth bleibt im Volume `docsvault-codex` erhalten. Die Vaults liegen au
 
 ## Vault aktualisieren
 
-Der Crawler braucht Playwright (Mac, nicht Docker):
+docsvault selbst hat keinen Crawler. Content wird in einem separaten Vault-Repo gepflegt (z.B. [otris-docs-vault](https://github.com/intexKluss/otris-docs-vault)). Wie man das updated steht dort in `crawl/README.md`.
 
-```bash
-npm run crawl:login   # Einmalig: Browser-Login
-npm run crawl         # Vault aktualisieren
-```
-
-Siehe [UPDATE-VAULT.md](UPDATE-VAULT.md) für Details.
+Siehe [UPDATE-VAULT.md](UPDATE-VAULT.md) fuer den Deployment-Flow (Pull im Vault-Repo → Container sieht neue Version sofort).
 
 ## Tests
 

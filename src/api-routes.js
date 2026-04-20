@@ -82,7 +82,7 @@ function registerVaultRoutes(router, vault) {
 
   router.get(`${base}/overview`, (req, res) => {
     const { section } = req.query;
-    const result = handleOverview(vaultPath, { section: section || undefined });
+    const result = handleOverview(vaultPath, { section: section || undefined }, vault.name);
     res.json({ text: result });
   });
 

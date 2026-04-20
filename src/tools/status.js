@@ -5,7 +5,7 @@ export function handleStatus(vaultPath) {
   if (!existsSync(vaultPath)) {
     return {
       status: 'not_installed',
-      message: 'No documentation found. Run: npm run crawl:login && npm run crawl'
+      message: 'No documentation found. Vault directory is missing.'
     };
   }
 
@@ -20,7 +20,7 @@ export function handleStatus(vaultPath) {
   if (!manifest) {
     return {
       status: 'unknown',
-      message: `Documentation found (${totalPages} pages, ${sections.length} sections) but no manifest. Consider re-crawling.`,
+      message: `Documentation found (${totalPages} pages, ${sections.length} sections) but no manifest.`,
       pages: totalPages,
       sections: sections.length
     };
@@ -33,13 +33,13 @@ export function handleStatus(vaultPath) {
   let status, message;
   if (daysOld <= 7) {
     status = 'current';
-    message = `Documentation is up to date (crawled ${daysOld === 0 ? 'today' : daysOld + ' days ago'}).`;
+    message = `Documentation is up to date (updated ${daysOld === 0 ? 'today' : daysOld + ' days ago'}).`;
   } else if (daysOld <= 30) {
     status = 'aging';
-    message = `Documentation is ${daysOld} days old. Consider running: npm run crawl`;
+    message = `Documentation is ${daysOld} days old.`;
   } else {
     status = 'stale';
-    message = `Documentation is ${daysOld} days old! Run: npm run crawl`;
+    message = `Documentation is ${daysOld} days old — may be outdated.`;
   }
 
   return {

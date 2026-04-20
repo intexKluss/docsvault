@@ -38,37 +38,21 @@ Fertig — kein Rebuild noetig.
 
 ## otris-Vault neu crawlen (Dev-Rechner, Playwright)
 
-Nur wenn eine neue otris-Doku-Version vom Crawler gezogen werden soll:
+Der Crawler lebt im `otris-docs-vault`-Repo unter `crawl/`. Er schreibt direkt in den Vault-Root.
 
 ```bash
-cd /path/to/docsvault
+cd /path/to/otris-docs-vault/crawl
+npm install             # einmalig — zieht playwright
+npm run crawl:login     # einmalig — browser-login, legt .auth.json an
+npm run crawl           # vault komplett neu scrapen
 ```
 
-```bash
-npm run crawl
-```
-
-Output landet in `./vault/` — das ist ein lokaler Staging-Ordner (in `.gitignore`, wird **nicht** in docsvault committet).
-
-Content ins Vault-Repo spiegeln:
+Nach dem Crawl committen und pushen:
 
 ```bash
-cp -rf vault/. /path/to/otris-docs-vault/
-```
-
-```bash
-cd /path/to/otris-docs-vault
-```
-
-```bash
+cd ..
 git add -A
-```
-
-```bash
-git commit -m "Update vault: <Datum oder Release-Notes>"
-```
-
-```bash
+git commit -m "update vault content"
 git push
 ```
 
