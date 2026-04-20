@@ -183,9 +183,13 @@ export async function createServer(opts = {}) {
 
 function warmUpSession(ws, manager, clientId, toolPrefix) {
   manager.createAndWarmUp(clientId, toolPrefix).then(() => {
-    if (ws.readyState === 1) {
-      ws.send(JSON.stringify({ type: 'session_ready', toolPrefix }));
-    }
+    // stale-check: wenn der user zwischenzeitlich einen anderen vault gewaehlt hat,
+    // ist in der session-map bereits ein placeholder/session mit anderem toolPrefix.
+    // in dem fall kein session_ready mehr senden (der neue warmup uebernimmt).
+    const current = manager.getSessionRaw(clientId);
+    if (!current || current.toolPrefix !== toolPrefix) return;
+    if (ws.readyState !== 1) return;
+    ws.send(JSON.stringify({ type: 'session_ready', toolPrefix }));
   }).catch((err) => {
     console.error(`[server] warm-up failed for ${clientId}: ${err.message}`);
     if (ws.readyState === 1) {

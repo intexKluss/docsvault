@@ -269,6 +269,11 @@
         break;
 
       case 'session_ready':
+        // stale session_ready vom vorherigen vault ignorieren — kann bei schnellem
+        // switch passieren, wenn der alte warmup erst nach dem neuen fertig wird
+        if (typeof msg.toolPrefix === 'string' && activeVaultPrefix && msg.toolPrefix !== activeVaultPrefix) {
+          break;
+        }
         sessionReady = true;
         cancelled = false;
         if (typeof msg.toolPrefix === 'string') activeVaultPrefix = msg.toolPrefix;
