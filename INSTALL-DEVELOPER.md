@@ -1,6 +1,6 @@
 # MCP Tool für Entwickler
 
-Dein Coding-Agent (Claude Code, Codex CLI, VS Code Copilot, etc.) bekommt Zugriff auf alle auf dem Server konfigurierten Wissensbereiche (Vaults) — z.B. die otris DOCUMENTS Dokumentation plus interne Firmenregeln. Die Inhalte liegen auf dem Server, du brauchst keinen eigenen Vault.
+Dein Coding-Agent (Claude Code, Codex CLI, Gemini CLI, VS Code Copilot, etc.) bekommt Zugriff auf alle auf dem Server konfigurierten Wissensbereiche (Vaults) — z.B. die otris DOCUMENTS Dokumentation plus interne Firmenregeln. Die Inhalte liegen auf dem Server, du brauchst keinen eigenen Vault.
 
 Welche Vaults der Server bereitstellt siehst du unter `http://SERVER-IP:3000/api/vaults`. Pro Vault gibt es fünf Tools mit dem `toolPrefix` aus der Vault-Konfiguration (z.B. `otris_search`, `intex_regeln_search`, ...).
 
@@ -49,6 +49,26 @@ Oder manuell in `~/.codex/config.toml`:
 ```toml
 [mcp_servers.otris-docs]
 url = "http://SERVER-IP:3000/mcp"
+```
+
+### Gemini CLI
+
+Per CLI (empfohlen):
+
+```bash
+gemini mcp add --transport sse otris-docs http://SERVER-IP:3000/sse
+```
+
+Oder manuell in `~/.gemini/settings.json`:
+
+```json
+{
+  "mcpServers": {
+    "otris-docs": {
+      "url": "http://SERVER-IP:3000/sse"
+    }
+  }
+}
 ```
 
 ### VS Code (GitHub Copilot)
