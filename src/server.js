@@ -67,7 +67,7 @@ export async function createServer(opts = {}) {
 
   app.use((req, res, next) => {
     res.setHeader('Content-Security-Policy',
-      "default-src 'self'; script-src 'self' cdnjs.cloudflare.com; style-src 'self' cdnjs.cloudflare.com 'unsafe-inline'; img-src 'self' data:; connect-src 'self' ws: wss:; font-src 'self' cdnjs.cloudflare.com"
+      "default-src 'self'; script-src 'self' cdnjs.cloudflare.com 'unsafe-inline'; style-src 'self' cdnjs.cloudflare.com fonts.googleapis.com 'unsafe-inline'; img-src 'self' data:; connect-src 'self' ws: wss:; font-src 'self' cdnjs.cloudflare.com fonts.gstatic.com data:"
     );
     next();
   });
