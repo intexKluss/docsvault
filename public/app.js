@@ -52,6 +52,9 @@
   const btnTheme = document.getElementById('btn-theme');
   const landingTheme = document.getElementById('landing-theme');
   const hljsTheme = document.getElementById('hljs-theme');
+  const vaultSelectorEl = document.getElementById('vault-selector');
+  const vaultBadgeEl = document.getElementById('vault-badge');
+  const vaultBadgeName = vaultBadgeEl ? vaultBadgeEl.querySelector('.vault-badge-name') : null;
 
   marked.setOptions({ gfm: true, breaks: true });
 
@@ -75,6 +78,115 @@
     return arr[Math.floor(Math.random() * arr.length)];
   }
 
+  function activeVault() {
+    return vaults.find(function (v) { return v.toolPrefix === activeVaultPrefix; }) || null;
+  }
+
+  function buildInputPlaceholder() {
+    const v = activeVault();
+    if (v && vaults.length >= 2) {
+      return 'Was willst du zu ' + v.name + ' wissen?';
+    }
+    return randomFrom(PLACEHOLDERS);
+  }
+
+  function handleVaultsList(list) {
+    vaults = list.filter(function (v) {
+      return v && typeof v.toolPrefix === 'string' && typeof v.name === 'string';
+    });
+    if (vaults.length === 0) {
+      vaultSelectorEl.classList.add('hidden');
+      return;
+    }
+
+    // Default = erster Vault in der vom Server gelieferten Reihenfolge
+    if (!activeVaultPrefix || !vaults.some(function (v) { return v.toolPrefix === activeVaultPrefix; })) {
+      activeVaultPrefix = vaults[0].toolPrefix;
+    }
+
+    if (vaults.length >= 2) {
+      renderVaultSelector();
+      vaultSelectorEl.classList.remove('hidden');
+      updateVaultBadge();
+      // Server warmt bei >=2 Vaults erst nach select_vault
+      sendSelectVault(activeVaultPrefix);
+    } else {
+      vaultSelectorEl.classList.add('hidden');
+      updateVaultBadge();
+      // Single-vault-case: Server waermt selbst, kein select_vault noetig
+    }
+
+    landingInput.placeholder = sessionReady ? buildInputPlaceholder() : randomFrom(INIT_MESSAGES);
+  }
+
+  function renderVaultSelector() {
+    vaultSelectorEl.innerHTML = '';
+    vaults.forEach(function (v) {
+      const btn = document.createElement('button');
+      btn.type = 'button';
+      btn.className = 'vault-segment' + (v.toolPrefix === activeVaultPrefix ? ' active' : '');
+      btn.textContent = v.name;
+      btn.title = v.description || v.name;
+      btn.dataset.toolPrefix = v.toolPrefix;
+      btn.setAttribute('role', 'tab');
+      btn.setAttribute('aria-selected', v.toolPrefix === activeVaultPrefix ? 'true' : 'false');
+      if (vaultLocked) btn.disabled = true;
+      btn.addEventListener('click', function () {
+        selectVault(v.toolPrefix);
+      });
+      vaultSelectorEl.appendChild(btn);
+    });
+  }
+
+  function selectVault(prefix) {
+    if (vaultLocked) return;
+    if (prefix === activeVaultPrefix && sessionReady) return;
+    activeVaultPrefix = prefix;
+    vaults.forEach(function (v) {
+      const btn = vaultSelectorEl.querySelector('[data-tool-prefix="' + CSS.escape(v.toolPrefix) + '"]');
+      if (!btn) return;
+      const isActive = v.toolPrefix === prefix;
+      btn.classList.toggle('active', isActive);
+      btn.setAttribute('aria-selected', isActive ? 'true' : 'false');
+    });
+    updateVaultBadge();
+    // Umschalten heisst: Server baut Session neu auf -> ab jetzt wieder warten
+    sessionReady = false;
+    landingInput.disabled = true;
+    landingSend.disabled = true;
+    if (sessionStatus) {
+      sessionStatus.classList.remove('hidden', 'ready');
+      sessionStatus.classList.add('loading');
+      sessionStatus.innerHTML = SVG_SPINNER + '<span>Wird auf ' + activeVault().name + ' umgestellt...</span>';
+    }
+    sendSelectVault(prefix);
+  }
+
+  function sendSelectVault(prefix) {
+    if (!ws || ws.readyState !== WebSocket.OPEN) return;
+    ws.send(JSON.stringify({ type: 'select_vault', toolPrefix: prefix }));
+  }
+
+  function updateVaultBadge() {
+    if (!vaultBadgeEl || !vaultBadgeName) return;
+    const v = activeVault();
+    if (v && vaults.length >= 2) {
+      vaultBadgeName.textContent = v.name;
+      vaultBadgeEl.classList.remove('hidden');
+    } else {
+      vaultBadgeEl.classList.add('hidden');
+    }
+  }
+
+  function lockVaultSelector() {
+    if (vaultLocked) return;
+    vaultLocked = true;
+    const segments = vaultSelectorEl.querySelectorAll('.vault-segment');
+    segments.forEach(function (btn) {
+      btn.disabled = true;
+    });
+  }
+
   let ws = null;
   let isChat = false;
   let sessionReady = false;
@@ -83,6 +195,9 @@
   let isProcessing = false;
   let cancelled = false;
   let messageId = 0;
+  let vaults = [];
+  let activeVaultPrefix = null;
+  let vaultLocked = false;
 
   let textBuffer = '';
   let typewriterTimer = null;
@@ -121,6 +236,10 @@
     if (cancelled) return;
 
     switch (msg.type) {
+      case 'vaults':
+        handleVaultsList(Array.isArray(msg.list) ? msg.list : []);
+        break;
+
       case 'session_init':
         sessionReady = false;
         if (sessionStatus) {
@@ -134,6 +253,7 @@
       case 'session_ready':
         sessionReady = true;
         cancelled = false;
+        if (typeof msg.toolPrefix === 'string') activeVaultPrefix = msg.toolPrefix;
         if (isChat) setInputEnabled(true);
         if (sessionStatus) {
           sessionStatus.classList.remove('loading');
@@ -144,7 +264,7 @@
           }, 1500);
         }
         landingInput.disabled = false;
-        landingInput.placeholder = randomFrom(PLACEHOLDERS);
+        landingInput.placeholder = buildInputPlaceholder();
         landingInput.focus();
         break;
 
@@ -197,6 +317,7 @@
       switchToChat();
     }
 
+    lockVaultSelector();
     appendUserMessage(text);
 
     const mode = getActiveSpeed().dataset.mode;
@@ -219,6 +340,10 @@
     document.body.classList.add('chat');
     chatSpeed.dataset.mode = landingSpeed.dataset.mode;
     updateSpeedDisplay(chatSpeed);
+    const v = activeVault();
+    if (v && vaults.length >= 2 && chatInput) {
+      chatInput.placeholder = 'Was willst du zu ' + v.name + ' wissen?';
+    }
   }
 
   function appendUserMessage(text) {

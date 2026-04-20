@@ -24,6 +24,7 @@
       <div class="logo-wrap">
         <img src="logo.png" alt="intex" class="logo-img">
       </div>
+      <div id="vault-selector" class="vault-selector hidden" role="tablist" aria-label="Vault auswählen"></div>
       <h1>Stelle eine Frage zur Dokumentation</h1>
       <p class="subtitle">Durchsuche API-Referenzen, Handbücher, HowTos und interne Regeln</p>
       <a href="/help/" class="help-link">Wie installiere ich es?</a>
@@ -53,6 +54,10 @@
       <div class="header-left">
         <img src="logo.png" alt="intex" class="header-logo-img">
         <span class="header-title">docsvault</span>
+        <span id="vault-badge" class="vault-badge hidden" aria-label="Aktiver Vault">
+          <span class="vault-badge-dot"></span>
+          <span class="vault-badge-name"></span>
+        </span>
       </div>
       <div class="header-right">
         <button id="btn-theme" class="header-btn" title="Theme wechseln">
