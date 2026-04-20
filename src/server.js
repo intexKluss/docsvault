@@ -136,27 +136,34 @@ export async function createServer(opts = {}) {
     ws.clientId = clientId;
     ws.messageQueue = [];
     ws.processing = false;
+    ws.messageSent = false;
 
     ws.on('pong', () => {
       ws.isAlive = true;
     });
 
     ws.send(JSON.stringify({ type: 'session_init' }));
+    ws.send(JSON.stringify({
+      type: 'vaults',
+      list: vaultRegistry.map(v => ({
+        toolPrefix: v.toolPrefix,
+        name: v.name,
+        description: v.description,
+      })),
+    }));
 
-    manager.createAndWarmUp(clientId).then(() => {
-      if (ws.readyState === 1) {
-        ws.send(JSON.stringify({ type: 'session_ready' }));
-      }
-    }).catch((err) => {
-      console.error(`[server] warm-up failed for ${clientId}: ${err.message}`);
-      if (ws.readyState === 1) {
-        ws.send(JSON.stringify({ type: 'error', message: 'Da ist leider etwas schiefgelaufen. Lade die Seite einfach neu.' }));
-      }
-    });
+    // Auto warm-up nur bei genau 1 Vault. Bei 2+ Vaults wartet der Server
+    // auf select_vault vom Client (der default bereits mitschickt).
+    if (vaultRegistry.length === 1) {
+      warmUpSession(ws, manager, clientId, vaultRegistry[0].toolPrefix);
+    } else if (vaultRegistry.length === 0) {
+      // kein vault = nichts zu tun, aber frontend braucht den session_ready trotzdem nicht
+      // (input bleibt disabled, da list leer)
+    }
 
     ws.on('message', (data) => {
       ws.messageQueue.push(data);
-      processQueue(ws, manager, req);
+      processQueue(ws, manager, req, vaultRegistry);
     });
 
     ws.on('close', () => {
@@ -174,7 +181,20 @@ export async function createServer(opts = {}) {
   });
 }
 
-async function processQueue(ws, manager, req) {
+function warmUpSession(ws, manager, clientId, toolPrefix) {
+  manager.createAndWarmUp(clientId, toolPrefix).then(() => {
+    if (ws.readyState === 1) {
+      ws.send(JSON.stringify({ type: 'session_ready', toolPrefix }));
+    }
+  }).catch((err) => {
+    console.error(`[server] warm-up failed for ${clientId}: ${err.message}`);
+    if (ws.readyState === 1) {
+      ws.send(JSON.stringify({ type: 'error', message: 'Da ist leider etwas schiefgelaufen. Lade die Seite einfach neu.' }));
+    }
+  });
+}
+
+async function processQueue(ws, manager, req, vaultRegistry) {
   if (ws.processing) return;
   ws.processing = true;
   try {
@@ -184,7 +204,7 @@ async function processQueue(ws, manager, req) {
         break;
       }
       const raw = ws.messageQueue.shift();
-      await handleMessage(ws, manager, req, raw);
+      await handleMessage(ws, manager, req, raw, vaultRegistry);
     }
   } finally {
     ws.processing = false;
@@ -199,7 +219,7 @@ function getClientIp(req) {
   return req.socket?.remoteAddress || 'unknown';
 }
 
-async function handleMessage(ws, manager, req, raw) {
+async function handleMessage(ws, manager, req, raw, vaultRegistry) {
   let msg;
   try {
     msg = JSON.parse(raw.toString());
@@ -221,7 +241,14 @@ async function handleMessage(ws, manager, req, raw) {
     return;
   }
 
+  if (msg.type === 'select_vault') {
+    await handleSelectVault(ws, manager, msg, vaultRegistry);
+    return;
+  }
+
   if (msg.type !== 'message') return;
+
+  if (!ws.messageSent) ws.messageSent = true;
 
   try {
     manager.validateMessage(msg.content);
@@ -270,6 +297,36 @@ function sanitizeChatContext(context) {
     const text = typeof item.text === 'string' ? item.text.substring(0, MAX_CONTEXT_ITEM_LENGTH) : '';
     return { role, text };
   }).filter(Boolean);
+}
+
+async function handleSelectVault(ws, manager, msg, vaultRegistry) {
+  const toolPrefix = typeof msg.toolPrefix === 'string' ? msg.toolPrefix : '';
+  const known = vaultRegistry.some(v => v.toolPrefix === toolPrefix);
+  if (!known) {
+    ws.send(JSON.stringify({ type: 'error', message: 'Unbekannter Vault.' }));
+    return;
+  }
+  if (ws.messageSent) {
+    // Vault ist nach erster Nachricht locked
+    return;
+  }
+
+  const existing = manager.getSessionRaw(ws.clientId);
+  if (existing && existing.toolPrefix === toolPrefix) {
+    // gleiche auswahl, no-op. session_ready wurde evtl. schon gesendet.
+    if (existing.ready && ws.readyState === 1) {
+      ws.send(JSON.stringify({ type: 'session_ready', toolPrefix }));
+    }
+    return;
+  }
+  if (existing) {
+    try {
+      await manager.removeSession(ws.clientId);
+    } catch (err) {
+      console.error(`[server] session switch cleanup error: ${err.message}`);
+    }
+  }
+  warmUpSession(ws, manager, ws.clientId, toolPrefix);
 }
 
 async function handleReport(ws, msg) {

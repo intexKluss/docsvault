@@ -16,9 +16,15 @@ export class CodexBridge {
     );
   }
 
-  async createSession() {
+  async createSession(toolPrefix) {
     const id = randomUUID();
-    const systemPrompt = buildSystemPrompt(this.vaultRegistry);
+    let registry = this.vaultRegistry;
+    if (toolPrefix) {
+      const scoped = registry.find(v => v.toolPrefix === toolPrefix);
+      if (!scoped) throw new Error(`Unknown vault: ${toolPrefix}`);
+      registry = [scoped];
+    }
+    const systemPrompt = buildSystemPrompt(registry);
     let destroyed = false;
     let warmedUp = false;
     let warmingUp = false;

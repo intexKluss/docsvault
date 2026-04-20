@@ -25,16 +25,17 @@ export class SessionManager {
     return this.#sessions.size;
   }
 
-  async createAndWarmUp(clientId) {
+  async createAndWarmUp(clientId, toolPrefix) {
     // synchroner platzhalter gegen race condition bei bursts
     if (this.#sessions.size >= this.#config.maxSessions) {
       throw new Error('Max sessions reached');
     }
-    const placeholder = { ready: false, destroyed: false };
+    const placeholder = { ready: false, destroyed: false, toolPrefix };
     this.#sessions.set(clientId, placeholder);
 
     try {
-      const session = await this.#bridge.createSession();
+      const session = await this.#bridge.createSession(toolPrefix);
+      session.toolPrefix = toolPrefix;
       this.#sessions.set(clientId, session);
       await session.warmUp();
       return session;
@@ -46,6 +47,14 @@ export class SessionManager {
       }
       throw err;
     }
+  }
+
+  hasSession(clientId) {
+    return this.#sessions.has(clientId);
+  }
+
+  getSessionRaw(clientId) {
+    return this.#sessions.get(clientId);
   }
 
   getSession(clientId) {

@@ -34,7 +34,7 @@ export class ClaudeBridge {
     );
   }
 
-  async createSession() {
+  async createSession(toolPrefix) {
     const id = randomUUID();
     let destroyed = false;
     let sessionId = null;
@@ -42,7 +42,12 @@ export class ClaudeBridge {
     let warmingUp = false;
     let activeAbort = null;
 
-    const registry = this.vaultRegistry;
+    let registry = this.vaultRegistry;
+    if (toolPrefix) {
+      const scoped = registry.find(v => v.toolPrefix === toolPrefix);
+      if (!scoped) throw new Error(`Unknown vault: ${toolPrefix}`);
+      registry = [scoped];
+    }
     const systemPrompt = buildSystemPrompt(registry);
     const allowedTools = registry.flatMap(v =>
       TOOL_SUFFIXES.map(s => `mcp__docsvault__${v.toolPrefix}_${s}`)
