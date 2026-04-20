@@ -1,6 +1,6 @@
 # MCP Tool für Entwickler
 
-Dein Coding-Agent (Claude Code, Codex CLI, Gemini CLI, etc.) bekommt Zugriff auf alle auf dem Server konfigurierten Wissensbereiche (Vaults) — z.B. die otris DOCUMENTS Dokumentation plus interne Firmenregeln. Die Inhalte liegen auf dem Server, du brauchst keinen eigenen Vault.
+Dein Coding-Agent (Claude Code, Codex CLI, VS Code Copilot, etc.) bekommt Zugriff auf alle auf dem Server konfigurierten Wissensbereiche (Vaults) — z.B. die otris DOCUMENTS Dokumentation plus interne Firmenregeln. Die Inhalte liegen auf dem Server, du brauchst keinen eigenen Vault.
 
 Welche Vaults der Server bereitstellt siehst du unter `http://SERVER-IP:3000/api/vaults`. Pro Vault gibt es fünf Tools mit dem `toolPrefix` aus der Vault-Konfiguration (z.B. `otris_search`, `intex_regeln_search`, ...).
 
@@ -83,34 +83,7 @@ Oder global in den VS Code User Settings (`Ctrl+Shift+P` → "Preferences: Open 
 }
 ```
 
-## Option 2: Lokaler MCP-Proxy
-
-Für Agents die kein Remote-MCP unterstützen (z.B. Gemini CLI). Installiert einen lokalen MCP-Server der Anfragen an den otris-docs-web Server weiterleitet.
-
-```bash
-npm install -g git+ssh://git@github.com:leminkozey/otris-docs-mcp.git
-```
-
-Dann in der Agent-Konfiguration:
-
-```json
-{
-  "mcpServers": {
-    "otris-docs": {
-      "command": "otris-docs-mcp",
-      "env": {
-        "OTRIS_DOCS_URL": "http://SERVER-IP:3000"
-      }
-    }
-  }
-}
-```
-
-Details: [otris-docs-mcp Repository](https://github.com/leminkozey/otris-docs-mcp)
-
-> **Hinweis:** Der lokale Proxy wurde urspruenglich fuer den Single-Vault-Stand geschrieben und exponiert aktuell nur `otris_*`-Tools. Fuer Multi-Vault-Zugriff nutze Option 1 (Remote MCP) oder Option 3 (REST API).
-
-## Option 3: REST API
+## Option 2: REST API
 
 Für Agents oder Tools die kein MCP unterstützen. Jeder Vault hat seinen eigenen Prefix — welche verfuegbar sind, listet `/api/vaults`:
 

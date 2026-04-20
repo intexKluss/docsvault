@@ -102,7 +102,7 @@ Kein Reconnect, kein Session-Persist. Jeder Page-Load = neue Session.
 
 Tools sind in `src/tools/` internalisiert und werden über drei Wege bereitgestellt:
 1. **Intern (Bridges)**: Claude Bridge verbindet sich per MCP SSE zum eigenen Server
-2. **MCP SSE** (`/sse` + `/messages`): Für externe MCP-Clients (z.B. otris-docs-mcp)
+2. **MCP SSE** (`/sse` + `/messages`): Für externe MCP-Clients (Claude Code, Codex CLI, VS Code Copilot)
 3. **REST API** (`/api/*`): Für einfache HTTP-Clients
 4. **MCP Streamable HTTP** (`/mcp`): Alternatives MCP-Transportprotokoll
 
