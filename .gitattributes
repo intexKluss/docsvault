@@ -3,3 +3,11 @@ vault/** linguist-generated
 # shell scripts immer LF (sonst kaputt im Container)
 *.sh text eol=lf
 docker-entrypoint.sh text eol=lf
+
+# binary files — niemals EOL-Conversion
+*.png binary
+*.jpg binary
+*.jpeg binary
+*.gif binary
+*.ico binary
+*.webp binary
