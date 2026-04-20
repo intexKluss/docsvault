@@ -2,49 +2,72 @@
 <html lang="en">
 <head>
   <meta charset="UTF-8">
+  <meta http-equiv="Content-Security-Policy" content="default-src 'none'; script-src 'self' https://cdnjs.cloudflare.com 'unsafe-inline'; style-src 'self' https://cdnjs.cloudflare.com https://fonts.googleapis.com 'unsafe-inline'; img-src 'self' data:; connect-src 'self'; font-src 'self' data: https://fonts.gstatic.com; base-uri 'none'; form-action 'none'">
+  <meta name="color-scheme" content="light dark">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <title>Help</title>
+  <link rel="icon" type="image/svg+xml" href="logo.svg">
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600&family=Geist+Mono:wght@400;500;600&display=swap">
   <link rel="stylesheet" href="help.css">
-  <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/highlight.js/11.9.0/styles/github.min.css" id="hljs-light">
-  <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/highlight.js/11.9.0/styles/github-dark.min.css" id="hljs-dark" disabled>
+  <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/highlight.js/11.9.0/styles/github.min.css" integrity="sha384-eFTL69TLRZTkNfYZOLM+G04821K1qZao/4QLJbet1pP4tcF+fdXq/9CdqAbWRl/L" crossorigin="anonymous" referrerpolicy="no-referrer" id="hljs-light">
+  <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/highlight.js/11.9.0/styles/github-dark.min.css" integrity="sha384-wH75j6z1lH97ZOpMOInqhgKzFkAInZPPSPlZpYKYTOqsaizPvhQZmAtLcPKXpLyH" crossorigin="anonymous" referrerpolicy="no-referrer" id="hljs-dark" disabled>
+  <script>
+  (function(){
+    var stored = null;
+    try { stored = localStorage.getItem('help-theme'); } catch(e) {}
+    var prefersDark = window.matchMedia && window.matchMedia('(prefers-color-scheme: dark)').matches;
+    var dark = stored === 'dark' || (stored !== 'light' && prefersDark);
+    if (dark) document.documentElement.setAttribute('data-theme', 'dark');
+    document.addEventListener('DOMContentLoaded', function(){
+      var l = document.getElementById('hljs-light'); if (l) l.disabled = dark;
+      var d = document.getElementById('hljs-dark'); if (d) d.disabled = !dark;
+    });
+  })();
+  </script>
 </head>
 <body>
+  <a href="#main" class="help-skip-link">Skip to content</a>
 
   <header class="help-header">
-    <button class="help-sidebar-toggle" aria-label="Toggle sidebar">
-      <svg width="20" height="20" viewBox="0 0 20 20" fill="none" stroke="currentColor" stroke-width="2">
+    <button class="help-sidebar-toggle" aria-label="Toggle sidebar" aria-expanded="false" aria-controls="help-sidebar-nav">
+      <svg width="20" height="20" viewBox="0 0 20 20" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true" focusable="false">
         <line x1="3" y1="5" x2="17" y2="5"/><line x1="3" y1="10" x2="17" y2="10"/><line x1="3" y1="15" x2="17" y2="15"/>
       </svg>
     </button>
-    <span class="help-title"></span>
+    <div class="help-toc-bar"></div>
     <div class="help-header-right">
       <div class="help-search-wrapper">
-        <input type="text" class="help-search" placeholder="Search..." aria-label="Search">
-        <div class="help-search-results"></div>
+        <input type="text" class="help-search" placeholder="Search..." aria-label="Search documentation" role="combobox" aria-autocomplete="list" aria-expanded="false" aria-controls="help-search-results-list">
+        <div class="help-search-results" id="help-search-results-list" role="listbox"></div>
       </div>
-      <button class="help-theme-toggle" aria-label="Toggle theme">
-        <svg class="icon-sun" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="5"/><line x1="12" y1="1" x2="12" y2="3"/><line x1="12" y1="21" x2="12" y2="23"/><line x1="4.22" y1="4.22" x2="5.64" y2="5.64"/><line x1="18.36" y1="18.36" x2="19.78" y2="19.78"/><line x1="1" y1="12" x2="3" y2="12"/><line x1="21" y1="12" x2="23" y2="12"/><line x1="4.22" y1="19.78" x2="5.64" y2="18.36"/><line x1="18.36" y1="5.64" x2="19.78" y2="4.22"/></svg>
-        <svg class="icon-moon" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M21 12.79A9 9 0 1 1 11.21 3 7 7 0 0 0 21 12.79z"/></svg>
+      <button class="help-theme-toggle" aria-label="Toggle theme" aria-pressed="false">
+        <svg class="icon-sun" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true" focusable="false"><circle cx="12" cy="12" r="5"/><line x1="12" y1="1" x2="12" y2="3"/><line x1="12" y1="21" x2="12" y2="23"/><line x1="4.22" y1="4.22" x2="5.64" y2="5.64"/><line x1="18.36" y1="18.36" x2="19.78" y2="19.78"/><line x1="1" y1="12" x2="3" y2="12"/><line x1="21" y1="12" x2="23" y2="12"/><line x1="4.22" y1="19.78" x2="5.64" y2="18.36"/><line x1="18.36" y1="5.64" x2="19.78" y2="4.22"/></svg>
+        <svg class="icon-moon" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true" focusable="false"><path d="M21 12.79A9 9 0 1 1 11.21 3 7 7 0 0 0 21 12.79z"/></svg>
       </button>
     </div>
   </header>
 
-  <div class="help-toc-bar"></div>
-
   <div class="help-layout">
-    <nav class="help-sidebar">
+    <nav class="help-sidebar" aria-label="Chapters" id="help-sidebar-nav">
+      <div class="help-sidebar-header">
+        <svg class="help-logo" viewBox="0 0 150 150" fill="currentColor" aria-hidden="true" focusable="false"><path d="m122.8 18.4-1.9-1.6-0.3-0.1-1.8-1.5-3.6-2.3-3-1.7-2.1-1.2-1.8-0.9-3.1-1.5-1.8-0.6c-7.3-3.1-15.3-4.8-23.8-4.8h-8.3l-2.2 0.1c-37 2.1-67.2 31.6-67.2 66.8v10.6c0.5 34 27.6 66.2 65 68l7.8 0.3h3.7l3.7-0.1c13.1-0.6 26.8-4.7 38.5-13.1l4.5-3.4 3-2.7 1.1-1.5-0.6-1h-6.2l-0.9 0.4-2.9 2.3c-6 3.9-3.3 0.5-1.5-1.3l2.1-2.7 2.4-4 1.7-3.3 1.8-4.4 0.8-1.2v-1.5l-0.8 0.1-2.1 1.7c-3.7 2.2-7.3 4-15.1 4.5l-1.1-0.4 0.4-0.6c2.1-1.6 6-5.3 6.7-8.4l-0.5-0.7-3.8-2.7-6.7-6.7c-3.7-3.1-7.3-4.4-12.8-4.4-9.1 0-13.8 3.1-21 6.1-5.2 2.4-12.5 6.4-26.3 6.4-8.3-0.7-16.4-3.6-22.2-10.8l-0.6-1 0.4-0.1 3 1.6c5.3 2.8 10.4 5.8 21.5 6.1 9.9 0.3 14.1-1.3 20.2-3.7l9.2-4.1 2.7-1.2 4.9-1.7 0.5-0.5 0.4-1.2v-2.9c-0.5-10.3-4.9-21.9-13.7-28.8-5.8-5.1-12.8-10.2-29-10.5l-7 0.7 0.1-0.5c2.2-1.2 7.2-2.9 13.3-2.9 20.8-0.3 35.1 12.4 40.6 21.6l11.6 10.1 6.2 5.5 4.1 4.2 3.1 4 2.4 3.4 2 2.8 2.5 2.7 0.4 1-0.5 0.2c-3.3-0.4-4.8-2.1-8.2-5.3l-5.3-5.2c-3.9-2.8-8.1-5.5-17.4-5.8l-0.7 0.5v4.3l0.8 0.9h2c6.8-0.3 12.5 1.7 18 6.8l4.1 4.1c2.2 1.8 4.3 3.7 8.5 3.9h3.2c2.2 0 6-1.7 6.5-4 0.4-2.1-1.3-7.2-1-15.2 0.4-7.4 4.4-11.4 6.5-15 2.7-4.4 4.5-8.9 4.5-14.3v-6.2l-0.7-4-1.2-4.5v-1.9l2.6-4 3-4.9 2.3-4.2 2.1-4.5-1.1-1.5h-7.3c-9.2 0.2-16.5 3.1-20.7 5.3l-4.4 2.3-4.4 3.1-2.7 2.3-0.5-0.3 1.2-2 4.3-4.2 2.5-1.9 3-2.1 3.5-1.9 0.9-0.6v-1zm-19 45.7h0.3l0.8 0.5 1 1.4 1.7 1.6 2.3 1.3 2.2 1.1 1.3 1 0.7 1.1 0.4 1.4-0.4 1.6-1.9-1.7-1.7-0.8-2.4-1.1-2-1.6-1.7-2.3-0.6-1.6v-1.9z"/></svg>
+        <span class="help-title"></span>
+      </div>
       <ul class="help-nav"></ul>
     </nav>
     <div class="help-sidebar-overlay"></div>
 
-    <main class="help-content">
+    <main class="help-content" id="main" tabindex="-1">
       <article class="help-article"></article>
       <footer class="help-footer"></footer>
     </main>
   </div>
 
-  <script src="https://cdnjs.cloudflare.com/ajax/libs/marked/12.0.2/marked.min.js"></script>
-  <script src="https://cdnjs.cloudflare.com/ajax/libs/highlight.js/11.9.0/highlight.min.js"></script>
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/dompurify/3.2.4/purify.min.js" integrity="sha384-eEu5CTj3qGvu9PdJuS+YlkNi7d2XxQROAFYOr59zgObtlcux1ae1Il3u7jvdCSWu" crossorigin="anonymous" referrerpolicy="no-referrer"></script>
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/marked/12.0.2/marked.min.js" integrity="sha384-/TQbtLCAerC3jgaim+N78RZSDYV7ryeoBCVqTuzRrFec2akfBkHS7ACQ3PQhvMVi" crossorigin="anonymous" referrerpolicy="no-referrer"></script>
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/highlight.js/11.9.0/highlight.min.js" integrity="sha384-F/bZzf7p3Joyp5psL90p/p89AZJsndkSoGwRpXcZhleCWhd8SnRuoYo4d0yirjJp" crossorigin="anonymous" referrerpolicy="no-referrer"></script>
   <script src="help.js"></script>
 </body>
 </html>
