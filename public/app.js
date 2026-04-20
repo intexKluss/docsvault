@@ -155,6 +155,8 @@
     landingInput.disabled = true;
     landingSend.disabled = true;
     if (sessionStatus) {
+      // alten hide-timer abbrechen, sonst macht er uns die fresh-loading-anzeige hidden
+      cancelSessionStatusHide();
       sessionStatus.classList.remove('hidden', 'ready');
       sessionStatus.classList.add('loading');
       sessionStatus.innerHTML = SVG_SPINNER + '<span>Wird auf ' + activeVault().name + ' umgestellt...</span>';
@@ -198,6 +200,22 @@
   let vaults = [];
   let activeVaultPrefix = null;
   let vaultLocked = false;
+  let sessionStatusHideTimer = null;
+
+  function cancelSessionStatusHide() {
+    if (sessionStatusHideTimer) {
+      clearTimeout(sessionStatusHideTimer);
+      sessionStatusHideTimer = null;
+    }
+  }
+
+  function scheduleSessionStatusHide() {
+    cancelSessionStatusHide();
+    sessionStatusHideTimer = setTimeout(function () {
+      sessionStatus.classList.add('hidden');
+      sessionStatusHideTimer = null;
+    }, 1500);
+  }
 
   let textBuffer = '';
   let typewriterTimer = null;
@@ -243,10 +261,10 @@
       case 'session_init':
         sessionReady = false;
         if (sessionStatus) {
-          sessionStatus.classList.remove('hidden');
-          sessionStatus.classList.remove('ready');
+          cancelSessionStatusHide();
+          sessionStatus.classList.remove('hidden', 'ready');
           sessionStatus.classList.add('loading');
-          sessionStatus.querySelector('span').textContent = randomFrom(INIT_MESSAGES);
+          sessionStatus.innerHTML = SVG_SPINNER + '<span>' + randomFrom(INIT_MESSAGES) + '</span>';
         }
         break;
 
@@ -256,12 +274,12 @@
         if (typeof msg.toolPrefix === 'string') activeVaultPrefix = msg.toolPrefix;
         if (isChat) setInputEnabled(true);
         if (sessionStatus) {
-          sessionStatus.classList.remove('loading');
+          // alten timer abbrechen (z.b. von vorherigem ready vor vault-switch)
+          cancelSessionStatusHide();
+          sessionStatus.classList.remove('loading', 'hidden');
           sessionStatus.classList.add('ready');
           sessionStatus.innerHTML = SVG_CHECK + '<span>Bereit</span>';
-          setTimeout(function () {
-            sessionStatus.classList.add('hidden');
-          }, 1500);
+          scheduleSessionStatusHide();
         }
         landingInput.disabled = false;
         landingInput.placeholder = buildInputPlaceholder();
