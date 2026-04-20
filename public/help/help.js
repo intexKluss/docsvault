@@ -57,8 +57,8 @@
         flattenChapters(data.chapters);
         preloadChapters();
         navigateFromHash();
-        $footer.innerHTML = 'made by <a href="https://leminkozey.me" target="_blank" rel="noopener noreferrer">leminkozey</a>' +
-          (data.version ? ' &middot; ' + escapeHtml(data.version) : '');
+        // local patch: upstream hardcodes 'made by leminkozey' — re-apply after each help-book upgrade
+        $footer.textContent = data.version || '';
       })
       .catch(function () {
         $article.innerHTML = '<p>Failed to load chapters.json</p>';
