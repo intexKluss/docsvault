@@ -1,6 +1,15 @@
 import { readdirSync, readFileSync, existsSync } from 'node:fs';
 import { join, resolve } from 'node:path';
 
+// Ordner die kein Vault-Content sind und uebersprungen werden (zusaetzlich
+// zu '.'- und '_'-Praefix). crawl = Crawler-Code, node_modules = Deps.
+const SKIP_DIRS = new Set(['crawl', 'node_modules']);
+
+// true wenn der Ordner kein Vault-Content ist (Meta/Internal/Crawler/Deps).
+export function isSkippedDir(name) {
+  return name.startsWith('.') || name.startsWith('_') || SKIP_DIRS.has(name);
+}
+
 // Wandelt einen freien Namen in einen MCP-kompatiblen Tool-Prefix.
 // Regeln: lowercase, non-[a-z0-9] zu _, mehrfache _ zu einem, trim leading/trailing _.
 export function slugify(name) {
@@ -47,8 +56,8 @@ function hasAnyMarkdown(dir) {
   }
   for (const e of entries) {
     if (e.isSymbolicLink()) continue;
-    // _-Prefix = Meta/Internal (analog _meta.json), nicht Teil des Vault-Inhalts
-    if (e.name.startsWith('.') || e.name.startsWith('_')) continue;
+    // _-Prefix = Meta/Internal (analog _meta.json), crawl/node_modules = kein Content
+    if (isSkippedDir(e.name)) continue;
     const full = join(dir, e.name);
     if (e.isDirectory()) {
       if (hasAnyMarkdown(full)) return true;

@@ -143,6 +143,19 @@ describe('loadVaultRegistry — validation', () => {
     assert.deepEqual(registry.map(v => v.toolPrefix), ['full']);
   });
 
+  it('ignores markdown that only lives in crawl/ or node_modules/', () => {
+    const { root, cleanup } = createTempVaultsRoot({
+      'crawlonly': {
+        meta: { toolPrefix: 'crawlonly' },
+        files: { 'crawl/script.md': '# crawler', 'node_modules/dep/readme.md': '# dep' },
+      },
+      'real': { meta: { toolPrefix: 'real' }, files: { 'doc.md': '# real' } },
+    });
+    after(cleanup);
+    const registry = loadVaultRegistry(root);
+    assert.deepEqual(registry.map(v => v.toolPrefix), ['real']);
+  });
+
   it('finds nested markdown (recursive check)', () => {
     const { root, cleanup } = createTempVaultsRoot({
       'nested': {
