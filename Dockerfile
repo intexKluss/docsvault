@@ -1,6 +1,8 @@
 FROM node:20-slim
 
-RUN apt-get update && apt-get install -y --no-install-recommends ca-certificates && rm -rf /var/lib/apt/lists/*
+# ripgrep (rg) fuer schnelle Volltextsuche; ohne faellt der Server auf eine
+# langsamere Node-Implementierung zurueck (siehe README -> Volltextsuche)
+RUN apt-get update && apt-get install -y --no-install-recommends ca-certificates ripgrep && rm -rf /var/lib/apt/lists/*
 
 WORKDIR /app
 

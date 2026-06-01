@@ -8,7 +8,12 @@ Web-Chat UI und MCP-Server für die otris DOCUMENTS Dokumentation. Nutzt Claude 
 - **MCP-Endpoints**: SSE (`/sse`) und Streamable HTTP (`/mcp`) für externe MCP-Clients
 - **REST API**: `/api/vaults` (Liste), `/api/<prefix>/{search,read,list,overview,status}` pro Vault
 - **Bridge-Switching**: Claude oder Codex per `BRIDGE` ENV Variable
+- **Volltextsuche**: nutzt [ripgrep](https://github.com/BurntSushi/ripgrep) (`rg`) für schnelle Suche, mit reinem Node-Fallback falls `rg` fehlt
 - **Sicherheit**: Rate Limiting, Origin-Validation, DOMPurify, Tool-Whitelisting, Prompt-Injection-Schutz
+
+## Volltextsuche
+
+`<prefix>_search` durchsucht den Vault mit **ripgrep** (`rg`), wenn es im `PATH` liegt — das ist deutlich schneller als der Node-Fallback, der greift nur wenn `rg` fehlt. Das Docker-Image installiert `ripgrep` daher mit (siehe `Dockerfile`). Lokal (Dev) ohne installiertes `rg` läuft automatisch der Fallback, das Suchergebnis ist identisch, nur langsamer.
 
 ## Quick Start
 
