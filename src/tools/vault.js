@@ -1,6 +1,7 @@
 import { readdirSync, readFileSync, existsSync, statSync } from 'fs';
 import { join, relative, basename, sep, resolve } from 'path';
 import { execFileSync } from 'child_process';
+import { isSkippedDir } from '../vault-registry.js';
 
 function isInsideVault(vaultPath, targetPath) {
   const resolvedVault = resolve(vaultPath);
@@ -11,7 +12,7 @@ function isInsideVault(vaultPath, targetPath) {
 export function getSections(vaultPath) {
   try {
     return readdirSync(vaultPath, { withFileTypes: true })
-      .filter(d => d.isDirectory() && !d.name.startsWith('.') && !d.name.startsWith('_'))
+      .filter(d => d.isDirectory() && !isSkippedDir(d.name))
       .map(d => d.name)
       .sort();
   } catch {
@@ -80,6 +81,42 @@ export function readDoc(vaultPath, docPath, maxLength = 50000) {
   };
 }
 
+// Baut einen Zeilen-Index fuer eine roh eingelesene Datei:
+//  - frontmatterEnd: 1-basierte Zeilennummer des schliessenden '---' (0 = kein Frontmatter)
+//  - headings: { line, text } aller Markdown-Ueberschriften (#, ##, ...)
+function buildLineIndex(raw) {
+  const lines = raw.split('\n');
+  let frontmatterEnd = 0;
+
+  // Frontmatter nur wenn die allererste Zeile genau '---' ist (CRLF-tolerant)
+  if (lines.length && lines[0].replace(/\r$/, '') === '---') {
+    for (let i = 1; i < lines.length; i++) {
+      if (lines[i].replace(/\r$/, '') === '---') {
+        frontmatterEnd = i + 1; // 1-basiert
+        break;
+      }
+    }
+  }
+
+  const headings = [];
+  for (let i = 0; i < lines.length; i++) {
+    const m = lines[i].match(/^(#{1,6})\s+(.+?)\s*$/);
+    if (m) headings.push({ line: i + 1, text: m[2].replace(/\r$/, '') });
+  }
+
+  return { frontmatterEnd, headings };
+}
+
+// Naechste vorausgehende Ueberschrift fuer eine Trefferzeile (oder '').
+function headingForLine(headings, line) {
+  let current = '';
+  for (const h of headings) {
+    if (h.line <= line) current = h.text;
+    else break;
+  }
+  return current;
+}
+
 function parseFrontmatter(raw) {
   const match = raw.match(/^---\r?\n([\s\S]*?)\r?\n---\r?\n?([\s\S]*)$/);
   if (!match) {
@@ -114,13 +151,18 @@ export function searchDocs(vaultPath, query, options = {}) {
   const tokens = query.trim().split(/\s+/).filter(t => t.length >= 2);
   if (tokens.length === 0) return [];
 
-  // single token or exact phrase: search as-is
+  // single token or exact phrase: search as-is.
+  // ueberhole etwas, damit das Title-/Pfad-Ranking (enrichResults) eine
+  // kanonische Seite auch dann nach vorne ziehen kann, wenn sie nicht
+  // unter den ersten maxResults Datei-Treffern liegt.
   if (tokens.length === 1) {
+    let raw;
     try {
-      return searchWithRipgrep(vaultPath, searchPath, query, contextLines, maxResults);
+      raw = searchWithRipgrep(vaultPath, searchPath, query, contextLines, maxResults * 3);
     } catch {
-      return searchWithNode(vaultPath, searchPath, query, contextLines, maxResults);
+      raw = searchWithNode(vaultPath, searchPath, query, contextLines, maxResults * 3);
     }
+    return enrichResults(vaultPath, raw, tokens).slice(0, maxResults);
   }
 
   // multi-token: search with OR pattern, then rank by distinct token hits
@@ -133,7 +175,7 @@ export function searchDocs(vaultPath, query, options = {}) {
     raw = searchWithNodeRegex(vaultPath, searchPath, new RegExp(orPattern, 'i'), 0, maxResults * 3);
   }
 
-  const ranked = rankByTokenCoverage(raw, tokens).slice(0, maxResults);
+  const ranked = rankByTokenCoverage(raw, tokens);
 
   // trim matches per file to keep response size down
   for (const result of ranked) {
@@ -142,7 +184,56 @@ export function searchDocs(vaultPath, query, options = {}) {
     }
   }
 
-  return ranked;
+  // erst anreichern/title-ranken (Frontmatter-Treffer koennen ganze Dateien
+  // droppen), dann auf maxResults begrenzen
+  return enrichResults(vaultPath, ranked, tokens).slice(0, maxResults);
+}
+
+// Post-processing fuer beide Suchpfade (ripgrep + node fallback):
+//  - filtert Treffer aus dem YAML-Frontmatter-Block raus (Punkt 1)
+//  - haengt pro Treffer die naechste vorausgehende Ueberschrift als `heading` an (Punkt 2)
+//  - markiert Dateien deren Titel/Pfad/Name auf einen Token passt mit `titleMatch` und
+//    sortiert diese nach vorne, stabil zur Eingangsreihenfolge (Punkt 3)
+//  - strippt trailing \r aus dem Treffer-Text (Punkt 5)
+// Das bestehende Schema { file, title, matches: [{ line, text }] } bleibt erhalten,
+// neue Felder kommen nur additiv dazu.
+function enrichResults(vaultPath, results, tokens) {
+  const tokenRegexes = tokens.map(t => new RegExp(escapeRegex(t), 'i'));
+  const enriched = [];
+
+  for (const result of results) {
+    let frontmatterEnd = 0;
+    let headings = [];
+    try {
+      const raw = readFileSync(join(vaultPath, result.file + '.md'), 'utf-8');
+      ({ frontmatterEnd, headings } = buildLineIndex(raw));
+    } catch {
+      // Datei nicht lesbar: ohne Index weiter, nichts wird gefiltert/angereichert
+    }
+
+    const matches = [];
+    for (const m of result.matches) {
+      // Treffer innerhalb des Frontmatter-Blocks raushalten
+      if (frontmatterEnd && m.line <= frontmatterEnd) continue;
+      matches.push({
+        line: m.line,
+        text: typeof m.text === 'string' ? m.text.replace(/\r$/, '') : m.text,
+        heading: headingForLine(headings, m.line),
+      });
+    }
+
+    // alle verbliebenen Treffer waren Frontmatter-Laerm: Datei droppen
+    if (matches.length === 0) continue;
+
+    const haystack = `${result.title} ${result.file} ${basename(result.file)}`;
+    const titleMatch = tokenRegexes.some(re => re.test(haystack));
+
+    enriched.push({ ...result, matches, titleMatch });
+  }
+
+  // titleMatch zuerst, sonst stabile Eingangsreihenfolge
+  enriched.sort((a, b) => (b.titleMatch === true) - (a.titleMatch === true));
+  return enriched;
 }
 
 function rankByTokenCoverage(results, tokens) {
@@ -167,7 +258,17 @@ function rankByTokenCoverage(results, tokens) {
 }
 
 function searchWithRipgrep(vaultPath, searchPath, query, contextLines, maxResults) {
-  const args = ['-i', '-n', '--no-heading', '-C', String(contextLines), '--glob', '*.md', '--max-count', String(maxResults * 2), query, searchPath];
+  // dieselbe Skip-Semantik wie der node-fallback: crawl/, node_modules/ und
+  // _-/.-praefixierte Ordner sind kein Vault-Content (Punkt 4)
+  const args = [
+    '-i', '-n', '--no-heading', '-C', String(contextLines),
+    '--glob', '*.md',
+    '--glob', '!**/crawl/**',
+    '--glob', '!**/node_modules/**',
+    '--glob', '!**/_*/**',
+    '--glob', '!**/.*/**',
+    '--max-count', String(maxResults * 2), query, searchPath,
+  ];
 
   let output;
   try {
@@ -264,7 +365,7 @@ function collectMdFilePaths(dir, results) {
   const entries = readdirSync(dir, { withFileTypes: true });
   for (const entry of entries) {
     const fullPath = join(dir, entry.name);
-    if (entry.isDirectory() && !entry.name.startsWith('.') && !entry.name.startsWith('_')) {
+    if (entry.isDirectory() && !isSkippedDir(entry.name)) {
       collectMdFilePaths(fullPath, results);
     } else if (entry.isFile() && entry.name.endsWith('.md')) {
       results.push(fullPath);
