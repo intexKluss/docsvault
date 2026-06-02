@@ -397,6 +397,13 @@ button {
   margin-top: 6px;
 }
 
+/* inline hint bei zu langer nachricht */
+.length-hint {
+  margin-top: 6px;
+  font-size: 12px;
+  color: var(--red);
+}
+
 /* speed toggle */
 .speed-toggle {
   display: flex;
@@ -799,6 +806,17 @@ body.landing #chat { display: none !important; }
   border-color: #555;
 }
 
+/* fehler im bug-report-overlay */
+.overlay-error {
+  margin-top: 12px;
+  font-size: 13px;
+  color: var(--red);
+}
+
+.overlay-error.hidden {
+  display: none;
+}
+
 .overlay-actions {
   display: flex;
   justify-content: flex-end;
@@ -853,6 +871,17 @@ body.landing #chat { display: none !important; }
   font-size: 13px;
   color: var(--green);
   padding: 8px 0;
+}
+
+/* reconnect-hinweis: neutral statt grun, dezent blinkend */
+.msg-system.reconnecting {
+  color: var(--text-muted);
+  animation: reconnect-pulse 1.2s ease-in-out infinite;
+}
+
+@keyframes reconnect-pulse {
+  0%, 100% { opacity: 0.5; }
+  50% { opacity: 1; }
 }
 
 /* scrollbar */

@@ -37,7 +37,7 @@
     </div>
     <div class="input-area landing-input">
       <div class="input-box">
-        <textarea id="landing-input" placeholder="Wo stehst du auf dem Schlauch?" rows="1" disabled></textarea>
+        <textarea id="landing-input" placeholder="Wo stehst du auf dem Schlauch?" rows="1" maxlength="2000" disabled></textarea>
         <div class="input-controls">
           <button id="landing-speed" class="speed-toggle" data-mode="fast" title="Schnell">
             <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polygon points="13 2 3 14 12 14 11 22 21 10 12 10 13 2"/></svg>
@@ -88,6 +88,7 @@
         <h3>Bug melden</h3>
         <p class="overlay-desc">Beschreibe was passiert ist. Der Chat-Verlauf wird automatisch mitgeschickt.</p>
         <textarea id="report-text" placeholder="Was ist passiert?" rows="4"></textarea>
+        <p id="report-error" class="overlay-error hidden"></p>
         <div class="overlay-actions">
           <button id="report-cancel" class="overlay-btn">Abbrechen</button>
           <button id="report-send" class="overlay-btn primary">Senden</button>
@@ -97,7 +98,7 @@
 
     <div class="input-area chat-input">
       <div class="input-box">
-        <textarea id="chat-input" placeholder="Wo stehst du auf dem Schlauch?" rows="1"></textarea>
+        <textarea id="chat-input" placeholder="Wo stehst du auf dem Schlauch?" rows="1" maxlength="2000"></textarea>
         <div class="input-controls">
           <button id="chat-speed" class="speed-toggle" data-mode="fast" title="Schnell">
             <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polygon points="13 2 3 14 12 14 11 22 21 10 12 10 13 2"/></svg>

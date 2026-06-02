@@ -96,6 +96,16 @@
     });
     if (vaults.length === 0) {
       vaultSelectorEl.classList.add('hidden');
+      // kein vault = nichts wird je bereit. statt ewig "wird vorbereitet" klar sagen.
+      sessionReady = false;
+      landingInput.disabled = true;
+      landingSend.disabled = true;
+      landingInput.placeholder = 'Keine Dokumentation verfügbar';
+      if (sessionStatus) {
+        cancelSessionStatusHide();
+        sessionStatus.classList.remove('loading', 'hidden', 'ready');
+        setSessionStatus('', 'Keine Dokumentation verfügbar. Bitte den Administrator kontaktieren.');
+      }
       return;
     }
 
@@ -159,7 +169,7 @@
       cancelSessionStatusHide();
       sessionStatus.classList.remove('hidden', 'ready');
       sessionStatus.classList.add('loading');
-      sessionStatus.innerHTML = SVG_SPINNER + '<span>Wird auf ' + activeVault().name + ' umgestellt...</span>';
+      setSessionStatus(SVG_SPINNER, 'Wird auf ' + activeVault().name + ' umgestellt...');
     }
     sendSelectVault(prefix);
   }
@@ -209,6 +219,16 @@
     }
   }
 
+  // status setzen: icon ist trusted svg-konstante, text via textContent (kein innerHTML
+  // fuer dynamische werte wie vault-namen)
+  function setSessionStatus(iconSvg, text) {
+    if (!sessionStatus) return;
+    sessionStatus.innerHTML = iconSvg || '';
+    const span = document.createElement('span');
+    span.textContent = text;
+    sessionStatus.appendChild(span);
+  }
+
   function scheduleSessionStatusHide() {
     cancelSessionStatusHide();
     sessionStatusHideTimer = setTimeout(function () {
@@ -221,6 +241,76 @@
   let typewriterTimer = null;
   const CHARS_PER_TICK = 3;
   const TICK_MS = 12;
+  // render throttle: text-buffer waechst jeden tick, aber das teure marked.parse +
+  // sanitize laeuft nur ~alle 60ms statt jede 12ms (sonst O(n^2) auf wachsendem doku)
+  const RENDER_MS = 60;
+  let lastRenderTs = 0;
+
+  // markdown/llm-output: code, tabellen, links erlaubt; svg/style raus (siehe public/help)
+  const SANITIZE_MD = {
+    ALLOWED_URI_REGEXP: /^(?:https?|mailto|tel|#|\/|\.\/|\.\.\/)/i,
+    FORBID_TAGS: ['svg', 'math', 'form', 'iframe', 'object', 'embed'],
+    FORBID_ATTR: ['style'],
+    ADD_ATTR: ['target', 'rel'],
+  };
+
+  function sanitizeMarkdown(md) {
+    return DOMPurify.sanitize(marked.parse(md), SANITIZE_MD);
+  }
+
+  // reconnect/lifecycle-state
+  let intentionalClose = false;
+  let reconnectAttempts = 0;
+  let reconnectTimer = null;
+  const MAX_RECONNECT_ATTEMPTS = 5;
+  // global watchdog: wenn eine antwort nie fertig wird, ui wieder freigeben
+  let responseTimeoutTimer = null;
+  const RESPONSE_TIMEOUT_MS = 120000;
+  // report-overlay state, damit fehler im overlay statt im chat landen
+  let reportPending = false;
+  // muss zum server-default passen (MAX_MESSAGE_LENGTH, src/session-manager.js)
+  const MAX_MESSAGE_LENGTH = 2000;
+
+  // gemeinsame aufraeumlogik: typewriter leeren, laufenden tool-block abschliessen,
+  // leere ai-bubble entfernen. die input-freigabe machen die aufrufer selbst, weil
+  // cancel/onclose/error/timeout sie unterschiedlich behandeln.
+  function finalizeActiveResponse() {
+    clearResponseTimeout();
+    flushTypewriter();
+    if (currentAiMsg) {
+      currentAiMsg.querySelectorAll('.tool-detail.running').forEach(function (el) {
+        el.className = 'tool-detail done';
+        el.innerHTML = SVG_CHECK + '<span>Abgebrochen</span>';
+      });
+      finalizeToolBlock(currentAiMsg);
+      if (currentAiText) {
+        highlightCodeBlocks(currentAiMsg);
+      } else if (!currentAiMsg.querySelector('.tool-block')) {
+        currentAiMsg.remove();
+      }
+    }
+    currentAiMsg = null;
+    currentAiText = '';
+    textBuffer = '';
+  }
+
+  function clearResponseTimeout() {
+    if (responseTimeoutTimer) {
+      clearTimeout(responseTimeoutTimer);
+      responseTimeoutTimer = null;
+    }
+  }
+
+  function startResponseTimeout() {
+    clearResponseTimeout();
+    responseTimeoutTimer = setTimeout(function () {
+      responseTimeoutTimer = null;
+      if (!isProcessing) return;
+      finalizeActiveResponse();
+      appendError('Die Antwort hat zu lange gedauert. Bitte versuche es erneut.');
+      setInputEnabled(true);
+    }, RESPONSE_TIMEOUT_MS);
+  }
 
   function connect() {
     const proto = location.protocol === 'https:' ? 'wss:' : 'ws:';
@@ -238,10 +328,20 @@
       handleEvent(msg);
     };
 
+    ws.onopen = function () {
+      reconnectAttempts = 0;
+    };
+
     ws.onclose = function () {
-      if (isChat) {
-        appendError('Die Verbindung wurde unterbrochen. Lade die Seite einfach neu.');
+      // bewusster close (cancel/new-chat): nichts tun, der jeweilige pfad regelt das
+      if (intentionalClose) {
+        intentionalClose = false;
+        return;
       }
+      // unerwarteter abbruch: laufende antwort sauber beenden und reconnect versuchen
+      finalizeActiveResponse();
+      setInputEnabled(false);
+      attemptReconnect();
     };
 
     ws.onerror = function () {
@@ -249,9 +349,63 @@
     };
   }
 
+  function attemptReconnect() {
+    if (reconnectTimer) return;
+    if (reconnectAttempts >= MAX_RECONNECT_ATTEMPTS) {
+      if (isChat) {
+        appendError('Die Verbindung wurde unterbrochen. Lade die Seite einfach neu.');
+      }
+      return;
+    }
+    reconnectAttempts++;
+    showReconnectingStatus();
+    // einfacher backoff: 1s, 2s, 3s ...
+    const delay = reconnectAttempts * 1000;
+    reconnectTimer = setTimeout(function () {
+      reconnectTimer = null;
+      connect();
+    }, delay);
+  }
+
+  // im chat gibt es keine sichtbare status-leiste (die session-status liegt im
+  // landing-screen, der dann display:none ist), drum hier eine eigene info-zeile
+  let reconnectNoticeEl = null;
+
+  function showReconnectingStatus() {
+    if (isChat) {
+      if (!reconnectNoticeEl) {
+        reconnectNoticeEl = document.createElement('div');
+        reconnectNoticeEl.className = 'msg-wrap';
+        const inner = document.createElement('div');
+        inner.className = 'msg-system reconnecting';
+        inner.textContent = 'Verbindung wird wiederhergestellt...';
+        reconnectNoticeEl.appendChild(inner);
+        messagesEl.appendChild(reconnectNoticeEl);
+        scrollToBottom();
+      }
+      return;
+    }
+    if (!sessionStatus) return;
+    cancelSessionStatusHide();
+    sessionStatus.classList.remove('hidden', 'ready');
+    sessionStatus.classList.add('loading');
+    setSessionStatus(SVG_SPINNER, 'Verbindung wird wiederhergestellt...');
+  }
+
+  function clearReconnectNotice() {
+    if (reconnectNoticeEl) {
+      reconnectNoticeEl.remove();
+      reconnectNoticeEl = null;
+    }
+  }
+
+  // streaming-events werden nach einem cancel verworfen, lifecycle-events nicht
+  // (sonst geht das frische session_ready nach reconnect verloren -> chat bricht)
+  const STREAMING_EVENTS = { chunk: true, tool_use: true, done: true };
+
   function handleEvent(msg) {
     if (!msg || typeof msg.type !== 'string') return;
-    if (cancelled) return;
+    if (cancelled && STREAMING_EVENTS[msg.type]) return;
 
     switch (msg.type) {
       case 'vaults':
@@ -264,7 +418,7 @@
           cancelSessionStatusHide();
           sessionStatus.classList.remove('hidden', 'ready');
           sessionStatus.classList.add('loading');
-          sessionStatus.innerHTML = SVG_SPINNER + '<span>' + randomFrom(INIT_MESSAGES) + '</span>';
+          setSessionStatus(SVG_SPINNER, randomFrom(INIT_MESSAGES));
         }
         break;
 
@@ -276,6 +430,8 @@
         }
         sessionReady = true;
         cancelled = false;
+        reconnectAttempts = 0;
+        clearReconnectNotice();
         if (typeof msg.toolPrefix === 'string') activeVaultPrefix = msg.toolPrefix;
         if (isChat) setInputEnabled(true);
         if (sessionStatus) {
@@ -283,7 +439,7 @@
           cancelSessionStatusHide();
           sessionStatus.classList.remove('loading', 'hidden');
           sessionStatus.classList.add('ready');
-          sessionStatus.innerHTML = SVG_CHECK + '<span>Bereit</span>';
+          setSessionStatus(SVG_CHECK, 'Bereit');
           scheduleSessionStatusHide();
         }
         landingInput.disabled = false;
@@ -297,6 +453,7 @@
           currentAiMsg = appendAiMessage();
           currentAiText = '';
         }
+        startResponseTimeout();
         textBuffer += msg.content;
         startTypewriter();
         break;
@@ -307,27 +464,36 @@
           currentAiMsg = appendAiMessage();
           currentAiText = '';
         }
+        startResponseTimeout();
         handleToolUse(msg);
         scrollToBottom();
         break;
 
       case 'done':
+        clearResponseTimeout();
         finishResponse(messageId);
         break;
 
       case 'report_saved':
+        reportPending = false;
         closeReportOverlay();
         appendSystemMessage('Bug-Report gespeichert. Danke!');
         break;
 
-      case 'error':
-        flushTypewriter();
-        appendError(typeof msg.message === 'string' ? msg.message : 'Unbekannter Fehler');
-        currentAiMsg = null;
-        currentAiText = '';
-        textBuffer = '';
+      case 'error': {
+        const errMsg = typeof msg.message === 'string' ? msg.message : 'Unbekannter Fehler';
+        // fehler waehrend ein report laeuft: im overlay zeigen statt im chat verstecken
+        if (reportPending && !reportOverlay.classList.contains('hidden')) {
+          reportPending = false;
+          showReportError(errMsg);
+          break;
+        }
+        // laufenden tool-block sauber beenden (finalizeActiveResponse), dann fehler zeigen
+        finalizeActiveResponse();
+        appendError(errMsg);
         setInputEnabled(true);
         break;
+      }
 
     }
   }
@@ -335,6 +501,14 @@
   function sendMessage(text) {
     text = text.trim();
     if (!text || !ws || ws.readyState !== WebSocket.OPEN || !sessionReady) return;
+
+    // laengencheck VOR jeglicher ui-mutation: sonst geht die nachricht verloren,
+    // wenn der server sie ablehnt (bubble waere schon weg, input geleert)
+    if (text.length > MAX_MESSAGE_LENGTH) {
+      showLengthHint(text.length);
+      return;
+    }
+    clearLengthHint();
 
     if (!isChat) {
       switchToChat();
@@ -404,8 +578,11 @@
     const chars = textBuffer.substring(0, CHARS_PER_TICK);
     textBuffer = textBuffer.substring(CHARS_PER_TICK);
     currentAiText += chars;
-    renderAiContent();
-    scrollToBottom();
+    // text-buffer immer weiterschieben, aber nur gedrosselt rendern
+    if (Date.now() - lastRenderTs >= RENDER_MS) {
+      renderAiContent();
+      scrollToBottom();
+    }
   }
 
   function flushTypewriter() {
@@ -416,6 +593,10 @@
     if (textBuffer.length > 0) {
       currentAiText += textBuffer;
       textBuffer = '';
+    }
+    // immer final rendern, auch wenn der buffer leer war (gedrosselte ticks
+    // koennten den letzten stand sonst ausgelassen haben)
+    if (currentAiText) {
       renderAiContent();
       scrollToBottom();
     }
@@ -429,7 +610,9 @@
         setTimeout(tryFinish, 50);
         return;
       }
-      if (textBuffer.length > 0) flushTypewriter();
+      // immer final flushen/rendern: durch das render-throttling koennen die letzten
+      // zeichen im currentAiText haengen ohne im dom zu sein
+      flushTypewriter();
 
       if (currentAiMsg) {
         if (!currentAiText && !currentAiMsg.querySelector('.tool-block')) {
@@ -450,8 +633,9 @@
     if (!currentAiMsg) return;
     const contentEl = currentAiMsg.querySelector('.msg-content');
     if (contentEl) {
-      contentEl.innerHTML = DOMPurify.sanitize(marked.parse(currentAiText));
+      contentEl.innerHTML = sanitizeMarkdown(currentAiText);
     }
+    lastRenderTs = Date.now();
   }
 
   function getToolBlock(aiMsg) {
@@ -632,29 +816,45 @@
     if (!isProcessing) return;
     cancelled = true;
     messageId++;
-    flushTypewriter();
-    if (currentAiMsg) {
-      currentAiMsg.querySelectorAll('.tool-detail.running').forEach(function (el) {
-        el.className = 'tool-detail done';
-        el.innerHTML = SVG_CHECK + '<span>Abgebrochen</span>';
-      });
-      if (currentAiText) {
-        highlightCodeBlocks(currentAiMsg);
-      }
-    }
-    currentAiMsg = null;
-    currentAiText = '';
-    textBuffer = '';
+    finalizeActiveResponse();
     if (ws) {
-      ws.onclose = null;
+      // bewusster close: onclose soll keinen reconnect ausloesen
+      intentionalClose = true;
       ws.close();
     }
     sessionReady = false;
     connect();
+    // cancelled bleibt true: das blockt nur noch streaming-events (siehe handleEvent).
+    // das frische session_ready des neuen sockets setzt cancelled wieder false und
+    // gibt den input frei. lifecycle-events sind nicht mehr gegated, also kommt das
+    // ready durch (genau der bug der den chat vorher gebrickt hat).
   }
 
   function getActiveSpeed() {
     return isChat ? chatSpeed : landingSpeed;
+  }
+
+  function getActiveInput() {
+    return isChat ? chatInput : landingInput;
+  }
+
+  function showLengthHint(len) {
+    const input = getActiveInput();
+    const box = input.closest('.input-box');
+    if (!box) return;
+    let hint = box.querySelector('.length-hint');
+    if (!hint) {
+      hint = document.createElement('div');
+      hint.className = 'length-hint';
+      box.appendChild(hint);
+    }
+    hint.textContent = 'Nachricht zu lang: ' + len + ' / ' + MAX_MESSAGE_LENGTH + ' Zeichen';
+  }
+
+  function clearLengthHint() {
+    document.querySelectorAll('.length-hint').forEach(function (el) {
+      el.remove();
+    });
   }
 
   function toggleSpeed(btn) {
@@ -692,6 +892,7 @@
   landingInput.addEventListener('input', function () {
     autoResize(this);
     updateSendBtn(this, landingSend);
+    if (this.value.trim().length <= MAX_MESSAGE_LENGTH) clearLengthHint();
   });
 
   landingInput.addEventListener('keydown', function (e) {
@@ -708,6 +909,7 @@
   chatInput.addEventListener('input', function () {
     autoResize(this);
     updateSendBtn(this, chatSend);
+    if (this.value.trim().length <= MAX_MESSAGE_LENGTH) clearLengthHint();
   });
 
   chatInput.addEventListener('keydown', function (e) {
@@ -738,6 +940,8 @@
   });
 
   btnNewChat.addEventListener('click', function () {
+    // bewusster reload: socket-close soll keinen reconnect-flash ausloesen
+    intentionalClose = true;
     location.reload();
   });
 
@@ -784,26 +988,50 @@
 
   reportText.addEventListener('input', function () {
     reportSend.disabled = !this.value.trim();
+    clearReportError();
   });
 
   reportOverlay.addEventListener('click', function (e) {
     if (e.target === reportOverlay) closeReportOverlay();
   });
 
+  const reportError = document.getElementById('report-error');
+
   function openReportOverlay() {
     reportText.value = '';
     reportSend.disabled = true;
+    reportPending = false;
+    clearReportError();
     reportOverlay.classList.remove('hidden');
     reportText.focus();
   }
 
   function closeReportOverlay() {
+    reportPending = false;
     reportOverlay.classList.add('hidden');
+  }
+
+  function showReportError(text) {
+    // fehler im overlay anzeigen und senden wieder freigeben statt overlay zu blocken
+    if (reportError) {
+      reportError.textContent = text;
+      reportError.classList.remove('hidden');
+    }
+    reportSend.disabled = !reportText.value.trim();
+  }
+
+  function clearReportError() {
+    if (reportError) {
+      reportError.textContent = '';
+      reportError.classList.add('hidden');
+    }
   }
 
   function submitReport() {
     const desc = reportText.value.trim();
     if (!desc || !ws || ws.readyState !== WebSocket.OPEN) return;
+
+    clearReportError();
 
     const context = [];
     messagesEl.querySelectorAll('.msg-wrap').forEach(function (wrap) {
@@ -816,6 +1044,7 @@
       }
     });
 
+    reportPending = true;
     ws.send(JSON.stringify({
       type: 'report',
       description: desc,
