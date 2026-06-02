@@ -11,7 +11,10 @@ src/
   claude-bridge.js       Bridge zu Claude Agent SDK (@anthropic-ai/claude-agent-sdk)
   codex-bridge.js        Bridge zu OpenAI Codex SDK (@openai/codex-sdk)
   api-routes.js          REST API für externe MCP-Clients
-  mcp-handler.js         MCP SSE + Streamable HTTP Endpoints
+  mcp-handler.js         MCP SSE + Streamable HTTP Endpoints (createMcpServer, version 0.2.0)
+  mcp-stdio.js           MCP stdio-Transport (lokaler Start ohne HTTP-Server, z.B. fuer CLI-Clients)
+  vault-registry.js      Vault-Discovery, _meta.json, toolPrefix, describeVaults()
+  system-prompt.js       System-Prompt mit Safety- + Behavior-Rules
   tools/                 Internalisierte Tool-Handler (vault, search, read, list, overview, status)
 public/
   index.html             Landing + Chat UI
@@ -20,6 +23,8 @@ public/
   logo.png               Intex Logo
   help/                  Installationshilfe
 ```
+
+Transporte fuer die MCP-Tools: SSE (`/sse` + `/messages`), Streamable HTTP (`/mcp`) und stdio (`src/mcp-stdio.js`, fuer lokal gestartete MCP-Clients ohne laufenden HTTP-Server).
 
 ## Architektur-Überblick
 
@@ -40,7 +45,7 @@ src/tools/ (search, read, list, overview, status)
     |
     v
 vaults/
-  ├── otris/        (via Volume-Mount, 995 MDs, _meta.json)
+  ├── otris/        (via Volume-Mount, _meta.json; Seitenzahl via <prefix>_status)
   ├── intex-regeln/ (via Volume-Mount, _meta.json)
   └── ...
 ```
@@ -73,7 +78,8 @@ Beide Bridges exportieren das gleiche Interface:
 
 ```js
 { type: 'session_init' }                                     // Session wird erstellt
-{ type: 'session_ready' }                                    // Warm-up fertig, Input frei
+{ type: 'vaults', list: [{ toolPrefix, name, description }] } // verfuegbare Vaults (direkt nach Connect)
+{ type: 'session_ready', toolPrefix: 'otris' }               // Warm-up fertig, Input frei (mit gewaehltem Vault)
 { type: 'chunk', content: '...' }                            // Text-Stream
 { type: 'tool_use', tool: 'otris_search', status: 'running' } // Tool gestartet
 { type: 'tool_use', tool: 'otris_search', status: 'done' }    // Tool fertig
@@ -85,16 +91,18 @@ Beide Bridges exportieren das gleiche Interface:
 ### Client → Server
 
 ```js
+{ type: 'select_vault', toolPrefix: 'otris' }                // Vault waehlen (vor erster Nachricht)
 { type: 'message', content: '...', mode: 'fast'|'thorough' } // Chat-Nachricht
 { type: 'report', description: '...', chatContext: [...] }    // Bug-Report
 ```
 
 ## Session-Lifecycle
 
-1. **Connect**: Client öffnet WebSocket → Server sendet `session_init`
-2. **Warm-Up**: Bridge erstellt Session, sendet Init-Query → Server sendet `session_ready`
-3. **Chat**: Client sendet `message` → Server streamt `tool_use`/`chunk`/`done`
-4. **Disconnect**: WebSocket schließt → Session wird sofort destroyed
+1. **Connect**: Client öffnet WebSocket → Server sendet `session_init` und direkt danach `vaults` (Liste aller verfuegbaren Vaults)
+2. **Vault-Auswahl**: Bei genau 1 Vault waermt der Server automatisch auf. Bei 2+ Vaults wartet er auf `select_vault` vom Client (das Frontend schickt den Default direkt mit). Nach der ersten `message` ist der Vault gelockt, ein spaeteres `select_vault` wird ignoriert.
+3. **Warm-Up**: Bridge erstellt Session, sendet Init-Query → Server sendet `session_ready` (inkl. `toolPrefix` des gewaehlten Vaults)
+4. **Chat**: Client sendet `message` → Server streamt `tool_use`/`chunk`/`done`
+5. **Disconnect**: WebSocket schließt → Session wird sofort destroyed
 
 Kein Reconnect, kein Session-Persist. Jeder Page-Load = neue Session.
 
@@ -123,21 +131,22 @@ Codex Bridge: Nutzt MCP über Codex CLI Config.
 
 | Variable | Default | Beschreibung |
 |---|---|---|
-| `BRIDGE` | `claude` | `claude` oder `codex` |
+| `BRIDGE` | `claude` | `claude` oder `codex`. **Achtung:** Das mitgelieferte Docker-Image setzt `BRIDGE=codex` (Image-Override) |
 | `PORT` | `3000` | Server Port |
-| `VAULTS_ROOT` | `./vaults` | Wurzel-Verzeichnis der Vaults (Volume-Mount) |
+| `VAULTS_ROOT` | `./vaults` | Wurzel-Verzeichnis der Vaults (Volume-Mount). Docker-Image setzt `/app/vaults`. (`VAULT_PATH` ist deprecated) |
 | `MAX_SESSIONS` | `50` | Max gleichzeitige Sessions |
-| `RATE_LIMIT_PER_MIN` | `10` | Max Messages pro Minute/IP |
+| `RATE_LIMIT_PER_MIN` | `10` | Max WebSocket-Messages pro Minute/IP |
 | `MAX_MESSAGE_LENGTH` | `2000` | Max Zeichen pro Nachricht |
 | `TRUST_PROXY` | — | Express trust proxy (für Reverse Proxy) |
-| `ALLOW_NO_ORIGIN` | — | WebSocket ohne Origin erlauben |
-| `ALLOWED_ORIGINS` | — | Komma-separierte erlaubte Origins |
+| `ALLOW_NO_ORIGIN` | `false` | WebSocket ohne Origin-Header erlauben (für REST/MCP-Clients noetig) |
+| `ALLOWED_ORIGINS` | — | Komma-separierte erlaubte WebSocket-Origins |
 | `CLAUDE_PATH` | — | Pfad zur Claude Code CLI |
 | `CODEX_PATH` | — | Pfad zur Codex CLI |
 | `CODEX_MODEL` | `gpt-5.4` | Model für Codex Bridge |
 | `MCP_CWD` | Projekt-Root | Arbeitsverzeichnis für MCP |
 | `MCP_SSE_URL` | `http://localhost:$PORT/sse` | SSE-URL für Claude Bridge MCP-Verbindung |
 | `API_RATE_LIMIT_PER_MIN` | `60` | Max REST API Requests pro Minute/IP |
+| `API_TOKEN` | — | Wenn gesetzt: erzwingt Bearer-Token-Auth (`Authorization: Bearer <TOKEN>`) auf `/api`, `/sse`, `/messages`, `/mcp` und dem WebSocket. Unset = offen (Default) |
 
 ## Frontend (app.js)
 
@@ -160,11 +169,14 @@ Codex Bridge: Nutzt MCP über Codex CLI Config.
 
 - **Prompt Injection**: System-Prompt mit strikten Regeln, Social-Engineering-Abwehr
 - **Tool-Whitelist**: Nur docsvault MCP Tools erlaubt, alle Built-in Tools gesperrt
-- **Rate Limiting**: IP-basiert, proxy-aware via `trust proxy`
+- **Rate Limiting**: IP-basiert, proxy-aware via `trust proxy` (WebSocket + REST)
 - **WebSocket**: Origin-Validierung, 16KB Payload-Limit, Heartbeat
 - **XSS**: DOMPurify auf allen Markdown-Outputs, `CSS.escape` in Selektoren
 - **Error Filtering**: Generische Messages an Client, keine Internals
 - **Bug Reports**: JSONL append-only (keine Race Condition), chatContext sanitized
+- **Auth (opt-in)**: `API_TOKEN` aktiviert Bearer-Token-Auth auf `/api`, `/sse`, `/messages`, `/mcp` und dem WebSocket. Ohne `API_TOKEN` sind diese Endpoints offen.
+
+> **Wichtig, keine Illusionen:** Die Origin-Validierung schuetzt **nur den WebSocket**. REST (`/api`) und MCP (`/sse`, `/messages`, `/mcp`) haben **keinen Origin-Check** und ohne gesetztes `API_TOKEN` **keine Auth**. Wer den Port erreicht, kann den Vault lesen. Rate Limiting bremst Missbrauch, ist aber keine Zugriffskontrolle. Fuer oeffentliche Deployments `API_TOKEN` setzen oder den Port hinter Reverse Proxy / VPN dichtmachen.
 
 ## Dependencies
 

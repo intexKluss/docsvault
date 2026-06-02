@@ -47,7 +47,7 @@ Ergibt folgende Struktur:
 <dein-arbeitsordner>/
 ├── docsvault/      <- der gerade geklonte Server-Code
 └── vaults/
-    └── otris/           <- der Vault mit _meta.json + 995 MDs
+    └── otris/           <- der Vault mit _meta.json + den Markdown-Seiten
 ```
 
 > **Server-Setup (Linux-Konvention):** Vaults oft unter `/srv/otris/vaults/` — ausfuehrbar aus beliebigem Arbeitsverzeichnis:
@@ -127,6 +127,7 @@ Analog fuer das zweite Volume `-v docsvault-codex:/home/node/.codex`:
 > **Bug-Reports persistent machen** (optional): Standardmaessig landen Bug-Reports in `/app/reports.json` **im Container** — verschwinden also beim `docker rm`. Wenn du sie ueber Container-Rebuilds erhalten willst, mounte eine Host-Datei drauf:
 > - Host-Datei vorher anlegen: Linux `touch /srv/otris/reports.json` bzw. Windows `New-Item -ItemType File "C:\pfad\reports.json" -Force`
 > - Beim `docker run` ergaenzen: `-v /srv/otris/reports.json:/app/reports.json` (Linux) bzw. `-v "C:/pfad/reports.json:/app/reports.json"` (Windows)
+> - **Wichtig (Linux):** Der Container laeuft als User `node` (uid 1000). Die gemountete Host-Datei muss diesem User gehoeren, sonst kann der Server nicht reinschreiben: `chown 1000:1000 /srv/otris/reports.json`. Sonst landen Reports nur im Container-Log als Fehler.
 
 Die Volumes sorgen dafür, dass Vaults, Codex-Auth und Bug-Reports bei Container-Rebuilds erhalten bleiben.
 
@@ -210,9 +211,9 @@ Details: [INSTALL-DEVELOPER.md](INSTALL-DEVELOPER.md)
 
 | Variable | Default | Beschreibung |
 |----------|---------|--------------|
-| `BRIDGE` | `codex` | AI-Bridge: `codex` oder `claude` |
+| `BRIDGE` | `claude` (Code) / `codex` (Image) | AI-Bridge: `codex` oder `claude`. Der Code-Default ist `claude`, das mitgelieferte Docker-Image setzt aber `BRIDGE=codex` (siehe Dockerfile) |
 | `PORT` | `3000` | Server-Port |
-| `VAULTS_ROOT` | `/app/vaults` | Wurzel-Verzeichnis der Vaults im Container (Volume-Mount) |
+| `VAULTS_ROOT` | `/app/vaults` (Image) | Wurzel-Verzeichnis der Vaults im Container (Volume-Mount). Ausserhalb von Docker: `./vaults` |
 | `ALLOWED_ORIGINS` | — | Erlaubte Origins für WebSocket (kommasepariert) |
 | `CODEX_MODEL` | `gpt-5.4` | Model für Codex Bridge |
 | `ALLOW_NO_ORIGIN` | `false` | Verbindungen ohne Origin-Header erlauben (für REST API/MCP Clients nötig) |
@@ -221,6 +222,7 @@ Details: [INSTALL-DEVELOPER.md](INSTALL-DEVELOPER.md)
 | `API_RATE_LIMIT_PER_MIN` | `60` | REST API Requests pro Minute pro IP |
 | `TRUST_PROXY` | — | Proxy-Konfiguration (`loopback`, IP, etc.) |
 | `MAX_MESSAGE_LENGTH` | `2000` | Max Zeichen pro Chat-Nachricht |
+| `API_TOKEN` | — | Wenn gesetzt: erzwingt Bearer-Token-Auth auf `/api`, `/sse`, `/messages`, `/mcp` und dem WebSocket. Unset = offen (Default-Verhalten) |
 
 ## Endpoints
 
@@ -242,11 +244,15 @@ Details: [INSTALL-DEVELOPER.md](INSTALL-DEVELOPER.md)
 
 ## Sicherheit
 
-- Container läuft als non-root User (`node`)
+- Container läuft als non-root User (`node`, uid 1000)
 - Built-in Health Check (alle 30s)
 - Rate Limiting für WebSocket und REST API
-- Origin-Validierung für WebSocket-Verbindungen
+- Origin-Validierung **nur** für WebSocket-Verbindungen
 - CSP Header auf allen Responses
+
+**Ehrlich, damit keine falschen Annahmen entstehen:** REST API (`/api`) und MCP (`/sse`, `/messages`, `/mcp`) haben **keinen Origin-Check** und sind **standardmaessig ohne Authentifizierung** erreichbar. Origin-Validierung schuetzt nur den WebSocket (Web-Chat). Rate Limiting bremst Missbrauch, ist aber keine Zugriffskontrolle.
+
+**Auth aktivieren (`API_TOKEN`):** Setzt du die ENV-Variable `API_TOKEN` (z.B. `-e API_TOKEN=<geheim>` im `docker run`), verlangen `/api`, `/sse`, `/messages`, `/mcp` und der WebSocket einen Bearer-Token (`Authorization: Bearer <TOKEN>`). Ohne gesetztes `API_TOKEN` bleiben alle Endpoints offen. Fuer oeffentlich erreichbare Deployments unbedingt `API_TOKEN` setzen oder den Port hinter Reverse Proxy / VPN dichtmachen.
 
 ## Update
 

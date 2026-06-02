@@ -1,15 +1,15 @@
 # docsvault
 
-Web-Chat UI und MCP-Server für die otris DOCUMENTS Dokumentation. Nutzt Claude Agent SDK oder OpenAI Codex SDK als AI-Backend. Die Dokumentation (995 Markdown-Seiten) ist im Vault enthalten und wird im Docker-Image gebacken.
+Web-Chat UI und MCP-Server für die otris DOCUMENTS Dokumentation. Nutzt Claude Agent SDK oder OpenAI Codex SDK als AI-Backend. Die Dokumentation liegt in einem separaten Vault-Repo (z.B. [otris-docs-vault](https://github.com/intexKluss/otris-docs-vault)) und wird zur Laufzeit als Volume gemountet, nicht ins Docker-Image gebacken. Die aktuelle Seitenanzahl liefert das `<prefix>_status` Tool bzw. `GET /api/<prefix>/status`.
 
 ## Features
 
 - **Web-Chat**: Landing Page + Chat-UI mit Typewriter-Effekt, Tool-Fortschrittsanzeige, Speed-Toggle
 - **MCP-Endpoints**: SSE (`/sse`) und Streamable HTTP (`/mcp`) für externe MCP-Clients
 - **REST API**: `/api/vaults` (Liste), `/api/<prefix>/{search,read,list,overview,status}` pro Vault
-- **Bridge-Switching**: Claude oder Codex per `BRIDGE` ENV Variable
+- **Bridge-Switching**: Claude oder Codex per `BRIDGE` ENV Variable (Code-Default `claude`, das mitgelieferte Docker-Image setzt `BRIDGE=codex`)
 - **Volltextsuche**: nutzt [ripgrep](https://github.com/BurntSushi/ripgrep) (`rg`) für schnelle Suche, mit reinem Node-Fallback falls `rg` fehlt
-- **Sicherheit**: Rate Limiting, Origin-Validation, DOMPurify, Tool-Whitelisting, Prompt-Injection-Schutz
+- **Sicherheit**: Rate Limiting, DOMPurify, Tool-Whitelisting, Prompt-Injection-Schutz; Origin-Validierung schützt nur den WebSocket. Optionale Bearer-Token-Auth für REST/MCP per `API_TOKEN` (siehe unten)
 
 ## Volltextsuche
 
@@ -19,9 +19,15 @@ Web-Chat UI und MCP-Server für die otris DOCUMENTS Dokumentation. Nutzt Claude 
 
 ```bash
 npm install
-npm run dev           # Claude Bridge (default)
+npm run dev           # Claude Bridge (Code-Default)
 npm run dev:codex     # Codex Bridge
 ```
+
+> **Windows-Hinweis:** `dev:codex` und `dev:claude` nutzen die bash-typische `BRIDGE=... node ...` Inline-Syntax und laufen so nur unter bash/WSL/Git Bash. Auf nativer PowerShell stattdessen:
+> ```powershell
+> $env:BRIDGE="codex"; node --watch src/server.js
+> ```
+> (`npm run dev` ohne ENV laeuft ueberall und nutzt den Code-Default `claude`.)
 
 ## Deployment (Docker)
 
@@ -123,6 +129,16 @@ Oder manuell in `.mcp.json`:
 ```
 
 Siehe [INSTALL-DEVELOPER.md](INSTALL-DEVELOPER.md) für alle Optionen.
+
+## Sicherheit & Auth
+
+Ehrlich, damit niemand falsche Annahmen trifft:
+
+- **REST API (`/api`) und MCP (`/sse`, `/messages`, `/mcp`) sind standardmaessig ohne Authentifizierung erreichbar.** Es gibt dort weder Origin-Check noch (ohne Token) eine Zugriffskontrolle. Wer den Port erreicht, kann lesen.
+- **Origin-Validierung greift nur fuer den WebSocket** (Web-Chat), nicht fuer REST/MCP.
+- **Rate Limiting** (`RATE_LIMIT_PER_MIN` fuer WebSocket, `API_RATE_LIMIT_PER_MIN` fuer REST) bremst Missbrauch, ist aber keine Auth.
+
+**Opt-in Auth via `API_TOKEN`:** Setzt du die ENV-Variable `API_TOKEN`, verlangen `/api`, `/sse`, `/messages`, `/mcp` und der WebSocket einen Bearer-Token (`Authorization: Bearer <TOKEN>`). Ist `API_TOKEN` nicht gesetzt, bleiben alle Endpoints offen (aktuelles Default-Verhalten). Fuer oeffentlich erreichbare Deployments dringend setzen oder den Port hinter einem Reverse Proxy / VPN dichtmachen.
 
 ## Nützliche Befehle
 

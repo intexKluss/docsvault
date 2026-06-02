@@ -113,10 +113,11 @@ curl "http://SERVER-IP:3000/api/vaults"
 
 # Pro Vault: /api/<toolPrefix>/<aktion>
 curl "http://SERVER-IP:3000/api/otris/search?query=DocFile"
-curl "http://SERVER-IP:3000/api/otris/read?path=Portalscript%20API/classes/DocFile"
-curl "http://SERVER-IP:3000/api/otris/list?section=Portalscript%20API"
 curl "http://SERVER-IP:3000/api/otris/overview"
+curl "http://SERVER-IP:3000/api/otris/list?section=Scripting"
 curl "http://SERVER-IP:3000/api/otris/status"
+# read: immer den exakten Pfad aus search/list nehmen (URL-encoded), nie selbst zusammenbauen
+curl "http://SERVER-IP:3000/api/otris/read?path=<exakter%20pfad%20aus%20search>"
 
 # Falls der Server weitere Vaults anbietet, analog:
 curl "http://SERVER-IP:3000/api/intex_regeln/search?query=commit"
