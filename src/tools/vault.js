@@ -336,7 +336,7 @@ export function searchDocs(vaultPath, query, options = {}) {
 
   raw = mergeTitleCandidates(vaultPath, searchPath, raw, tokens, 0);
 
-  const ranked = rankByTokenCoverage(raw, tokens);
+  const ranked = rankByTokenCoverage(vaultPath, raw, tokens, query);
 
   for (const result of ranked) {
     if (result.matches.length > MAX_MATCHES_PER_FILE) {
@@ -610,17 +610,20 @@ function synthesizeSnippet(lines, frontmatterEnd, headings) {
   return null;
 }
 
-function rankByTokenCoverage(results, tokens) {
-  const tokenRes = tokens.map(t => foldedTokenRegex(t));
+// Pre-Slice-Ranking: nutzt denselben Score wie enrichResults (titleScore +
+// bodyScore), damit titleMatch-Seiten den candidateCap-Slice ueberleben und
+// nicht hinter coverage-staerkeren Beispielseiten weggeschnitten werden.
+// Titel werden vorab aus dem Index nachgezogen (rg/node liefern leeren Titel),
+// sonst greift der Titel-Boost hier noch nicht.
+function rankByTokenCoverage(vaultPath, results, tokens, query) {
+  const titleByPath = new Map(getCachedTitleIndex(vaultPath).map(e => [e.path, e.title]));
 
   for (const result of results) {
-    const allText = foldText(result.matches.map(m => m.text).join(' '));
-    const titleFold = foldText(result.title || '');
-    let hits = 0;
-    for (const re of tokenRes) {
-      if (re.test(allText) || re.test(titleFold)) hits++;
+    if (!result.title && titleByPath.has(result.file)) {
+      result.title = titleByPath.get(result.file);
     }
-    result._score = hits;
+    const { titleScore } = scoreTitle(result, tokens, query);
+    result._score = titleScore + scoreBody(result.matches, tokens);
   }
 
   results.sort((a, b) => b._score - a._score);
