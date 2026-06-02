@@ -92,6 +92,27 @@ describe('loadVaultRegistry — basic scan', () => {
     assert.equal(registry.length, 1);
     assert.equal(registry[0].toolPrefix, 'otris');
   });
+
+  it('reads optional searchHint from _meta.json', () => {
+    const { root, cleanup } = createTempVaultsRoot({
+      'otris': {
+        meta: { toolPrefix: 'otris', searchHint: 'Check Properties first.' },
+        files: { 'a.md': '#' },
+      },
+    });
+    after(cleanup);
+    const [vault] = loadVaultRegistry(root);
+    assert.equal(vault.searchHint, 'Check Properties first.');
+  });
+
+  it('searchHint defaults to empty string when absent', () => {
+    const { root, cleanup } = createTempVaultsRoot({
+      'otris': { meta: { toolPrefix: 'otris' }, files: { 'a.md': '#' } },
+    });
+    after(cleanup);
+    const [vault] = loadVaultRegistry(root);
+    assert.equal(vault.searchHint, '');
+  });
 });
 
 describe('loadVaultRegistry — validation', () => {

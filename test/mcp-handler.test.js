@@ -90,4 +90,39 @@ describe('MCP Handler', () => {
     assert.ok(!schema.safeParse({ query: 'x', context_lines: 21 }).success);
     assert.ok(!schema.safeParse({ query: 'x', context_lines: -1 }).success);
   });
+
+  it('search description includes the multi-source search strategy', () => {
+    const server = createMcpServer(REGISTRY);
+    const tools = server._registeredTools || {};
+    const desc = tools['otris_search']?.description || '';
+    assert.match(desc, /do not stop at the first hit/i);
+    assert.match(desc, /search again/i);
+    assert.match(desc, /check more than one/i);
+  });
+
+  it('overview description tells agents to check multiple section types', () => {
+    const server = createMcpServer(REGISTRY);
+    const tools = server._registeredTools || {};
+    const desc = tools['otris_overview']?.description || '';
+    assert.match(desc, /different section types/i);
+    assert.match(desc, /not just one/i);
+  });
+
+  it('search description embeds the vault-specific searchHint when present', () => {
+    const withHint = [
+      { name: 'otris', description: 'otris Docs', toolPrefix: 'otris', searchHint: 'Check All Properties first.', path: '/tmp/otris' },
+    ];
+    const server = createMcpServer(withHint);
+    const tools = server._registeredTools || {};
+    const desc = tools['otris_search']?.description || '';
+    assert.match(desc, /Guidance for this vault:/);
+    assert.ok(desc.includes('Check All Properties first.'));
+  });
+
+  it('search description omits vault guidance when no searchHint', () => {
+    const server = createMcpServer(REGISTRY);
+    const tools = server._registeredTools || {};
+    const desc = tools['otris_search']?.description || '';
+    assert.ok(!desc.includes('Guidance for this vault:'));
+  });
 });

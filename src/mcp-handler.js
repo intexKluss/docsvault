@@ -26,13 +26,20 @@ function isErrorResult(value) {
 function registerVaultTools(server, vault) {
   const { toolPrefix, description } = vault;
   const vaultPath = vault.path;
+  const searchHint = vault.searchHint || '';
+  // generische Such-Strategie, hilft auch schwaecheren agents: nicht beim ersten
+  // Treffer aufhoeren, mehrgleisig suchen, die Seiten wirklich lesen
+  const strategy =
+    `Search strategy: do not stop at the first hit or at the snippets alone. The matches are pointers, not the answer; open the relevant pages with ${toolPrefix}_read before you answer. If results are thin, search again with other terms (synonyms, German and English, method name and concept name). Different page types (concept/handbook vs API reference vs properties/config) hold different parts of the answer, so check more than one.`;
+  // vault-spezifischer Hinweis aus _meta.json (optional)
+  const vaultGuidance = searchHint ? `\n\nGuidance for this vault: ${searchHint}` : '';
 
   // Jedes neue Tool hier muss auch in TOOL_SUFFIXES in vault-registry.js ergaenzt werden,
   // sonst wird es nicht in describeVaults()/System-Prompt auftauchen.
 
   server.tool(
     `${toolPrefix}_overview`,
-    `Get an overview of: ${description}\n\nStart here. Typical flow: ${toolPrefix}_overview to learn the section names, then ${toolPrefix}_search to find the relevant page, then ${toolPrefix}_read to read it in full.\n\nWithout parameters, returns a compact summary of all sections with page counts. With a section parameter, returns a detailed listing of all pages grouped by subfolder.`,
+    `Get an overview of: ${description}\n\nStart here. Typical flow: ${toolPrefix}_overview to learn the section names, then ${toolPrefix}_search to find the relevant page, then ${toolPrefix}_read to read it in full.\n\nWithout parameters, returns a compact summary of all sections with page counts. With a section parameter, returns a detailed listing of all pages grouped by subfolder.\n\nDifferent section types (concept/handbook vs API reference vs properties/config) cover different parts of an answer; identify and check all that are relevant, not just one.`,
     {
       section: z.string().optional().describe(`Section name to get detailed listing for. Use exact names as shown by ${toolPrefix}_overview.`),
     },
@@ -44,7 +51,7 @@ function registerVaultTools(server, vault) {
 
   server.tool(
     `${toolPrefix}_search`,
-    `Full-text search across: ${description}\n\nReturns a JSON array of result objects, each shaped like { "file": "<path>", "title": "<page title>", "matches": [{ "line": <n>, "text": "<line text>", "heading": "<nearest heading>" }], "titleMatch": <bool>, "score": <number> }.\n\nTo read a hit, pass its "file" value verbatim as the "path" argument to ${toolPrefix}_read; "file" IS the document path. Never guess or construct paths. Read the result with titleMatch:true (and the highest "score") first, as it marks the canonical page for the query. An empty array means no matches.`,
+    `Full-text search across: ${description}\n\nReturns a JSON array of result objects, each shaped like { "file": "<path>", "title": "<page title>", "matches": [{ "line": <n>, "text": "<line text>", "heading": "<nearest heading>" }], "titleMatch": <bool>, "score": <number> }.\n\nTo read a hit, pass its "file" value verbatim as the "path" argument to ${toolPrefix}_read; "file" IS the document path. Never guess or construct paths. Read the result with titleMatch:true (and the highest "score") first, as it marks the canonical page for the query. An empty array means no matches.\n\n${strategy}${vaultGuidance}`,
     {
       query: z.string().describe('Search query (case-insensitive text search)'),
       section: z.string().optional().describe(`Limit search to a specific section. Use exact names as shown by ${toolPrefix}_overview.`),
@@ -62,7 +69,7 @@ function registerVaultTools(server, vault) {
 
   server.tool(
     `${toolPrefix}_read`,
-    `Read the full content of a specific page in: ${description}\n\nPass the "file" value from a ${toolPrefix}_search or ${toolPrefix}_list result as the "path" argument here. IMPORTANT: Always use that exact path, never guess or construct paths yourself, as filenames may contain typos or unexpected spelling.`,
+    `Read the full content of a specific page in: ${description}\n\nPass the "file" value from a ${toolPrefix}_search or ${toolPrefix}_list result as the "path" argument here. IMPORTANT: Always use that exact path, never guess or construct paths yourself, as filenames may contain typos or unexpected spelling.\n\nRead whole concept/handbook pages, including any notes or FAQ sections at the end, where prerequisites and caveats often live.`,
     {
       path: z.string().describe(`Exact document path (the "file" field) from ${toolPrefix}_search or ${toolPrefix}_list results, without .md extension.`),
       max_length: z.number().int().min(1).max(200000).optional().describe('Maximum content length in characters (default: 50000, max: 200000).'),

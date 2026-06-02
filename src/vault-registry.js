@@ -41,8 +41,10 @@ function buildEntry(folderName, vaultDir, meta) {
   const toolPrefix = (meta?.toolPrefix && String(meta.toolPrefix).trim()) || slugify(folderName);
   const description = (meta?.description && String(meta.description).trim())
     || `Documentation vault '${name}'.`;
+  // optionaler vault-spezifischer Such-Hinweis, wird in die Tool-Beschreibungen eingehaengt
+  const searchHint = (meta?.searchHint && String(meta.searchHint).trim()) || '';
 
-  return { name, description, toolPrefix, path: vaultDir };
+  return { name, description, toolPrefix, searchHint, path: vaultDir };
 }
 
 const TOOL_PREFIX_PATTERN = /^[a-z][a-z0-9_]*$/;
