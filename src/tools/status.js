@@ -12,12 +12,18 @@ export function handleStatus(vaultPath) {
   const manifest = getManifest(vaultPath);
   const sections = getSections(vaultPath);
 
-  let totalPages = 0;
-  for (const sec of sections) {
-    totalPages += listFiles(vaultPath, sec).length;
+  // pageCount aus dem Manifest bevorzugen statt den ganzen Baum zu walken
+  // (Punkt 15). Nur walken wenn das Manifest fehlt/unvollstaendig ist.
+  function walkPageCount() {
+    let total = 0;
+    for (const sec of sections) {
+      total += listFiles(vaultPath, sec).length;
+    }
+    return total;
   }
 
   if (!manifest) {
+    const totalPages = walkPageCount();
     return {
       status: 'unknown',
       message: `Documentation found (${totalPages} pages, ${sections.length} sections) but no manifest.`,
@@ -25,6 +31,8 @@ export function handleStatus(vaultPath) {
       sections: sections.length
     };
   }
+
+  const pages = manifest.pageCount != null ? manifest.pageCount : walkPageCount();
 
   const crawledAt = new Date(manifest.crawledAt);
   const now = new Date();
@@ -39,7 +47,7 @@ export function handleStatus(vaultPath) {
     message = `Documentation is ${daysOld} days old.`;
   } else {
     status = 'stale';
-    message = `Documentation is ${daysOld} days old — may be outdated.`;
+    message = `Documentation is ${daysOld} days old, may be outdated.`;
   }
 
   return {
@@ -47,7 +55,7 @@ export function handleStatus(vaultPath) {
     message,
     crawledAt: manifest.crawledAt,
     daysOld,
-    pages: manifest.pageCount || totalPages,
+    pages,
     pdfs: manifest.pdfCount || 0,
     errors: manifest.errorCount || 0,
     sections: manifest.sections || sections,

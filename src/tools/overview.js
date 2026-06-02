@@ -1,5 +1,9 @@
 import { getSections, listFiles, getManifest } from './vault.js';
 
+// max. Anzahl Subfolder die inline pro Section in der Gesamt-Uebersicht
+// gelistet werden, bevor auf "+N weitere" gekuerzt wird (Punkt 16).
+const MAX_INLINE_SUBFOLDERS = 8;
+
 export function handleOverview(vaultPath, params, vaultName = 'Documentation') {
   const { section } = params;
 
@@ -27,14 +31,25 @@ export function handleOverview(vaultPath, params, vaultName = 'Documentation') {
   let out = `# ${vaultName}`;
   if (manifest?.crawledAt) out += ` (updated: ${manifest.crawledAt.split('T')[0]})`;
   out += '\n\n';
-  for (const sec of sections.sort()) {
+  for (const sec of sections.slice().sort()) {
     const files = listFiles(vaultPath, sec);
     const subfolders = new Set();
     for (const f of files) {
       const parts = f.path.split('/');
       if (parts.length > 2) subfolders.add(parts[1]);
     }
-    const sfInfo = subfolders.size > 0 ? ` (${[...subfolders].sort().join(', ')})` : '';
+    let sfInfo = '';
+    if (subfolders.size > 0) {
+      const sorted = [...subfolders].sort();
+      // grosse Sections nicht voll auflisten, sonst sprengt es das Token-Budget
+      if (sorted.length > MAX_INLINE_SUBFOLDERS) {
+        const shown = sorted.slice(0, MAX_INLINE_SUBFOLDERS).join(', ');
+        const rest = sorted.length - MAX_INLINE_SUBFOLDERS;
+        sfInfo = ` (${shown}, +${rest} weitere, nutze overview(${sec}))`;
+      } else {
+        sfInfo = ` (${sorted.join(', ')})`;
+      }
+    }
     out += `- ${sec}: ${files.length} pages${sfInfo}\n`;
   }
   return out;
