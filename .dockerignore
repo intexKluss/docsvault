@@ -5,6 +5,16 @@ test
 reports.json
 vault
 vaults
+
+# secrets nicht in den build-context leaken
+.env
+.env.*
+.auth-profile
+
+# scratch- und repro-dateien
+__repro.mjs
+*.repro.*
+*.log
 README.md
 ARCHITECTURE.md
 CLAUDE.md
