@@ -41,4 +41,53 @@ describe('MCP Handler', () => {
     const tools = server._registeredTools || {};
     assert.equal(Object.keys(tools).length, 0);
   });
+
+  it('search description documents the file -> read chaining contract', () => {
+    const server = createMcpServer(REGISTRY);
+    const tools = server._registeredTools || {};
+    const desc = tools['otris_search']?.description || '';
+    assert.match(desc, /"file"/);
+    assert.match(desc, /otris_read/);
+    assert.match(desc, /titleMatch/);
+    assert.match(desc, /score/);
+  });
+
+  it('overview description explains the overview -> search -> read flow', () => {
+    const server = createMcpServer(REGISTRY);
+    const tools = server._registeredTools || {};
+    const desc = tools['otris_overview']?.description || '';
+    assert.match(desc, /otris_search/);
+    assert.match(desc, /otris_read/);
+  });
+
+  it('read accepts an optional heading param and bounds max_length', () => {
+    const server = createMcpServer(REGISTRY);
+    const tools = server._registeredTools || {};
+    const schema = tools['otris_read']?.inputSchema;
+    assert.ok(schema, 'read tool should have an input schema');
+
+    // heading ist optional und additiv
+    assert.ok(schema.safeParse({ path: 'a/b' }).success);
+    assert.ok(schema.safeParse({ path: 'a/b', heading: 'Intro' }).success);
+
+    // max_length ist nach oben gedeckelt
+    assert.ok(schema.safeParse({ path: 'a/b', max_length: 50000 }).success);
+    assert.ok(!schema.safeParse({ path: 'a/b', max_length: 999999 }).success);
+    assert.ok(!schema.safeParse({ path: 'a/b', max_length: 0 }).success);
+  });
+
+  it('search bounds max_results and context_lines', () => {
+    const server = createMcpServer(REGISTRY);
+    const tools = server._registeredTools || {};
+    const schema = tools['otris_search']?.inputSchema;
+    assert.ok(schema, 'search tool should have an input schema');
+
+    assert.ok(schema.safeParse({ query: 'x' }).success);
+    assert.ok(schema.safeParse({ query: 'x', max_results: 100, context_lines: 20 }).success);
+
+    assert.ok(!schema.safeParse({ query: 'x', max_results: 101 }).success);
+    assert.ok(!schema.safeParse({ query: 'x', max_results: 0 }).success);
+    assert.ok(!schema.safeParse({ query: 'x', context_lines: 21 }).success);
+    assert.ok(!schema.safeParse({ query: 'x', context_lines: -1 }).success);
+  });
 });

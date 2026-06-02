@@ -12,6 +12,16 @@ function clampInt(value, min, max, fallback) {
   return Math.max(min, Math.min(max, n));
 }
 
+// Unterscheidet den "unbekannte Section"-Fehler ({ error }) vom normalen
+// Treffer-Array (auch leer = kein Match). Nur ein Nicht-Array-Objekt mit
+// String-error gilt als Fehler.
+function isErrorResult(value) {
+  return value != null
+    && !Array.isArray(value)
+    && typeof value === 'object'
+    && typeof value.error === 'string';
+}
+
 const apiRateCounts = new Map();
 const API_RATE_LIMIT = parseInt(process.env.API_RATE_LIMIT_PER_MIN || '60', 10);
 
@@ -52,6 +62,7 @@ function registerVaultRoutes(router, vault) {
       max_results: clampInt(req.query.max_results, 1, 100, 10),
       context_lines: clampInt(req.query.context_lines, 0, 20, 3),
     });
+    if (isErrorResult(results)) return res.status(400).json(results);
     res.json(results);
   });
 
@@ -77,6 +88,7 @@ function registerVaultRoutes(router, vault) {
       section: section.trim(),
       subfolder: subfolder || undefined,
     });
+    if (isErrorResult(files)) return res.status(400).json(files);
     res.json(files);
   });
 
