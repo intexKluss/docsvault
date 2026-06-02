@@ -3,6 +3,50 @@ import assert from 'node:assert/strict';
 import { createServer } from '../src/server.js';
 import { createTempVaultsRoot } from './helpers/temp-vault.js';
 
+// minimaler fake-bridge fuer die ws-tests. warmUp ist sofort fertig, send liefert
+// einen kurzen stream. deterministisch, keine echten subprozesse.
+function fakeBridge() {
+  return {
+    async createSession(toolPrefix) {
+      let ready = false;
+      let destroyed = false;
+      return {
+        toolPrefix,
+        get ready() { return ready; },
+        get destroyed() { return destroyed; },
+        async warmUp() { ready = true; },
+        async *send() {
+          yield { type: 'chunk', content: 'ok' };
+          yield { type: 'done' };
+        },
+        async destroy() { destroyed = true; },
+      };
+    },
+  };
+}
+
+// sammelt ws-frames bis ein frame mit einem der erwarteten typen kommt.
+function waitForType(ws, types, timeoutMs = 3000) {
+  const want = new Set(Array.isArray(types) ? types : [types]);
+  const seen = [];
+  return new Promise((resolve, reject) => {
+    const timer = setTimeout(() => {
+      ws.off('message', onMsg);
+      reject(new Error(`timeout waiting for ${[...want].join('|')}, saw: ${seen.map(m => m.type).join(',')}`));
+    }, timeoutMs);
+    function onMsg(data) {
+      const msg = JSON.parse(data.toString());
+      seen.push(msg);
+      if (want.has(msg.type)) {
+        clearTimeout(timer);
+        ws.off('message', onMsg);
+        resolve({ msg, seen });
+      }
+    }
+    ws.on('message', onMsg);
+  });
+}
+
 // server.test nutzt einen fixture-vault (otris-Content liegt nicht mehr im repo)
 const { root: TEST_VAULTS_ROOT, cleanup: cleanupTestVaults } = createTempVaultsRoot({
   'otris': {
@@ -160,6 +204,81 @@ describe('Server', () => {
     it('DELETE /mcp returns 405', async () => {
       const res = await fetch(`${baseUrl}/mcp`, { method: 'DELETE' });
       assert.equal(res.status, 405);
+    });
+  });
+
+  // eigener server mit injiziertem fake-bridge und 2 vaults (kein auto-warmup,
+  // select_vault wird gebraucht). low rate-limit fuer den spam-test.
+  describe('WebSocket select_vault + ordering', () => {
+    let fbServer, fbPort;
+    let fbCleanup;
+    let WebSocket;
+
+    before(async () => {
+      ({ default: WebSocket } = await import('ws'));
+      const { root, cleanup } = createTempVaultsRoot({
+        'va': { meta: { name: 'va', description: 'Vault A', toolPrefix: 'va' }, files: { 'x/a.md': '# A' } },
+        'vb': { meta: { name: 'vb', description: 'Vault B', toolPrefix: 'vb' }, files: { 'x/b.md': '# B' } },
+      });
+      fbCleanup = cleanup;
+      process.env.VAULTS_ROOT = root;
+      process.env.RATE_LIMIT_PER_MIN = '3';
+      const result = await createServer({ port: 0, bridge: fakeBridge() });
+      fbServer = result.server;
+      fbPort = result.port;
+    });
+
+    after(() => {
+      delete process.env.RATE_LIMIT_PER_MIN;
+      process.env.VAULTS_ROOT = TEST_VAULTS_ROOT;
+      fbCleanup();
+      fbServer.close();
+    });
+
+    function connect() {
+      return new Promise((resolve, reject) => {
+        const ws = new WebSocket(`ws://127.0.0.1:${fbPort}`);
+        ws.on('open', () => resolve(ws));
+        ws.on('error', reject);
+      });
+    }
+
+    // laeuft VOR dem spam-test, damit das per-IP rate-limit noch budget hat.
+    it('does not lock the vault selector after a rejected first message', async () => {
+      const ws = await connect();
+      // erste nachricht ist ungueltig (leer) -> validierung schlaegt fehl (vor dem
+      // rate-limit, verbraucht also kein budget). messageSent darf NICHT gesetzt werden.
+      const errP = waitForType(ws, ['error'], 3000);
+      ws.send(JSON.stringify({ type: 'message', content: '   ' }));
+      const { msg: err } = await errP;
+      assert.match(err.message, /leer/i);
+
+      // select_vault muss danach noch funktionieren (selector nicht gelockt).
+      const readyP = waitForType(ws, ['session_ready', 'error'], 3000);
+      ws.send(JSON.stringify({ type: 'select_vault', toolPrefix: 'va' }));
+      const { msg: ready } = await readyP;
+      assert.equal(ready.type, 'session_ready');
+      assert.equal(ready.toolPrefix, 'va');
+      ws.close();
+    });
+
+    it('rate-limits select_vault spam', async () => {
+      const ws = await connect();
+      // rate-limit ist 3/min pro IP. abwechselnd va/vb waehlen, damit kein
+      // duplikat-drop greift. sobald das budget aufgebraucht ist kommt der throttle.
+      let throttled = false;
+      for (let i = 0; i < 6; i++) {
+        const prefix = i % 2 === 0 ? 'va' : 'vb';
+        const p = waitForType(ws, ['session_ready', 'error'], 3000);
+        ws.send(JSON.stringify({ type: 'select_vault', toolPrefix: prefix }));
+        const { msg } = await p;
+        if (msg.type === 'error' && /zu schnell/i.test(msg.message)) {
+          throttled = true;
+          break;
+        }
+      }
+      assert.ok(throttled, 'select_vault spam must hit the rate limit');
+      ws.close();
     });
   });
 });

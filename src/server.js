@@ -9,9 +9,13 @@ import { SessionManager } from './session-manager.js';
 import { handleSseGet, handleSsePost, handleStreamablePost } from './mcp-handler.js';
 import { createApiRouter } from './api-routes.js';
 import { loadVaultRegistry, TOOL_SUFFIXES } from './vault-registry.js';
+import { requireToken, wsAuthOk } from './auth.js';
 
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = dirname(__filename);
+
+// max anzahl gepufferter ws-nachrichten pro verbindung bevor wir droppen.
+const MAX_QUEUE = 20;
 
 async function loadBridge(bridgeMode, vaultRegistry) {
   if (bridgeMode === 'codex') {
@@ -50,7 +54,8 @@ export async function createServer(opts = {}) {
     }
   }
 
-  const bridge = await loadBridge(bridgeMode, vaultRegistry);
+  // opts.bridge erlaubt tests einen kontrollierbaren fake-bridge zu injizieren.
+  const bridge = opts.bridge ?? await loadBridge(bridgeMode, vaultRegistry);
   const manager = new SessionManager(bridge, config);
 
   const app = express();
@@ -72,18 +77,41 @@ export async function createServer(opts = {}) {
     next();
   });
 
-  app.use(createApiRouter(vaultRegistry));
-
-  app.get('/sse', (req, res) => {
-    handleSseGet(req, res, vaultRegistry);
+  // opt-in token-auth vor allen API/MCP-routes. ohne API_TOKEN ein no-op.
+  // /api/health bleibt immer offen, sonst kann der docker HEALTHCHECK (schickt
+  // kein token) den container nie als healthy melden wenn API_TOKEN gesetzt ist.
+  app.use(['/api', '/sse', '/messages', '/mcp'], (req, res, next) => {
+    if ((req.originalUrl || '').split('?')[0] === '/api/health') return next();
+    return requireToken(req, res, next);
   });
 
-  app.post('/messages', (req, res) => {
-    handleSsePost(req, res);
+  app.use(createApiRouter(vaultRegistry));
+
+  app.get('/sse', async (req, res) => {
+    try {
+      await handleSseGet(req, res, vaultRegistry);
+    } catch (err) {
+      console.error(`[server] /sse error: ${err.message}`);
+      if (!res.headersSent) res.status(500).json({ error: 'Internal error' });
+    }
+  });
+
+  app.post('/messages', async (req, res) => {
+    try {
+      await handleSsePost(req, res);
+    } catch (err) {
+      console.error(`[server] /messages error: ${err.message}`);
+      if (!res.headersSent) res.status(500).json({ error: 'Internal error' });
+    }
   });
 
   app.post('/mcp', async (req, res) => {
-    await handleStreamablePost(req, res, vaultRegistry);
+    try {
+      await handleStreamablePost(req, res, vaultRegistry);
+    } catch (err) {
+      console.error(`[server] /mcp error: ${err.message}`);
+      if (!res.headersSent) res.status(500).json({ error: 'Internal error' });
+    }
   });
   app.get('/mcp', (req, res) => { res.writeHead(405).end(); });
   app.delete('/mcp', (req, res) => { res.writeHead(405).end(); });
@@ -96,6 +124,8 @@ export async function createServer(opts = {}) {
     server,
     maxPayload: 16 * 1024,
     verifyClient: ({ req }) => {
+      // opt-in token-auth. ohne API_TOKEN ein no-op (default offen).
+      if (!wsAuthOk(req)) return false;
       const origin = req.headers.origin;
       // ohne origin nur erlauben wenn explizit konfiguriert
       if (!origin) return !!process.env.ALLOW_NO_ORIGIN;
@@ -137,6 +167,8 @@ export async function createServer(opts = {}) {
     ws.messageQueue = [];
     ws.processing = false;
     ws.messageSent = false;
+    // in-flight warm-up guard: hoechstens ein warm-up pro verbindung gleichzeitig.
+    ws.warmUp = null;
 
     ws.on('pong', () => {
       ws.isAlive = true;
@@ -162,6 +194,13 @@ export async function createServer(opts = {}) {
     }
 
     ws.on('message', (data) => {
+      // queue cappen, sonst kann ein client unbegrenzt nachrichten anstauen.
+      if (ws.messageQueue.length >= MAX_QUEUE) {
+        if (ws.readyState === 1) {
+          ws.send(JSON.stringify({ type: 'error', message: 'Zu viele Nachrichten auf einmal. Warte kurz.' }));
+        }
+        return;
+      }
       ws.messageQueue.push(data);
       processQueue(ws, manager, req, vaultRegistry);
     });
@@ -181,8 +220,10 @@ export async function createServer(opts = {}) {
   });
 }
 
+// startet genau einen warm-up und merkt ihn als in-flight auf der verbindung.
+// gibt das promise zurueck, damit aufrufer darauf warten koennen.
 function warmUpSession(ws, manager, clientId, toolPrefix) {
-  manager.createAndWarmUp(clientId, toolPrefix).then(() => {
+  const promise = manager.createAndWarmUp(clientId, toolPrefix).then(() => {
     // stale-check: wenn der user zwischenzeitlich einen anderen vault gewaehlt hat,
     // ist in der session-map bereits ein placeholder/session mit anderem toolPrefix.
     // in dem fall kein session_ready mehr senden (der neue warmup uebernimmt).
@@ -191,11 +232,18 @@ function warmUpSession(ws, manager, clientId, toolPrefix) {
     if (ws.readyState !== 1) return;
     ws.send(JSON.stringify({ type: 'session_ready', toolPrefix }));
   }).catch((err) => {
+    // superseded ist erwartetes verhalten beim vault-wechsel, kein fehler fuer den user.
+    if (err.message === 'Session superseded') return;
     console.error(`[server] warm-up failed for ${clientId}: ${err.message}`);
     if (ws.readyState === 1) {
       ws.send(JSON.stringify({ type: 'error', message: 'Da ist leider etwas schiefgelaufen. Lade die Seite einfach neu.' }));
     }
+  }).finally(() => {
+    // nur loeschen wenn es noch unser eintrag ist (kein neuerer warm-up gestartet).
+    if (ws.warmUp && ws.warmUp.promise === promise) ws.warmUp = null;
   });
+  ws.warmUp = { toolPrefix, promise };
+  return promise;
 }
 
 async function processQueue(ws, manager, req, vaultRegistry) {
@@ -216,11 +264,25 @@ async function processQueue(ws, manager, req, vaultRegistry) {
 }
 
 function getClientIp(req) {
-  if (process.env.TRUST_PROXY) {
-    const xff = req.headers['x-forwarded-for'];
-    if (xff) return xff.split(',')[0].trim();
+  const peer = req.socket?.remoteAddress || 'unknown';
+  // x-forwarded-for ist trivial faelschbar. nur auswerten wenn explizit ein
+  // reverse proxy konfiguriert ist (TRUST_PROXY), sonst immer den socket-peer nehmen.
+  if (!process.env.TRUST_PROXY) return peer;
+
+  const xff = req.headers['x-forwarded-for'];
+  if (!xff) return peer;
+  const chain = xff.split(',').map(s => s.trim()).filter(Boolean);
+  if (chain.length === 0) return peer;
+
+  // bei TRUST_PROXY=<n> die n rechten (vertrauten) hops abstreifen, wie express'
+  // trust-proxy-count. der naechste eintrag von rechts ist die echte client-ip.
+  const hops = parseInt(process.env.TRUST_PROXY, 10);
+  if (Number.isInteger(hops) && hops > 0) {
+    const idx = chain.length - 1 - hops;
+    return idx >= 0 ? chain[idx] : chain[0];
   }
-  return req.socket?.remoteAddress || 'unknown';
+  // sonst (loopback/true/subnetz-config): linkester eintrag als best effort.
+  return chain[0];
 }
 
 async function handleMessage(ws, manager, req, raw, vaultRegistry) {
@@ -246,13 +308,11 @@ async function handleMessage(ws, manager, req, raw, vaultRegistry) {
   }
 
   if (msg.type === 'select_vault') {
-    await handleSelectVault(ws, manager, msg, vaultRegistry);
+    await handleSelectVault(ws, manager, msg, vaultRegistry, ip);
     return;
   }
 
   if (msg.type !== 'message') return;
-
-  if (!ws.messageSent) ws.messageSent = true;
 
   try {
     manager.validateMessage(msg.content);
@@ -270,9 +330,14 @@ async function handleMessage(ws, manager, req, raw, vaultRegistry) {
 
   const session = manager.getSession(ws.clientId);
   if (!session || !session.ready) {
-    ws.send(JSON.stringify({ type: 'error', message: 'Gleich gehts los — wird noch vorbereitet.' }));
+    ws.send(JSON.stringify({ type: 'error', message: 'Gleich gehts los, wird noch vorbereitet.' }));
     return;
   }
+
+  // erst jetzt vault locken: nachricht hat validierung + rate-limit bestanden und
+  // eine fertige session nimmt sie an. so sperrt eine abgelehnte erste nachricht
+  // nicht dauerhaft den vault-selector.
+  ws.messageSent = true;
 
   try {
     const mode = msg.mode === 'fast' ? 'fast' : 'thorough';
@@ -303,7 +368,16 @@ function sanitizeChatContext(context) {
   }).filter(Boolean);
 }
 
-async function handleSelectVault(ws, manager, msg, vaultRegistry) {
+async function handleSelectVault(ws, manager, msg, vaultRegistry, ip) {
+  // rate-limit wie message/report, sonst kann ein client vault-wechsel spammen
+  // und damit SDK-subprozesse fork-bomben.
+  try {
+    manager.checkRateLimit(ip);
+  } catch (err) {
+    ws.send(JSON.stringify({ type: 'error', message: err.message }));
+    return;
+  }
+
   const toolPrefix = typeof msg.toolPrefix === 'string' ? msg.toolPrefix : '';
   const known = vaultRegistry.some(v => v.toolPrefix === toolPrefix);
   if (!known) {
@@ -313,6 +387,21 @@ async function handleSelectVault(ws, manager, msg, vaultRegistry) {
   if (ws.messageSent) {
     // Vault ist nach erster Nachricht locked
     return;
+  }
+
+  // in-flight warm-up guard: laeuft bereits ein warm-up auf dieser verbindung...
+  if (ws.warmUp) {
+    // ...fuer denselben vault, dann ist das ein duplikat, einfach droppen.
+    if (ws.warmUp.toolPrefix === toolPrefix) return;
+    // ...fuer einen anderen vault, dann den laufenden erst abbrechen und abwarten,
+    // bevor der neue startet. so ist hoechstens ein warm-up gleichzeitig aktiv.
+    const previous = ws.warmUp.promise;
+    try {
+      await manager.removeSession(ws.clientId);
+    } catch (err) {
+      console.error(`[server] session switch cleanup error: ${err.message}`);
+    }
+    try { await previous; } catch {}
   }
 
   const existing = manager.getSessionRaw(ws.clientId);

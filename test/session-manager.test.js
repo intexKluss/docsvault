@@ -33,6 +33,54 @@ function failingBridge(error) {
   };
 }
 
+// kontrollierbarer bridge: warmUp blockiert bis das zurueckgegebene deferred
+// manuell aufgeloest wird. so lassen sich race-conditions deterministisch testen.
+function controllableBridge(opts = {}) {
+  const created = [];
+  // optionaler gate vor dem session-build, um den createSession-phase-abbruch zu testen.
+  let createReleased = !opts.gateCreate;
+  let releaseCreateFn;
+  const createGate = new Promise((res) => { releaseCreateFn = () => { createReleased = true; res(); }; });
+  // wartet bis der n-te build createSession durchlaufen hat und in warmUp blockiert.
+  async function waitForStart(n) {
+    while (created.length <= n) await Promise.resolve();
+    await created[n].startedPromise;
+    return created[n];
+  }
+  const bridge = {
+    created,
+    waitForStart,
+    releaseCreate: () => releaseCreateFn(),
+    async createSession(toolPrefix) {
+      if (opts.gateCreate && !createReleased) await createGate;
+      let release;
+      const gate = new Promise((res) => { release = res; });
+      let started;
+      const startedPromise = new Promise((res) => { started = res; });
+      const session = {
+        id: `sess-${created.length}`,
+        toolPrefix,
+        destroyed: false,
+        ready: false,
+        release,
+        // resolved sobald warmUp den gate erreicht hat (deterministisches timing).
+        startedPromise,
+        async warmUp() {
+          started();
+          await gate;
+          if (this.destroyed) throw new Error('destroyed during warmUp');
+          this.ready = true;
+        },
+        async *send() {},
+        async destroy() { this.destroyed = true; }
+      };
+      created.push(session);
+      return session;
+    }
+  };
+  return bridge;
+}
+
 describe('SessionManager', () => {
   let manager;
 
@@ -190,6 +238,98 @@ describe('SessionManager', () => {
       assert.equal(manager.sessionCount, 3);
       await manager.shutdown();
       assert.equal(manager.sessionCount, 0);
+    });
+  });
+
+  describe('vault-switch ownership guard', () => {
+    it('does not clobber the selected session with a late-resolving build', async () => {
+      const bridge = controllableBridge();
+      const m = new SessionManager(bridge, { maxSessions: 5, rateLimitPerMin: 100, maxMessageLength: 100 });
+
+      // build A startet und blockiert in warmUp.
+      const pA = m.createAndWarmUp('c', 'vaultA');
+      const sessionA = await bridge.waitForStart(0);
+
+      // user wechselt: removeSession (bricht A ab) und build B startet.
+      await m.removeSession('c');
+      const pB = m.createAndWarmUp('c', 'vaultB');
+      const sessionB = await bridge.waitForStart(1);
+
+      // B wird fertig zuerst.
+      sessionB.release();
+      await pB;
+
+      // jetzt loest A spaet auf, darf B aber NICHT ueberschreiben.
+      sessionA.release();
+      await assert.rejects(() => pA);
+
+      const current = m.getSessionRaw('c');
+      assert.equal(current, sessionB, 'selected vault B must still own the slot');
+      assert.equal(current.toolPrefix, 'vaultB');
+      assert.equal(sessionA.destroyed, true, 'orphaned session A must be destroyed');
+      await m.shutdown();
+    });
+  });
+
+  describe('removeSession abort', () => {
+    it('aborts a build that is still in the createSession phase', async () => {
+      // createSession blockiert -> removeSession aktiviert den abort auf dem placeholder.
+      const bridge = controllableBridge({ gateCreate: true });
+      const m = new SessionManager(bridge, { maxSessions: 5, rateLimitPerMin: 100, maxMessageLength: 100 });
+
+      const p = m.createAndWarmUp('c', 'vaultA');
+      // placeholder steht im slot, createSession haengt noch.
+      assert.equal(m.sessionCount, 1);
+
+      // removeSession bricht den laufenden build ab und raeumt den slot.
+      await m.removeSession('c');
+      assert.equal(m.sessionCount, 0);
+
+      // createSession aufloesen: ownership-guard sieht das abgebrochene signal
+      // und zerstoert die frisch gebaute session, statt sie einzuhaengen.
+      bridge.releaseCreate();
+      await assert.rejects(() => p, { message: 'Session superseded' });
+      assert.equal(m.sessionCount, 0);
+      assert.equal(bridge.created[0].destroyed, true, 'orphaned session must be destroyed');
+      await m.shutdown();
+    });
+
+    it('does not leak a session when removeSession races a warming-up build', async () => {
+      const bridge = controllableBridge();
+      const m = new SessionManager(bridge, { maxSessions: 5, rateLimitPerMin: 100, maxMessageLength: 100 });
+
+      const p = m.createAndWarmUp('c', 'vaultA');
+      const sessionA = await bridge.waitForStart(0);
+
+      // build haengt in warmUp, removeSession zerstoert die bereits eingehaengte session.
+      await m.removeSession('c');
+      assert.equal(m.sessionCount, 0);
+      assert.equal(sessionA.destroyed, true);
+
+      sessionA.release();
+      await assert.rejects(() => p);
+      assert.equal(m.sessionCount, 0);
+      await m.shutdown();
+    });
+  });
+
+  describe('rate-limit reset window', () => {
+    it('resets the counter after the window expires', async () => {
+      const realNow = Date.now;
+      let fakeNow = 1_000_000;
+      Date.now = () => fakeNow;
+      const m = new SessionManager(mockBridge, { maxSessions: 3, rateLimitPerMin: 2, maxMessageLength: 100 });
+      try {
+        m.checkRateLimit('ip');
+        m.checkRateLimit('ip');
+        assert.throws(() => m.checkRateLimit('ip'), { message: /zu schnell/i });
+        // fenster ueberschreiten -> counter wird zurueckgesetzt.
+        fakeNow += 60001;
+        assert.doesNotThrow(() => m.checkRateLimit('ip'));
+      } finally {
+        Date.now = realNow;
+        await m.shutdown();
+      }
     });
   });
 });
