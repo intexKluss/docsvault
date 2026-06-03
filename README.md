@@ -128,6 +128,12 @@ Oder manuell in `.mcp.json`:
 }
 ```
 
+**Bricht die Verbindung weg?** SSE (`type: sse`) braucht eine dauerhaft offene Verbindung, die ein Reverse-Proxy gern nach kurzer Idle-Zeit kappt (typisches Symptom: der Client zeigt kurz die Tools, dann ist der Server weg). Nutze dann den Streamable-HTTP-Endpunkt `/mcp` (`type: http`), der ist proxy-robust:
+
+```bash
+claude mcp add --transport http docsvault http://SERVER-IP:3000/mcp
+```
+
 Siehe [INSTALL-DEVELOPER.md](INSTALL-DEVELOPER.md) für alle Optionen.
 
 ## Sicherheit & Auth
