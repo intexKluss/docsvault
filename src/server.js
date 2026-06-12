@@ -134,11 +134,14 @@ export async function createServer(opts = {}) {
         return false;
       }
       // same-origin immer erlauben: das mitgelieferte frontend verbindet zu
-      // location.host, der browser schickt dann Origin-host == Host-header —
+      // location.host, der browser schickt dann Origin-host == Host-header,
       // egal ob ip, hostname oder gemappter port. cross-site-hijacking bleibt
-      // geblockt (fremde seite => fremder Origin-host).
+      // geblockt (fremde seite => fremder Origin-host). hostnamen sind
+      // case-insensitive, also lowercase vergleichen.
       try {
-        if (new URL(origin).host === req.headers.host) return true;
+        const originHost = new URL(origin).host.toLowerCase();
+        const reqHost = (req.headers.host || '').toLowerCase();
+        if (reqHost && originHost === reqHost) return true;
       } catch {
         console.warn(`[server] ws rejected: unparsebarer Origin "${origin}"`);
         return false;
