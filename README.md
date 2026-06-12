@@ -194,7 +194,6 @@ git pull
 docker build -t docsvault .
 docker run -d --name docsvault --restart unless-stopped \
   -p 3000:3000 -e BRIDGE=codex \
-  -e ALLOWED_ORIGINS=http://SERVER-IP:3000 \
   -e ALLOW_NO_ORIGIN=true \
   -v /srv/otris/vaults:/app/vaults:ro \
   -v docsvault-codex:/home/node/.codex \

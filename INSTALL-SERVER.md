@@ -90,7 +90,6 @@ docker run -d \
   --restart unless-stopped \
   -p 3000:3000 \
   -e BRIDGE=codex \
-  -e ALLOWED_ORIGINS=http://SERVER-IP:3000 \
   -e ALLOW_NO_ORIGIN=true \
   -v /srv/otris/vaults:/app/vaults:ro \
   -v docsvault-codex:/home/node/.codex \
@@ -100,12 +99,13 @@ docker run -d \
 **Windows (PowerShell)** — absolute Pfade, Forward-Slashes fuer Docker:
 
 ```powershell
-docker run -d --name docsvault --restart unless-stopped -p 3000:3000 -e BRIDGE=codex -e ALLOWED_ORIGINS=http://SERVER-IP:3000 -e ALLOW_NO_ORIGIN=true -v "C:/dein/pfad/zu/vaults:/app/vaults:ro" -v docsvault-codex:/home/node/.codex docsvault
+docker run -d --name docsvault --restart unless-stopped -p 3000:3000 -e BRIDGE=codex -e ALLOW_NO_ORIGIN=true -v "C:/dein/pfad/zu/vaults:/app/vaults:ro" -v docsvault-codex:/home/node/.codex docsvault
 ```
 
-**Diese Platzhalter musst du im `docker run` ersetzen:**
-- `SERVER-IP` — tatsaechliche IP oder Domain des Servers (bei Lokal-Test: `localhost`)
+**Dieser Platzhalter muss im `docker run` ersetzt werden:**
 - `/srv/otris/vaults` (Linux) bzw. `C:/dein/pfad/zu/vaults` (Windows) — dein Host-Pfad aus Schritt 3, also wohin du den Vault geklont hast
+
+Ein `ALLOWED_ORIGINS` ist **nicht noetig**: der Web-Chat verbindet immer same-origin, und same-origin laesst der Server automatisch durch — egal ueber welche IP, Domain oder welchen Port die Seite aufgerufen wird. `ALLOWED_ORIGINS` braucht man nur, wenn das Frontend von einer **anderen** Origin aus zugreift (z.B. Reverse Proxy, der den `Host`-Header umschreibt).
 
 **Zum Volume-Format `-v ...`:** Docker erwartet drei Teile getrennt mit `:` — `HOSTPFAD:CONTAINERPFAD:OPTIONEN`.
 
@@ -214,7 +214,7 @@ Details: [INSTALL-DEVELOPER.md](INSTALL-DEVELOPER.md)
 | `BRIDGE` | `claude` (Code) / `codex` (Image) | AI-Bridge: `codex` oder `claude`. Der Code-Default ist `claude`, das mitgelieferte Docker-Image setzt aber `BRIDGE=codex` (siehe Dockerfile) |
 | `PORT` | `3000` | Server-Port |
 | `VAULTS_ROOT` | `/app/vaults` (Image) | Wurzel-Verzeichnis der Vaults im Container (Volume-Mount). Ausserhalb von Docker: `./vaults` |
-| `ALLOWED_ORIGINS` | — | Erlaubte Origins für WebSocket (kommasepariert) |
+| `ALLOWED_ORIGINS` | — | Zusaetzlich erlaubte Origins für den WebSocket (kommasepariert). Same-origin ist immer erlaubt — nur noetig wenn das Frontend von einer anderen Origin zugreift (z.B. Reverse Proxy mit Host-Rewrite) |
 | `CODEX_MODEL` | `gpt-5.4` | Model für Codex Bridge |
 | `ALLOW_NO_ORIGIN` | `false` | Verbindungen ohne Origin-Header erlauben (für REST API/MCP Clients nötig) |
 | `MAX_SESSIONS` | `50` | Max gleichzeitige Chat-Sessions |
@@ -288,7 +288,6 @@ docker run -d \
   --restart unless-stopped \
   -p 3000:3000 \
   -e BRIDGE=codex \
-  -e ALLOWED_ORIGINS=http://SERVER-IP:3000 \
   -e ALLOW_NO_ORIGIN=true \
   -v /srv/otris/vaults:/app/vaults:ro \
   -v docsvault-codex:/home/node/.codex \
@@ -307,9 +306,18 @@ docker logs docsvault
 
 Der Server sollte `Server läuft auf http://localhost:3000` loggen. Wenn nicht, prüfen ob Port 3000 frei ist.
 
-### WebSocket verbindet nicht
+### WebSocket verbindet nicht (Web-Chat tot, Browser-Konsole zeigt "WebSocket connection failed")
 
-Prüfen ob `ALLOWED_ORIGINS` korrekt gesetzt ist. Für REST API und MCP Clients muss `ALLOW_NO_ORIGIN=true` gesetzt sein.
+Zuerst in die Container-Logs schauen — der Server loggt jede abgelehnte Verbindung mit Grund:
+
+```bash
+docker logs docsvault 2>&1 | grep "ws rejected"
+```
+
+- `Origin "..." passt nicht zu Host "..."` — die Seite laeuft hinter einem Proxy, der den `Host`-Header umschreibt. Die im Log gezeigte Origin in `ALLOWED_ORIGINS` eintragen (exakter String inkl. Protokoll und Port), oder den Proxy den originalen `Host`-Header durchreichen lassen (nginx: `proxy_set_header Host $host;`).
+- `kein Origin-Header` — REST API / MCP Clients brauchen `ALLOW_NO_ORIGIN=true`.
+
+Same-origin-Zugriffe (Seite direkt ueber `http://SERVER:3000` aufgerufen) laufen ohne Konfiguration — wenn es da haengt, liegt es nicht an Origins, sondern an Firewall/Port-Mapping.
 
 ### Chat antwortet nicht / Fehler bei Verarbeitung
 

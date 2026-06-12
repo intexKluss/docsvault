@@ -128,16 +128,32 @@ export async function createServer(opts = {}) {
       if (!wsAuthOk(req)) return false;
       const origin = req.headers.origin;
       // ohne origin nur erlauben wenn explizit konfiguriert
-      if (!origin) return !!process.env.ALLOW_NO_ORIGIN;
+      if (!origin) {
+        if (process.env.ALLOW_NO_ORIGIN) return true;
+        console.warn('[server] ws rejected: kein Origin-Header (ALLOW_NO_ORIGIN nicht gesetzt)');
+        return false;
+      }
+      // same-origin immer erlauben: das mitgelieferte frontend verbindet zu
+      // location.host, der browser schickt dann Origin-host == Host-header —
+      // egal ob ip, hostname oder gemappter port. cross-site-hijacking bleibt
+      // geblockt (fremde seite => fremder Origin-host).
+      try {
+        if (new URL(origin).host === req.headers.host) return true;
+      } catch {
+        console.warn(`[server] ws rejected: unparsebarer Origin "${origin}"`);
+        return false;
+      }
       const allowed = [
         'http://localhost:' + config.port,
         'https://localhost:' + config.port,
         'http://127.0.0.1:' + config.port,
       ];
       if (process.env.ALLOWED_ORIGINS) {
-        allowed.push(...process.env.ALLOWED_ORIGINS.split(','));
+        allowed.push(...process.env.ALLOWED_ORIGINS.split(',').map(s => s.trim()).filter(Boolean));
       }
-      return allowed.includes(origin);
+      if (allowed.includes(origin)) return true;
+      console.warn(`[server] ws rejected: Origin "${origin}" passt nicht zu Host "${req.headers.host}" und steht nicht in ALLOWED_ORIGINS`);
+      return false;
     }
   });
 

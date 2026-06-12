@@ -193,6 +193,38 @@ describe('Server', () => {
       assert.equal(msg.type, 'session_init');
       ws.close();
     });
+
+    // der server-ip-fall: seite wird ueber irgendeine ip/domain aufgerufen die
+    // weder localhost noch ALLOWED_ORIGINS ist. same-origin (Origin-host ==
+    // Host-header) muss trotzdem reinkommen, sonst ist der web-chat auf jedem
+    // deployment ohne exakt passendes ALLOWED_ORIGINS tot.
+    it('accepts same-origin connections for arbitrary hosts', async () => {
+      const { default: WebSocket } = await import('ws');
+      const ws = new WebSocket(`ws://127.0.0.1:${port}`, {
+        headers: { Host: `testserver.intern:${port}` },
+        origin: `http://testserver.intern:${port}`,
+      });
+      const msg = await new Promise((resolve, reject) => {
+        ws.on('message', data => resolve(JSON.parse(data.toString())));
+        ws.on('error', reject);
+      });
+      assert.equal(msg.type, 'session_init');
+      ws.close();
+    });
+
+    it('rejects cross-origin connections', async () => {
+      const { default: WebSocket } = await import('ws');
+      const ws = new WebSocket(`ws://127.0.0.1:${port}`, {
+        origin: 'http://evil.example',
+      });
+      const result = await new Promise((resolve) => {
+        ws.on('unexpected-response', (_req, res) => resolve({ status: res.statusCode }));
+        ws.on('error', () => resolve({ status: 'error' }));
+        ws.on('open', () => resolve({ status: 'open' }));
+      });
+      assert.notEqual(result.status, 'open');
+      ws.close();
+    });
   });
 
   describe('MCP endpoints', () => {
