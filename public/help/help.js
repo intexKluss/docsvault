@@ -2,7 +2,7 @@
   'use strict';
 
   var chapters = [];
-  // hold full markdown for every chapter — search needs full text, dropping would force re-fetches
+  // hold full markdown for every chapter: search needs full text, dropping would force re-fetches
   var chapterTexts = Object.create(null);
   var currentId = null;
   var chaptersReady = false;
@@ -240,7 +240,7 @@
     });
     $article.innerHTML = clean;
 
-    // todo: demote first H1 to H2 (multiple H1s per SPA view) — skipped, chapter css targets h1 explicitly
+    // todo: demote first H1 to H2 (multiple H1s per SPA view): skipped, chapter css targets h1 explicitly
     var usedIds = Object.create(null);
     var headings = $article.querySelectorAll('h1, h2, h3, h4');
     headings.forEach(function (h) {
@@ -577,7 +577,7 @@
     });
   }
 
-  // cross-tab sync — newValue null means storage cleared, fall back to OS pref
+  // cross-tab sync: newValue null means storage cleared, fall back to OS pref
   window.addEventListener('storage', function (e) {
     if (e.key !== 'help-theme') return;
     if (e.newValue === 'dark' || e.newValue === 'light') {

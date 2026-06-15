@@ -10,12 +10,12 @@ import { handleStatus } from './tools/status.js';
 const sseSessions = new Map();
 
 // Obergrenze gleichzeitiger SSE-Verbindungen. Verhindert dass die sseSessions-Map
-// unbegrenzt waechst (eine haengende/nie geschlossene Verbindung = ein Server + Transport).
+// unbegrenzt wächst (eine hängende/nie geschlossene Verbindung = ein Server + Transport).
 const MAX_SSE_SESSIONS = parseInt(process.env.MAX_SSE_SESSIONS || '100', 10);
 
 // Unterscheidet den "unbekannte Section"-Fehler ({ error }) vom normalen
 // Treffer-Array (auch leer = kein Match). Nur ein Nicht-Array-Objekt mit
-// String-error gilt als Fehler; ein leeres Array bleibt ein gueltiges Ergebnis.
+// String-error gilt als Fehler; ein leeres Array bleibt ein gültiges Ergebnis.
 function isErrorResult(value) {
   return value != null
     && !Array.isArray(value)
@@ -27,14 +27,14 @@ function registerVaultTools(server, vault) {
   const { toolPrefix, description } = vault;
   const vaultPath = vault.path;
   const searchHint = vault.searchHint || '';
-  // generische Such-Strategie, hilft auch schwaecheren agents: nicht beim ersten
-  // Treffer aufhoeren, mehrgleisig suchen, die Seiten wirklich lesen
+  // generische Such-Strategie, hilft auch schwächeren agents: nicht beim ersten
+  // Treffer aufhören, mehrgleisig suchen, die Seiten wirklich lesen
   const strategy =
     `Search strategy: do not stop at the first hit or at the snippets alone. The matches are pointers, not the answer; open the relevant pages with ${toolPrefix}_read before you answer. If results are thin, search again with other terms (synonyms, German and English, method name and concept name). Different page types (concept/handbook vs API reference vs properties/config) hold different parts of the answer, so check more than one.`;
   // vault-spezifischer Hinweis aus _meta.json (optional)
   const vaultGuidance = searchHint ? `\n\nGuidance for this vault: ${searchHint}` : '';
 
-  // Jedes neue Tool hier muss auch in TOOL_SUFFIXES in vault-registry.js ergaenzt werden,
+  // Jedes neue Tool hier muss auch in TOOL_SUFFIXES in vault-registry.js ergänzt werden,
   // sonst wird es nicht in describeVaults()/System-Prompt auftauchen.
 
   server.tool(
@@ -142,8 +142,8 @@ export async function handleSseGet(req, res, vaultRegistry) {
   sseSessions.set(transport.sessionId, transport);
   res.on('close', () => {
     sseSessions.delete(transport.sessionId);
-    // Transport und Server beim Verbindungsabbruch aufraeumen, sonst bleiben
-    // sie samt Listenern haengen (Leak ueber viele Verbindungen).
+    // Transport und Server beim Verbindungsabbruch aufräumen, sonst bleiben
+    // sie samt Listenern hängen (Leak über viele Verbindungen).
     Promise.resolve(transport.close?.()).catch(() => {});
     Promise.resolve(server.close?.()).catch(() => {});
   });

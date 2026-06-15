@@ -1,8 +1,8 @@
 import { readdirSync, readFileSync, existsSync } from 'node:fs';
 import { join, resolve } from 'node:path';
 
-// Ordner die kein Vault-Content sind und uebersprungen werden (zusaetzlich
-// zu '.'- und '_'-Praefix). crawl = Crawler-Code, node_modules = Deps.
+// Ordner die kein Vault-Content sind und übersprungen werden (zusätzlich
+// zu '.'- und '_'-Präfix). crawl = Crawler-Code, node_modules = Deps.
 const SKIP_DIRS = new Set(['crawl', 'node_modules']);
 
 // true wenn der Ordner kein Vault-Content ist (Meta/Internal/Crawler/Deps).
@@ -41,7 +41,7 @@ function buildEntry(folderName, vaultDir, meta) {
   const toolPrefix = (meta?.toolPrefix && String(meta.toolPrefix).trim()) || slugify(folderName);
   const description = (meta?.description && String(meta.description).trim())
     || `Documentation vault '${name}'.`;
-  // optionaler vault-spezifischer Such-Hinweis, wird in die Tool-Beschreibungen eingehaengt
+  // optionaler vault-spezifischer Such-Hinweis, wird in die Tool-Beschreibungen eingehängt
   const searchHint = (meta?.searchHint && String(meta.searchHint).trim()) || '';
 
   return { name, description, toolPrefix, searchHint, path: vaultDir };
@@ -86,7 +86,7 @@ export function loadVaultRegistry(vaultsRoot) {
     return [];
   }
 
-  // stabile Reihenfolge fuer Kollisionsaufloesung (Folder-Name alphabetisch)
+  // stabile Reihenfolge für Kollisionsauflösung (Folder-Name alphabetisch)
   const folders = topLevel
     .filter(e => e.isDirectory() && !e.name.startsWith('.'))
     .map(e => e.name)
@@ -130,7 +130,7 @@ export function describeVaults(registry) {
 
   const lines = registry.map(v => {
     const tools = TOOL_SUFFIXES.map(s => `${v.toolPrefix}_${s}`).join(', ');
-    return `- **${v.name}** — ${v.description}\n  Tools: ${tools}`;
+    return `- **${v.name}**: ${v.description}\n  Tools: ${tools}`;
   });
 
   return lines.join('\n\n');

@@ -8,7 +8,7 @@ const __dirname = dirname(fileURLToPath(import.meta.url));
 const VAULTS_ROOT = process.env.VAULTS_ROOT || resolve(__dirname, '..', 'vaults');
 
 if (process.env.VAULT_PATH && !process.env.VAULTS_ROOT) {
-  console.error('[mcp-stdio] VAULT_PATH is deprecated — use VAULTS_ROOT (pointing to the parent dir containing vault folders).');
+  console.error('[mcp-stdio] VAULT_PATH is deprecated, use VAULTS_ROOT (pointing to the parent dir containing vault folders).');
 }
 
 try {

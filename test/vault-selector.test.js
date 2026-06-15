@@ -4,7 +4,7 @@ import { createServer } from '../src/server.js';
 import { createTempVaultsRoot } from './helpers/temp-vault.js';
 import { SessionManager } from '../src/session-manager.js';
 
-// Erfasst die Prefixes, die die Bridge kriegt, damit wir das Scoping pruefen koennen.
+// Erfasst die Prefixes, die die Bridge kriegt, damit wir das Scoping prüfen können.
 function spyBridge() {
   const calls = [];
   return {
@@ -60,8 +60,8 @@ describe('Server vault-selector websocket flow', () => {
   before(async () => {
     process.env.ALLOW_NO_ORIGIN = 'true';
     process.env.VAULTS_ROOT = VAULTS_ROOT;
-    // Bridge ueberschreiben gibt es nicht — wir testen nur die WS-Events, nicht das Warmup.
-    // Dafuer BRIDGE=claude lassen und einfach nie "send" aufrufen; warm-up wird durch die echte
+    // Bridge überschreiben gibt es nicht, wir testen nur die WS-Events, nicht das Warmup.
+    // Dafür BRIDGE=claude lassen und einfach nie "send" aufrufen; warm-up wird durch die echte
     // Bridge getriggert, aber da kein CLAUDE_PATH -> error im Log, aber WS-Events davor kommen an.
     const result = await createServer({ port: 0 });
     server = result.server;

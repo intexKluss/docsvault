@@ -1,6 +1,6 @@
 # Vault-Updates
 
-Vaults liegen ausserhalb des Docker-Images auf dem Host. Der Container wird nur neu gestartet, nicht neu gebaut.
+Die Vaults liegen außerhalb des Docker-Images auf dem Host. Der Container wird nur neu gestartet, nicht neu gebaut.
 
 Der otris-Vault hat sein eigenes Repo: [otris-docs-vault](https://github.com/intexKluss/otris-docs-vault).
 
@@ -34,7 +34,7 @@ git pull
 docker restart docsvault
 ```
 
-Fertig — kein Rebuild noetig.
+Fertig, kein Rebuild nötig.
 
 ## otris-Vault neu crawlen (Dev-Rechner, Playwright)
 
@@ -42,8 +42,8 @@ Der Crawler lebt im `otris-docs-vault`-Repo unter `crawl/`. Er schreibt direkt i
 
 ```bash
 cd /path/to/otris-docs-vault/crawl
-npm install             # einmalig — zieht playwright
-npm run crawl:login     # einmalig — browser-login, legt .auth.json an
+npm install             # einmalig, zieht playwright
+npm run crawl:login     # einmalig, browser-login, legt .auth.json an
 npm run crawl           # vault komplett neu scrapen
 ```
 
@@ -58,7 +58,7 @@ git push
 
 Danach auf dem Server `git pull` + `docker restart` (siehe oben).
 
-## Neuen Vault hinzufuegen (z.B. Intex-Regeln)
+## Neuen Vault hinzufügen (z.B. Intex-Regeln)
 
 Verzeichnis anlegen:
 
@@ -72,7 +72,7 @@ mkdir -p /srv/otris/vaults/<name>
 cat > /srv/otris/vaults/<name>/_meta.json <<'EOF'
 {
   "name": "Anzeigename",
-  "description": "Wofuer ist dieser Vault da? Landet in Tool-Descriptions.",
+  "description": "Wofür ist dieser Vault da? Landet in Tool-Descriptions.",
   "toolPrefix": "name"
 }
 EOF
@@ -86,7 +86,7 @@ docker restart docsvault
 
 ## Bestehenden Non-otris-Vault aktualisieren
 
-Dateien im Host-Verzeichnis aendern/austauschen, dann:
+Dateien im Host-Verzeichnis ändern oder austauschen, dann:
 
 ```bash
 docker restart docsvault
@@ -104,4 +104,4 @@ docker restart docsvault
 
 ## Warum kein Live-Reload?
 
-Mehrere Nutzer koennten sonst unterschiedlichen Tool-Stand sehen. Container-Restart haelt alle Sessions konsistent. Der Restart ist nur ein paar Sekunden.
+Sonst könnten mehrere Nutzer unterschiedlichen Tool-Stand sehen. Der Container-Restart hält alle Sessions konsistent und dauert eh nur ein paar Sekunden.

@@ -3,7 +3,7 @@ import assert from 'node:assert/strict';
 import { createServer } from '../src/server.js';
 import { createTempVaultsRoot } from './helpers/temp-vault.js';
 
-// minimaler fake-bridge fuer die ws-tests. warmUp ist sofort fertig, send liefert
+// minimaler fake-bridge für die ws-tests. warmUp ist sofort fertig, send liefert
 // einen kurzen stream. deterministisch, keine echten subprozesse.
 function fakeBridge() {
   return {
@@ -52,7 +52,7 @@ const { root: TEST_VAULTS_ROOT, cleanup: cleanupTestVaults } = createTempVaultsR
   'otris': {
     meta: { name: 'otris', description: 'Test otris vault', toolPrefix: 'otris' },
     files: {
-      'portalscript-api/DocFile.md': '# DocFile\n\nEine Klasse fuer Dateien.',
+      'portalscript-api/DocFile.md': '# DocFile\n\nEine Klasse für Dateien.',
       'portalscript-api/FileType.md': '# FileType\n\nDateityp-Klasse.',
       'howtos/upload.md': '# Upload\n\nDoc-Upload Anleitung.',
     },
@@ -76,7 +76,7 @@ describe('Server', () => {
     delete process.env.VAULTS_ROOT;
     cleanupTestVaults();
     server.close();
-    // force exit — bridge warmup keeps event loop alive
+    // force exit: bridge warmup keeps event loop alive
     setTimeout(() => process.exit(0), 500);
   });
 
@@ -194,7 +194,7 @@ describe('Server', () => {
       ws.close();
     });
 
-    // der server-ip-fall: seite wird ueber irgendeine ip/domain aufgerufen die
+    // der server-ip-fall: seite wird über irgendeine ip/domain aufgerufen die
     // weder localhost noch ALLOWED_ORIGINS ist. same-origin (Origin-host ==
     // Host-header) muss trotzdem reinkommen, sonst ist der web-chat auf jedem
     // deployment ohne exakt passendes ALLOWED_ORIGINS tot.
@@ -240,7 +240,7 @@ describe('Server', () => {
   });
 
   // eigener server mit injiziertem fake-bridge und 2 vaults (kein auto-warmup,
-  // select_vault wird gebraucht). low rate-limit fuer den spam-test.
+  // select_vault wird gebraucht). low rate-limit für den spam-test.
   describe('WebSocket select_vault + ordering', () => {
     let fbServer, fbPort;
     let fbCleanup;
@@ -275,10 +275,10 @@ describe('Server', () => {
       });
     }
 
-    // laeuft VOR dem spam-test, damit das per-IP rate-limit noch budget hat.
+    // läuft VOR dem spam-test, damit das per-IP rate-limit noch budget hat.
     it('does not lock the vault selector after a rejected first message', async () => {
       const ws = await connect();
-      // erste nachricht ist ungueltig (leer) -> validierung schlaegt fehl (vor dem
+      // erste nachricht ist ungültig (leer) -> validierung schlägt fehl (vor dem
       // rate-limit, verbraucht also kein budget). messageSent darf NICHT gesetzt werden.
       const errP = waitForType(ws, ['error'], 3000);
       ws.send(JSON.stringify({ type: 'message', content: '   ' }));
@@ -296,7 +296,7 @@ describe('Server', () => {
 
     it('rate-limits select_vault spam', async () => {
       const ws = await connect();
-      // rate-limit ist 3/min pro IP. abwechselnd va/vb waehlen, damit kein
+      // rate-limit ist 3/min pro IP. abwechselnd va/vb wählen, damit kein
       // duplikat-drop greift. sobald das budget aufgebraucht ist kommt der throttle.
       let throttled = false;
       for (let i = 0; i < 6; i++) {

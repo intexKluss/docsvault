@@ -1,7 +1,7 @@
 import { getSections, listFiles, getManifest } from './vault.js';
 
-// max. Anzahl Subfolder die inline pro Section in der Gesamt-Uebersicht
-// gelistet werden, bevor auf "+N weitere" gekuerzt wird (Punkt 16).
+// max. Anzahl Subfolder die inline pro Section in der Gesamt-Übersicht
+// gelistet werden, bevor auf "+N weitere" gekürzt wird (Punkt 16).
 const MAX_INLINE_SUBFOLDERS = 8;
 
 export function handleOverview(vaultPath, params, vaultName = 'Documentation') {
@@ -41,7 +41,7 @@ export function handleOverview(vaultPath, params, vaultName = 'Documentation') {
     let sfInfo = '';
     if (subfolders.size > 0) {
       const sorted = [...subfolders].sort();
-      // grosse Sections nicht voll auflisten, sonst sprengt es das Token-Budget
+      // große Sections nicht voll auflisten, sonst sprengt es das Token-Budget
       if (sorted.length > MAX_INLINE_SUBFOLDERS) {
         const shown = sorted.slice(0, MAX_INLINE_SUBFOLDERS).join(', ');
         const rest = sorted.length - MAX_INLINE_SUBFOLDERS;

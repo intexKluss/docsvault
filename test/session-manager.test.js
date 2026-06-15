@@ -33,8 +33,8 @@ function failingBridge(error) {
   };
 }
 
-// kontrollierbarer bridge: warmUp blockiert bis das zurueckgegebene deferred
-// manuell aufgeloest wird. so lassen sich race-conditions deterministisch testen.
+// kontrollierbarer bridge: warmUp blockiert bis das zurückgegebene deferred
+// manuell aufgelöst wird. so lassen sich race-conditions deterministisch testen.
 function controllableBridge(opts = {}) {
   const created = [];
   // optionaler gate vor dem session-build, um den createSession-phase-abbruch zu testen.
@@ -259,7 +259,7 @@ describe('SessionManager', () => {
       sessionB.release();
       await pB;
 
-      // jetzt loest A spaet auf, darf B aber NICHT ueberschreiben.
+      // jetzt löst A spät auf, darf B aber NICHT überschreiben.
       sessionA.release();
       await assert.rejects(() => pA);
 
@@ -278,15 +278,15 @@ describe('SessionManager', () => {
       const m = new SessionManager(bridge, { maxSessions: 5, rateLimitPerMin: 100, maxMessageLength: 100 });
 
       const p = m.createAndWarmUp('c', 'vaultA');
-      // placeholder steht im slot, createSession haengt noch.
+      // placeholder steht im slot, createSession hängt noch.
       assert.equal(m.sessionCount, 1);
 
-      // removeSession bricht den laufenden build ab und raeumt den slot.
+      // removeSession bricht den laufenden build ab und räumt den slot.
       await m.removeSession('c');
       assert.equal(m.sessionCount, 0);
 
-      // createSession aufloesen: ownership-guard sieht das abgebrochene signal
-      // und zerstoert die frisch gebaute session, statt sie einzuhaengen.
+      // createSession auflösen: ownership-guard sieht das abgebrochene signal
+      // und zerstört die frisch gebaute session, statt sie einzuhängen.
       bridge.releaseCreate();
       await assert.rejects(() => p, { message: 'Session superseded' });
       assert.equal(m.sessionCount, 0);
@@ -301,7 +301,7 @@ describe('SessionManager', () => {
       const p = m.createAndWarmUp('c', 'vaultA');
       const sessionA = await bridge.waitForStart(0);
 
-      // build haengt in warmUp, removeSession zerstoert die bereits eingehaengte session.
+      // build hängt in warmUp, removeSession zerstört die bereits eingehängte session.
       await m.removeSession('c');
       assert.equal(m.sessionCount, 0);
       assert.equal(sessionA.destroyed, true);
@@ -323,7 +323,7 @@ describe('SessionManager', () => {
         m.checkRateLimit('ip');
         m.checkRateLimit('ip');
         assert.throws(() => m.checkRateLimit('ip'), { message: /zu schnell/i });
-        // fenster ueberschreiten -> counter wird zurueckgesetzt.
+        // fenster überschreiten -> counter wird zurückgesetzt.
         fakeNow += 60001;
         assert.doesNotThrow(() => m.checkRateLimit('ip'));
       } finally {

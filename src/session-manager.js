@@ -41,8 +41,8 @@ export class SessionManager {
     try {
       session = await this.#bridge.createSession(toolPrefix);
       // ownership-check: wurde der platzhalter zwischenzeitlich ersetzt (anderer
-      // vault gewaehlt) oder via removeSession abgebrochen, gehoert uns der slot
-      // nicht mehr. session zerstoeren statt ueberschreiben, damit keine
+      // vault gewählt) oder via removeSession abgebrochen, gehört uns der slot
+      // nicht mehr. session zerstören statt überschreiben, damit keine
       // subprocesses leaken und nicht der falsche vault gewinnt.
       if (this.#sessions.get(clientId) !== placeholder || abortController.signal.aborted) {
         cleanedUp = true;
@@ -52,8 +52,8 @@ export class SessionManager {
       session.toolPrefix = toolPrefix;
       this.#sessions.set(clientId, session);
       await session.warmUp();
-      // ownership-check nach warmUp: ein spaeter aufloesender build darf die vom
-      // user tatsaechlich gewaehlte session nicht mehr klobbern.
+      // ownership-check nach warmUp: ein später auflösender build darf die vom
+      // user tatsächlich gewählte session nicht mehr klobbern.
       if (this.#sessions.get(clientId) !== session || abortController.signal.aborted) {
         cleanedUp = true;
         if (session?.destroy) { try { await session.destroy(); } catch {} }
@@ -61,8 +61,8 @@ export class SessionManager {
       }
       return session;
     } catch (err) {
-      // nur aufraeumen wenn der slot noch uns gehoert (platzhalter oder unsere
-      // session). sonst haben wir oben schon zerstoert oder ein anderer call besitzt
+      // nur aufräumen wenn der slot noch uns gehört (platzhalter oder unsere
+      // session). sonst haben wir oben schon zerstört oder ein anderer call besitzt
       // den slot und darf nicht angefasst werden.
       const current = this.#sessions.get(clientId);
       if (current === placeholder || current === session) {
@@ -93,7 +93,7 @@ export class SessionManager {
     const session = this.#sessions.get(clientId);
     this.#sessions.delete(clientId);
     // laufenden build (createSession/warmUp) abbrechen. der ownership-guard in
-    // createAndWarmUp sieht das abgebrochene signal und zerstoert die session.
+    // createAndWarmUp sieht das abgebrochene signal und zerstört die session.
     if (session?.abortController) {
       try { session.abortController.abort(); } catch {}
     }

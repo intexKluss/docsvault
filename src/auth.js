@@ -5,7 +5,7 @@ function configuredToken() {
   return typeof t === 'string' && t.length > 0 ? t : null;
 }
 
-// extrahiert das praesentierte token aus Authorization-Header oder ?token= query.
+// extrahiert das präsentierte token aus Authorization-Header oder ?token= query.
 // EventSource/SSE kann keine header setzen, darum auch query erlauben.
 function extractToken(req) {
   const auth = req.headers?.authorization;
@@ -26,7 +26,7 @@ function extractToken(req) {
   return null;
 }
 
-// timing-safe vergleich ohne crypto-import, laenge wird vorab geprueft.
+// timing-safe vergleich ohne crypto-import, länge wird vorab geprüft.
 function tokensMatch(presented, expected) {
   if (typeof presented !== 'string' || presented.length !== expected.length) return false;
   let diff = 0;
@@ -36,7 +36,7 @@ function tokensMatch(presented, expected) {
   return diff === 0;
 }
 
-// prueft ob die anfrage autorisiert ist. ohne konfiguriertes token immer true.
+// prüft ob die anfrage autorisiert ist. ohne konfiguriertes token immer true.
 export function wsAuthOk(req) {
   const expected = configuredToken();
   if (!expected) return true;

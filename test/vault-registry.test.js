@@ -22,7 +22,7 @@ describe('slugify', () => {
   }
 });
 
-describe('loadVaultRegistry — basic scan', () => {
+describe('loadVaultRegistry: basic scan', () => {
   it('scans one vault with full _meta.json', () => {
     const { root, cleanup } = createTempVaultsRoot({
       'otris': {
@@ -115,7 +115,7 @@ describe('loadVaultRegistry — basic scan', () => {
   });
 });
 
-describe('loadVaultRegistry — validation', () => {
+describe('loadVaultRegistry: validation', () => {
   it('skips vault with invalid toolPrefix (starts with digit)', () => {
     const { root, cleanup } = createTempVaultsRoot({
       'bad': { meta: { toolPrefix: '2fa' }, files: { 'a.md': '#' } },

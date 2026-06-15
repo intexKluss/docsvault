@@ -3,12 +3,12 @@ import { join, relative, basename, sep } from 'path';
 import { isSkippedDir } from '../vault-registry.js';
 
 // Modul-weiter Cache pro Vault. Vaults sind zwischen Crawls read-only, daher
-// koennen wir Manifest, Sections und einen Titel-/Pfad-Index halten und nur
+// können wir Manifest, Sections und einen Titel-/Pfad-Index halten und nur
 // invalidieren wenn sich die mtime von _manifest.json (fallback: Vault-Root)
-// aendert.
+// ändert.
 const cache = new Map(); // vaultPath -> { mtimeMs, manifest, sections, titleIndex }
 
-// Liefert die mtime die fuer die Invalidierung benutzt wird:
+// Liefert die mtime die für die Invalidierung benutzt wird:
 // bevorzugt _manifest.json, sonst der Vault-Root-Ordner.
 function vaultMtime(vaultPath) {
   try {
@@ -22,8 +22,8 @@ function vaultMtime(vaultPath) {
   }
 }
 
-// Holt (oder baut) den Cache-Eintrag fuer einen Vault. Invalidiert bei
-// mtime-Aenderung.
+// Holt (oder baut) den Cache-Eintrag für einen Vault. Invalidiert bei
+// mtime-Änderung.
 function getEntry(vaultPath) {
   const mtimeMs = vaultMtime(vaultPath);
   const existing = cache.get(vaultPath);
@@ -65,7 +65,7 @@ export function getCachedSections(vaultPath) {
 }
 
 // liest nur den Frontmatter-title aus einer Datei, ohne den ganzen Body zu
-// behalten. Guenstig genug fuer den Index-Aufbau.
+// behalten. Günstig genug für den Index-Aufbau.
 function readTitleOnly(filePath) {
   let raw;
   try {
@@ -110,7 +110,7 @@ function buildTitleIndex(vaultPath) {
   return index;
 }
 
-// gecachter Titel-/Pfad-Index: [{ path, name, title }] fuer alle .md-Dateien
+// gecachter Titel-/Pfad-Index: [{ path, name, title }] für alle .md-Dateien
 // (ohne Skip-Dirs). Lazy aufgebaut, geteilt von Suche, status und overview.
 export function getCachedTitleIndex(vaultPath) {
   const entry = getEntry(vaultPath);
@@ -120,7 +120,7 @@ export function getCachedTitleIndex(vaultPath) {
   return entry.titleIndex;
 }
 
-// Cache leeren (vor allem fuer Tests).
+// Cache leeren (vor allem für Tests).
 export function clearVaultCache(vaultPath) {
   if (vaultPath) cache.delete(vaultPath);
   else cache.clear();

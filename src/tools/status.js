@@ -13,7 +13,7 @@ export function handleStatus(vaultPath) {
   const sections = getSections(vaultPath);
 
   // pageCount aus dem Manifest bevorzugen statt den ganzen Baum zu walken
-  // (Punkt 15). Nur walken wenn das Manifest fehlt/unvollstaendig ist.
+  // (Punkt 15). Nur walken wenn das Manifest fehlt/unvollständig ist.
   function walkPageCount() {
     let total = 0;
     for (const sec of sections) {

@@ -29,12 +29,12 @@ async function loadBridge(bridgeMode, vaultRegistry) {
 }
 
 export async function createServer(opts = {}) {
-  // env vars erst zur laufzeit lesen, damit tests VAULTS_ROOT ueberschreiben koennen
+  // env vars erst zur laufzeit lesen, damit tests VAULTS_ROOT überschreiben können
   const bridgeMode = process.env.BRIDGE || 'claude';
   const vaultsRoot = process.env.VAULTS_ROOT || join(__dirname, '..', 'vaults');
 
   if (process.env.VAULT_PATH && !process.env.VAULTS_ROOT) {
-    console.warn('[server] VAULT_PATH is deprecated — use VAULTS_ROOT (pointing to the parent dir containing vault folders).');
+    console.warn('[server] VAULT_PATH is deprecated, use VAULTS_ROOT (pointing to the parent dir containing vault folders).');
   }
 
   const config = {
@@ -46,11 +46,11 @@ export async function createServer(opts = {}) {
 
   const vaultRegistry = loadVaultRegistry(vaultsRoot);
   if (vaultRegistry.length === 0) {
-    console.warn(`[server] WARNING: no vaults found under ${vaultsRoot} — LLM will have no tools.`);
+    console.warn(`[server] WARNING: no vaults found under ${vaultsRoot}, LLM will have no tools.`);
   } else {
     console.log(`[server] loaded ${vaultRegistry.length} vault(s): ${vaultRegistry.map(v => v.toolPrefix).join(', ')}`);
     if (vaultRegistry.length > 20) {
-      console.warn(`[server] WARNING: ${vaultRegistry.length} vaults = ${vaultRegistry.length * TOOL_SUFFIXES.length} tools — some agents may hit tool-count limits.`);
+      console.warn(`[server] WARNING: ${vaultRegistry.length} vaults = ${vaultRegistry.length * TOOL_SUFFIXES.length} tools, some agents may hit tool-count limits.`);
     }
   }
 
@@ -186,7 +186,7 @@ export async function createServer(opts = {}) {
     ws.messageQueue = [];
     ws.processing = false;
     ws.messageSent = false;
-    // in-flight warm-up guard: hoechstens ein warm-up pro verbindung gleichzeitig.
+    // in-flight warm-up guard: höchstens ein warm-up pro verbindung gleichzeitig.
     ws.warmUp = null;
 
     ws.on('pong', () => {
@@ -240,25 +240,25 @@ export async function createServer(opts = {}) {
 }
 
 // startet genau einen warm-up und merkt ihn als in-flight auf der verbindung.
-// gibt das promise zurueck, damit aufrufer darauf warten koennen.
+// gibt das promise zurück, damit aufrufer darauf warten können.
 function warmUpSession(ws, manager, clientId, toolPrefix) {
   const promise = manager.createAndWarmUp(clientId, toolPrefix).then(() => {
-    // stale-check: wenn der user zwischenzeitlich einen anderen vault gewaehlt hat,
+    // stale-check: wenn der user zwischenzeitlich einen anderen vault gewählt hat,
     // ist in der session-map bereits ein placeholder/session mit anderem toolPrefix.
-    // in dem fall kein session_ready mehr senden (der neue warmup uebernimmt).
+    // in dem fall kein session_ready mehr senden (der neue warmup übernimmt).
     const current = manager.getSessionRaw(clientId);
     if (!current || current.toolPrefix !== toolPrefix) return;
     if (ws.readyState !== 1) return;
     ws.send(JSON.stringify({ type: 'session_ready', toolPrefix }));
   }).catch((err) => {
-    // superseded ist erwartetes verhalten beim vault-wechsel, kein fehler fuer den user.
+    // superseded ist erwartetes verhalten beim vault-wechsel, kein fehler für den user.
     if (err.message === 'Session superseded') return;
     console.error(`[server] warm-up failed for ${clientId}: ${err.message}`);
     if (ws.readyState === 1) {
       ws.send(JSON.stringify({ type: 'error', message: 'Da ist leider etwas schiefgelaufen. Lade die Seite einfach neu.' }));
     }
   }).finally(() => {
-    // nur loeschen wenn es noch unser eintrag ist (kein neuerer warm-up gestartet).
+    // nur löschen wenn es noch unser eintrag ist (kein neuerer warm-up gestartet).
     if (ws.warmUp && ws.warmUp.promise === promise) ws.warmUp = null;
   });
   ws.warmUp = { toolPrefix, promise };
@@ -284,7 +284,7 @@ async function processQueue(ws, manager, req, vaultRegistry) {
 
 function getClientIp(req) {
   const peer = req.socket?.remoteAddress || 'unknown';
-  // x-forwarded-for ist trivial faelschbar. nur auswerten wenn explizit ein
+  // x-forwarded-for ist trivial fälschbar. nur auswerten wenn explizit ein
   // reverse proxy konfiguriert ist (TRUST_PROXY), sonst immer den socket-peer nehmen.
   if (!process.env.TRUST_PROXY) return peer;
 
@@ -294,7 +294,7 @@ function getClientIp(req) {
   if (chain.length === 0) return peer;
 
   // bei TRUST_PROXY=<n> die n rechten (vertrauten) hops abstreifen, wie express'
-  // trust-proxy-count. der naechste eintrag von rechts ist die echte client-ip.
+  // trust-proxy-count. der nächste eintrag von rechts ist die echte client-ip.
   const hops = parseInt(process.env.TRUST_PROXY, 10);
   if (Number.isInteger(hops) && hops > 0) {
     const idx = chain.length - 1 - hops;
@@ -408,12 +408,12 @@ async function handleSelectVault(ws, manager, msg, vaultRegistry, ip) {
     return;
   }
 
-  // in-flight warm-up guard: laeuft bereits ein warm-up auf dieser verbindung...
+  // in-flight warm-up guard: läuft bereits ein warm-up auf dieser verbindung...
   if (ws.warmUp) {
-    // ...fuer denselben vault, dann ist das ein duplikat, einfach droppen.
+    // ...für denselben vault, dann ist das ein duplikat, einfach droppen.
     if (ws.warmUp.toolPrefix === toolPrefix) return;
-    // ...fuer einen anderen vault, dann den laufenden erst abbrechen und abwarten,
-    // bevor der neue startet. so ist hoechstens ein warm-up gleichzeitig aktiv.
+    // ...für einen anderen vault, dann den laufenden erst abbrechen und abwarten,
+    // bevor der neue startet. so ist höchstens ein warm-up gleichzeitig aktiv.
     const previous = ws.warmUp.promise;
     try {
       await manager.removeSession(ws.clientId);

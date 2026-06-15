@@ -4,7 +4,7 @@ import { join } from 'node:path';
 import { handleOverview } from '../src/tools/overview.js';
 import { createTempVaultsRoot } from './helpers/temp-vault.js';
 
-// section mit 12 subfoldern -> muss auf 8 + "+N weitere" gekuerzt werden
+// section mit 12 subfoldern -> muss auf 8 + "+N weitere" gekürzt werden
 const bigFiles = {};
 for (let i = 1; i <= 12; i++) {
   const sf = `sub${String(i).padStart(2, '0')}`;
@@ -26,7 +26,7 @@ const VAULT_PATH = join(root, 'ov');
 after(cleanup);
 
 describe('handleOverview', () => {
-  // Punkt 16: grosse section wird gekuerzt
+  // Punkt 16: große section wird gekürzt
   it('caps inline subfolders for large sections', () => {
     const out = handleOverview(VAULT_PATH, {}, 'Test');
     assert.match(out, /\+4 weitere, nutze overview\(big\)/);

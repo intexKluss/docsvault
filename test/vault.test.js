@@ -14,29 +14,29 @@ const { root, cleanup } = createTempVaultsRoot({
   'otris': {
     meta: { toolPrefix: 'otris' },
     files: {
-      'api/DocFile.md': '---\ntitle: DocFile\nsource: https://example.com\n---\n# DocFile\n\n## Methoden\n\nEine Klasse fuer Dateien. Hat function upload() method.',
+      'api/DocFile.md': '---\ntitle: DocFile\nsource: https://example.com\n---\n# DocFile\n\n## Methoden\n\nEine Klasse für Dateien. Hat function upload() method.',
       'api/Interface.md': '# Interface\n\nJede Klasse hat Methoden und function-Definitionen.',
-      'howtos/upload.md': '# Upload\n\nSo laedst du etwas hoch. function upload() benutzen.',
-      // CRLF + frontmatter mit title das den Suchbegriff enthaelt
-      'api/Crlf.md': '---\r\ntitle: CrlfPage\r\nsource: https://example.com\r\n---\r\n# CrlfPage\r\n\r\nDiese Seite nutzt carriage returns ueberall.\r\n',
+      'howtos/upload.md': '# Upload\n\nSo lädst du etwas hoch. function upload() benutzen.',
+      // CRLF + frontmatter mit title das den Suchbegriff enthält
+      'api/Crlf.md': '---\r\ntitle: CrlfPage\r\nsource: https://example.com\r\n---\r\n# CrlfPage\r\n\r\nDiese Seite nutzt carriage returns überall.\r\n',
       // crawler-code, darf NICHT als section/treffer auftauchen
-      'crawl/crawler.md': '# crawler internals\n\nfunction crawl() laeuft hier.',
-      // umlaut-doc fuer folding-test: Titel und Body mit echtem ü
+      'crawl/crawler.md': '# crawler internals\n\nfunction crawl() läuft hier.',
+      // umlaut-doc für folding-test: Titel und Body mit echtem ü
       'api/Uebersicht.md': '---\ntitle: Übersicht\n---\n# Übersicht\n\nDiese Seite ist eine Übersicht ueber alles.',
       // kanonische API-Klasse, soll bei "context getDocument" trotz vieler
       // example-pages nach vorne kommen (rank-before-slice)
       'Scripting/PortalscriptAPI/classes/context.md': '---\ntitle: context\n---\n# context\n\nDie Klasse context stellt getDocument bereit.\n\n## getDocument\n\ncontext.getDocument() liefert das aktuelle Dokument.',
-      // frontmatter-only titleMatch: title enthaelt den Begriff, Body sonst nichts
-      'api/FrontOnly.md': '---\ntitle: SonderBegriffXyz\n---\n# Heading One\n\nIrgendein Fliesstext ohne den Begriff im Body.',
-      // viele example-pages die context erwaehnen, damit context.md sonst untergeht
+      // frontmatter-only titleMatch: title enthält den Begriff, Body sonst nichts
+      'api/FrontOnly.md': '---\ntitle: SonderBegriffXyz\n---\n# Heading One\n\nIrgendein Fließtext ohne den Begriff im Body.',
+      // viele example-pages die context erwähnen, damit context.md sonst untergeht
       'examples/ex01.md': '# Example 1\n\nNutzt context irgendwo.',
       'examples/ex02.md': '# Example 2\n\nNutzt context irgendwo.',
       'examples/ex03.md': '# Example 3\n\nNutzt context irgendwo.',
       'examples/ex04.md': '# Example 4\n\nNutzt context irgendwo.',
       'examples/ex05.md': '# Example 5\n\nNutzt context irgendwo.',
-      // doc fuer per-file-cap: viele Treffer derselben Datei
+      // doc für per-file-cap: viele Treffer derselben Datei
       'api/Many.md': '# Many\n\ntoken\ntoken\ntoken\ntoken\ntoken\ntoken\ntoken\ntoken\ntoken\ntoken\ntoken\ntoken\ntoken\ntoken\ntoken',
-      // doc fuer heading-targeting in readDoc
+      // doc für heading-targeting in readDoc
       'guides/Sections.md': '---\ntitle: Sections\n---\n# Sections\n\nIntro text.\n\n## Alpha\n\nAlpha body line.\n\n### Sub\n\nSub body.\n\n## Beta\n\nBeta body line.',
     },
   },
@@ -126,13 +126,13 @@ describe('Vault', () => {
       }
     });
 
-    // Punkt 17: heading-targeting gibt nur den passenden Abschnitt zurueck
+    // Punkt 17: heading-targeting gibt nur den passenden Abschnitt zurück
     it('returns only the requested heading section', () => {
       const doc = readDoc(VAULT_PATH, 'guides/Sections', 50000, { heading: 'Alpha' });
       assert.ok(doc);
       assert.match(doc.content, /## Alpha/);
       assert.match(doc.content, /Alpha body line/);
-      // Sub gehoert noch zu Alpha (tieferes Level)
+      // Sub gehört noch zu Alpha (tieferes Level)
       assert.match(doc.content, /Sub body/);
       // Beta ist eine eigene H2 -> nicht enthalten
       assert.doesNotMatch(doc.content, /Beta body line/);
@@ -140,7 +140,7 @@ describe('Vault', () => {
       assert.doesNotMatch(doc.content, /Intro text/);
     });
 
-    // Punkt 17: self-healing ueber basename wenn exakter pfad fehlt
+    // Punkt 17: self-healing über basename wenn exakter pfad fehlt
     it('self-heals a wrong path via basename match', () => {
       const doc = readDoc(VAULT_PATH, 'wrongdir/DocFile');
       assert.ok(doc);
@@ -176,7 +176,7 @@ describe('Vault', () => {
       assert.deepEqual(results, []);
     });
 
-    // Punkt 1: Frontmatter-Zeilen (---/title/source) duerfen keine Treffer sein
+    // Punkt 1: Frontmatter-Zeilen (---/title/source) dürfen keine Treffer sein
     it('does not return matches inside the frontmatter block', () => {
       const results = searchDocs(VAULT_PATH, 'DocFile');
       const doc = results.find(r => r.file === 'api/DocFile');
@@ -188,7 +188,7 @@ describe('Vault', () => {
       }
     });
 
-    // Punkt 2: jeder Treffer traegt die naechste vorausgehende Ueberschrift
+    // Punkt 2: jeder Treffer trägt die nächste vorausgehende Überschrift
     it('attaches the nearest preceding heading to each match', () => {
       const results = searchDocs(VAULT_PATH, 'upload');
       assert.ok(results.length > 0);
@@ -263,7 +263,7 @@ describe('Vault', () => {
       }
     });
 
-    // Punkt 3: rank-before-slice - kanonische Seite ueberlebt trotz vieler examples
+    // Punkt 3: rank-before-slice - kanonische Seite überlebt trotz vieler examples
     it('surfaces the canonical title page even with many example hits', () => {
       const results = searchDocs(VAULT_PATH, 'context', { maxResults: 3 });
       const ctx = results.find(r => r.file === 'Scripting/PortalscriptAPI/classes/context');
@@ -282,13 +282,13 @@ describe('Vault', () => {
       }
     });
 
-    // Punkt 5: context_lines wird auch fuer multi-token honoriert
+    // Punkt 5: context_lines wird auch für multi-token honoriert
     it('honors context_lines for multi-token queries', () => {
       const results = searchDocs(VAULT_PATH, 'Methoden upload', { contextLines: 2 });
       const doc = results.find(r => r.file === 'api/DocFile');
       assert.ok(doc);
       // bei context 2 muss es mehr als nur die reinen treffer-zeilen geben
-      assert.ok(doc.matches.length >= 2, 'multi-token ohne kontext zurueckgegeben');
+      assert.ok(doc.matches.length >= 2, 'multi-token ohne kontext zurückgegeben');
     });
 
     // Punkt 7: umlaut-folding - ae-query findet ä-doc
@@ -337,7 +337,7 @@ describe('Vault', () => {
           type: 'match',
           data: {
             path: { text: abs },
-            lines: { text: 'Diese Seite nutzt carriage returns ueberall.\r\n' },
+            lines: { text: 'Diese Seite nutzt carriage returns überall.\r\n' },
             line_number: 7,
           },
         }),
@@ -352,7 +352,7 @@ describe('Vault', () => {
       // kein trailing CR oder LF mehr
       assert.ok(!parsed[0].matches[0].text.endsWith('\r'));
       assert.ok(!parsed[0].matches[0].text.endsWith('\n'));
-      assert.match(parsed[0].matches[0].text, /carriage returns ueberall/);
+      assert.match(parsed[0].matches[0].text, /carriage returns überall/);
     });
 
     it('stops collecting after maxResults distinct files', () => {
@@ -393,7 +393,7 @@ describe('Vault', () => {
   });
 
   describe('handleRead self-healing', () => {
-    // Punkt 17: exakter pfad heilt ueber den index
+    // Punkt 17: exakter pfad heilt über den index
     it('heals a wrong path to the right document', () => {
       const res = handleRead(VAULT_PATH, { path: 'totally/wrong/DocFile' });
       assert.ok(!res.error, `sollte heilen, nicht erroren: ${JSON.stringify(res)}`);

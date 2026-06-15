@@ -34,7 +34,7 @@ const { root, cleanup } = createTempVaultsRoot({
 after(cleanup);
 
 describe('handleStatus', () => {
-  // Punkt 15: pageCount aus dem manifest wird ohne tree-walk uebernommen
+  // Punkt 15: pageCount aus dem manifest wird ohne tree-walk übernommen
   it('uses manifest.pageCount without walking the tree', () => {
     const res = handleStatus(join(root, 'withmanifest'));
     assert.equal(res.pages, 999, 'pageCount aus manifest muss gewinnen, nicht der walk (=2)');

@@ -1,8 +1,8 @@
 # MCP Tool für Entwickler
 
-Dein Coding-Agent (Claude Code, Codex CLI, Gemini CLI, VS Code Copilot, etc.) bekommt Zugriff auf alle auf dem Server konfigurierten Wissensbereiche (Vaults) — z.B. die otris DOCUMENTS Dokumentation plus interne Firmenregeln. Die Inhalte liegen auf dem Server, du brauchst keinen eigenen Vault.
+Dein Coding-Agent (Claude Code, Codex CLI, Gemini CLI, VS Code Copilot, etc.) bekommt Zugriff auf alle Wissensbereiche (Vaults) die auf dem Server konfiguriert sind. Also z.B. die otris DOCUMENTS Dokumentation plus die internen Firmenregeln. Die Inhalte liegen auf dem Server, du brauchst keinen eigenen Vault.
 
-Welche Vaults der Server bereitstellt siehst du unter `http://SERVER-IP:3000/api/vaults`. Pro Vault gibt es fünf Tools mit dem `toolPrefix` aus der Vault-Konfiguration (z.B. `otris_search`, `intex_regeln_search`, ...).
+Welche Vaults der Server gerade bereitstellt siehst du unter `http://SERVER-IP:3000/api/vaults`. Pro Vault gibt es fünf Tools, benannt nach dem `toolPrefix` aus der Vault-Konfiguration (z.B. `otris_search`, `intex_regeln_search`, ...).
 
 ## Voraussetzungen
 
@@ -11,7 +11,7 @@ Welche Vaults der Server bereitstellt siehst du unter `http://SERVER-IP:3000/api
 
 ## Option 1: Remote MCP (empfohlen)
 
-Verbinde deinen Agent direkt per MCP-Netzwerkprotokoll mit dem Server. Keine lokale Installation nötig.
+Du verbindest deinen Agent direkt per MCP-Netzwerkprotokoll mit dem Server. Keine lokale Installation nötig.
 
 ### Claude Code
 
@@ -21,7 +21,7 @@ Per CLI (empfohlen):
 claude mcp add --transport sse --scope user docsvault http://SERVER-IP:3000/sse
 ```
 
-`--scope user` schreibt in `~/.claude.json` — damit ist der Server global verfügbar, auch in der VS Code Claude Code Extension.
+`--scope user` schreibt in `~/.claude.json`. Damit ist der Server global da, auch in der VS Code Claude Code Extension.
 
 Oder manuell in `.mcp.json` (im Projektordner, nur CLI):
 
@@ -73,7 +73,7 @@ Oder manuell in `~/.gemini/settings.json`:
 
 ### VS Code (GitHub Copilot)
 
-Voraussetzung: VS Code 1.99+, Copilot Extension, **Agent Mode** im Chat.
+Brauchst du: VS Code 1.99+, Copilot Extension, **Agent Mode** im Chat.
 
 Projekt-spezifisch in `.vscode/mcp.json`:
 
@@ -105,7 +105,7 @@ Oder global in den VS Code User Settings (`Ctrl+Shift+P` → "Preferences: Open 
 
 ## Option 2: REST API
 
-Für Agents oder Tools die kein MCP unterstützen. Jeder Vault hat seinen eigenen Prefix — welche verfuegbar sind, listet `/api/vaults`:
+Für Agents oder Tools die kein MCP können. Jeder Vault hat seinen eigenen Prefix, und welche verfügbar sind listet dir `/api/vaults`:
 
 ```bash
 # Welche Vaults existieren?
@@ -119,15 +119,15 @@ curl "http://SERVER-IP:3000/api/otris/status"
 # read: immer den exakten Pfad aus search/list nehmen (URL-encoded), nie selbst zusammenbauen
 curl "http://SERVER-IP:3000/api/otris/read?path=<exakter%20pfad%20aus%20search>"
 
-# Falls der Server weitere Vaults anbietet, analog:
+# Falls der Server noch weitere Vaults anbietet, analog:
 curl "http://SERVER-IP:3000/api/intex_regeln/search?query=commit"
 ```
 
-`SERVER-IP` immer durch die tatsächliche Server-Adresse ersetzen.
+`SERVER-IP` natürlich immer durch die echte Server-Adresse ersetzen.
 
 ## Verfügbare Tools
 
-Pro Vault registriert der Server fünf MCP-Tools mit dem `toolPrefix` aus der Vault-Konfiguration:
+Pro Vault registriert der Server fünf MCP-Tools, benannt nach dem `toolPrefix` aus der Vault-Konfiguration:
 
 | Tool | Beschreibung |
 |------|--------------|
@@ -137,7 +137,7 @@ Pro Vault registriert der Server fünf MCP-Tools mit dem `toolPrefix` aus der Va
 | `<prefix>_overview` | Übersicht über alle Bereiche und Sektionen |
 | `<prefix>_status` | Vault-Status und Aktualität prüfen |
 
-Beispiel: Beim Default-Setup heißt der otris-Vault-Prefix `otris` → Tools `otris_search`, `otris_read`, `otris_list`, `otris_overview`, `otris_status`. Ein zusätzlicher `intex-regeln`-Vault mit `toolPrefix: "intex_regeln"` bringt entsprechend `intex_regeln_search` usw.
+Beispiel: Beim Default-Setup heißt der otris-Vault-Prefix `otris`, also gibt es die Tools `otris_search`, `otris_read`, `otris_list`, `otris_overview`, `otris_status`. Ein zusätzlicher `intex-regeln`-Vault mit `toolPrefix: "intex_regeln"` bringt entsprechend `intex_regeln_search` usw.
 
 ## Testen
 

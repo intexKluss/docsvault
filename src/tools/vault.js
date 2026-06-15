@@ -4,7 +4,7 @@ import { execFileSync } from 'child_process';
 import { isSkippedDir } from '../vault-registry.js';
 import { getCachedManifest, getCachedSections, getCachedTitleIndex } from './vault-cache.js';
 
-// geteilte Obergrenze fuer Treffer pro Datei (Punkt 4). Beide Suchpfade
+// geteilte Obergrenze für Treffer pro Datei (Punkt 4). Beide Suchpfade
 // (single-token + multi-token) nutzen dieselbe Zahl damit ein einzelnes
 // Dokument die Antwort nicht flutet.
 const MAX_MATCHES_PER_FILE = 10;
@@ -58,8 +58,8 @@ function collectMdFiles(dir, vaultRoot, results) {
   }
 }
 
-// Liefert nur die gewuenschte Abschnittsabschnitt (von der passenden Ueberschrift
-// bis zur naechsten Ueberschrift gleichen oder hoeheren Levels). '' wenn nichts passt.
+// Liefert nur die gewünschte Abschnittsabschnitt (von der passenden Überschrift
+// bis zur nächsten Überschrift gleichen oder höheren Levels). '' wenn nichts passt.
 function extractHeadingSection(body, heading) {
   const wanted = heading.trim().toLowerCase();
   const lines = body.split('\n');
@@ -95,7 +95,7 @@ export function readDoc(vaultPath, docPath, maxLength = 50000, options = {}) {
   let resolvedPath = docPath;
   let filePath = join(vaultPath, docPath + '.md');
 
-  // Self-Healing (Punkt 17): wenn der exakte Pfad nicht existiert, ueber den
+  // Self-Healing (Punkt 17): wenn der exakte Pfad nicht existiert, über den
   // Titel-/Pfad-Index nach Basename/Titel suchen.
   if (!isInsideVault(vaultPath, filePath) || !existsSync(filePath)) {
     const healed = healDocPath(vaultPath, docPath);
@@ -119,7 +119,7 @@ export function readDoc(vaultPath, docPath, maxLength = 50000, options = {}) {
   let content = body;
   let truncated = false;
 
-  // optionales heading-Targeting: nur den passenden Abschnitt zurueckgeben
+  // optionales heading-Targeting: nur den passenden Abschnitt zurückgeben
   if (heading) {
     const section = extractHeadingSection(body, heading);
     if (section) {
@@ -140,10 +140,10 @@ export function readDoc(vaultPath, docPath, maxLength = 50000, options = {}) {
   };
 }
 
-// Versucht einen nicht gefundenen Pfad ueber den Titel-Index zu heilen.
-// Rueckgabe:
+// Versucht einen nicht gefundenen Pfad über den Titel-Index zu heilen.
+// Rückgabe:
 //  - { path } bei eindeutigem/besten Treffer
-//  - { error, candidates } wenn nur mehrdeutige Naehe-Treffer existieren
+//  - { error, candidates } wenn nur mehrdeutige Nähe-Treffer existieren
 //  - null wenn gar nichts passt
 function healDocPath(vaultPath, docPath) {
   const index = getCachedTitleIndex(vaultPath);
@@ -165,12 +165,12 @@ function healDocPath(vaultPath, docPath) {
     };
   }
 
-  // 2) Naehe-Treffer: Basename/Titel/Pfad enthaelt den gesuchten Basename.
-  // Anders als der exakte Treffer wird ein Naehe-Treffer NIE still als einzelnes
-  // Dokument aufgeloest. Ein blosser Substring (z.B. "doc" in "DocFile") ist
-  // inhaerent mehrdeutig und wuerde sonst stillschweigend das falsche Dokument
-  // liefern statt eines 404. Naehe-Treffer kommen daher immer als "did you mean"-
-  // Kandidaten zurueck; der Aufrufer entscheidet (handleRead -> error -> 404).
+  // 2) Nähe-Treffer: Basename/Titel/Pfad enthält den gesuchten Basename.
+  // Anders als der exakte Treffer wird ein Nähe-Treffer NIE still als einzelnes
+  // Dokument aufgelöst. Ein bloßer Substring (z.B. "doc" in "DocFile") ist
+  // inhärent mehrdeutig und würde sonst stillschweigend das falsche Dokument
+  // liefern statt eines 404. Nähe-Treffer kommen daher immer als "did you mean"-
+  // Kandidaten zurück; der Aufrufer entscheidet (handleRead -> error -> 404).
   const near = index.filter(e =>
     foldText(e.name.toLowerCase()).includes(wantedBase) ||
     foldText(e.title.toLowerCase()).includes(wantedBase) ||
@@ -186,9 +186,9 @@ function healDocPath(vaultPath, docPath) {
   return null;
 }
 
-// Baut einen Zeilen-Index fuer eine roh eingelesene Datei:
-//  - frontmatterEnd: 1-basierte Zeilennummer des schliessenden '---' (0 = kein Frontmatter)
-//  - headings: { line, text, level } aller Markdown-Ueberschriften (#, ##, ...)
+// Baut einen Zeilen-Index für eine roh eingelesene Datei:
+//  - frontmatterEnd: 1-basierte Zeilennummer des schließenden '---' (0 = kein Frontmatter)
+//  - headings: { line, text, level } aller Markdown-Überschriften (#, ##, ...)
 function buildLineIndex(raw) {
   const lines = raw.split('\n');
   let frontmatterEnd = 0;
@@ -212,7 +212,7 @@ function buildLineIndex(raw) {
   return { frontmatterEnd, headings, lines };
 }
 
-// Naechste vorausgehende Ueberschrift fuer eine Trefferzeile (oder '').
+// Nächste vorausgehende Überschrift für eine Trefferzeile (oder '').
 function headingForLine(headings, line) {
   let current = '';
   for (const h of headings) {
@@ -258,7 +258,7 @@ function foldText(str) {
 // 'ue' -> (?:ue|ü), 'ü' -> (?:ü|ue), 'ss' -> (?:ss|ß) usw. Der Token wird zuerst
 // regex-escaped, dann werden die gefoldeten Stellen zu Alternationen aufgeweitet.
 function tokenToFoldedPattern(token) {
-  // erst auf die gefaltete Form bringen, dann Stueck fuer Stueck escapen und
+  // erst auf die gefaltete Form bringen, dann Stück für Stück escapen und
   // an ae/oe/ue/ss Alternationen einsetzen.
   const folded = foldText(token);
   let out = '';
@@ -279,7 +279,7 @@ function foldedTokenRegex(token, flags = 'i') {
 
 // Tokenizer (Punkt 8): split auf Whitespace UND Identifier-trennende
 // Interpunktion (. ( ) [ ] :: ->), min length >= 2. Die Original-Phrase bleibt
-// fuer den Exact-Match-Boost separat erhalten.
+// für den Exact-Match-Boost separat erhalten.
 function tokenize(query) {
   return query
     .trim()
@@ -306,8 +306,8 @@ export function searchDocs(vaultPath, query, options = {}) {
   const tokens = tokenize(query);
   if (tokens.length === 0) return [];
 
-  // Kandidaten-Obergrenze fuer das Lesen: rg/node streamen in Pfad-Reihenfolge,
-  // nach ~maxResults*3 distinct Dateien hoeren wir auf zu sammeln (Punkt 2).
+  // Kandidaten-Obergrenze für das Lesen: rg/node streamen in Pfad-Reihenfolge,
+  // nach ~maxResults*3 distinct Dateien hören wir auf zu sammeln (Punkt 2).
   const candidateCap = maxResults * 3;
 
   if (tokens.length === 1) {
@@ -344,9 +344,9 @@ export function searchDocs(vaultPath, query, options = {}) {
     }
   }
 
-  // context_lines fuer multi-token nachreichen (Punkt 5): der Suchlauf lief mit
-  // Kontext 0; nach Ranking/Trim die gewuenschten Kontextzeilen um die
-  // ueberlebenden Treffer haengen.
+  // context_lines für multi-token nachreichen (Punkt 5): der Suchlauf lief mit
+  // Kontext 0; nach Ranking/Trim die gewünschten Kontextzeilen um die
+  // überlebenden Treffer hängen.
   const trimmed = ranked.slice(0, candidateCap);
   if (contextLines > 0) {
     attachContext(vaultPath, trimmed, contextLines);
@@ -355,7 +355,7 @@ export function searchDocs(vaultPath, query, options = {}) {
   return enrichResults(vaultPath, trimmed, tokens, query).slice(0, maxResults);
 }
 
-// Fuegt fuer multi-token-Ergebnisse die gewuenschten Kontextzeilen um jede
+// Fügt für multi-token-Ergebnisse die gewünschten Kontextzeilen um jede
 // Trefferzeile hinzu (Punkt 5). Liest jede Datei einmal.
 function attachContext(vaultPath, results, contextLines) {
   for (const result of results) {
@@ -383,7 +383,7 @@ function attachContext(vaultPath, results, contextLines) {
   }
 }
 
-// Titel-/Pfad-Vorlauf (Punkt 3): findet ueber den gecachten Titel-Index Dateien
+// Titel-/Pfad-Vorlauf (Punkt 3): findet über den gecachten Titel-Index Dateien
 // deren Basename oder Frontmatter-Titel auf IRGENDEINEN Token passt, und merged
 // diese (deduped by file) in das Ergebnis-Set BEVOR auf maxResults geschnitten
 // wird. So landet die kanonische Seite garantiert im Ranking.
@@ -405,7 +405,7 @@ function mergeTitleCandidates(vaultPath, searchPath, results, tokens, contextLin
     if (!tokenRes.some(re => re.test(hay))) continue;
 
     seen.add(entry.path);
-    // Body-Treffer fuer diese Kandidaten ziehen damit echte Snippets entstehen.
+    // Body-Treffer für diese Kandidaten ziehen damit echte Snippets entstehen.
     const matches = matchesForFile(vaultPath, entry.path, tokens, contextLines);
     results.push({ file: entry.path, title: entry.title, matches });
   }
@@ -413,7 +413,7 @@ function mergeTitleCandidates(vaultPath, searchPath, results, tokens, contextLin
   return results;
 }
 
-// Liest eine einzelne Datei und liefert Treffer-Zeilen (mit Kontext) fuer die
+// Liest eine einzelne Datei und liefert Treffer-Zeilen (mit Kontext) für die
 // gegebenen Tokens. Genutzt vom Titel-Vorlauf.
 function matchesForFile(vaultPath, relPath, tokens, contextLines) {
   let lines;
@@ -441,10 +441,10 @@ function matchesForFile(vaultPath, relPath, tokens, contextLines) {
   return matchingLines;
 }
 
-// Post-processing fuer beide Suchpfade (ripgrep + node fallback):
+// Post-processing für beide Suchpfade (ripgrep + node fallback):
 //  - filtert Treffer aus dem YAML-Frontmatter-Block raus
 //  - droppt leere/whitespace-only Treffer-Zeilen (Punkt 4)
-//  - haengt pro Treffer die naechste vorausgehende Ueberschrift als `heading` an
+//  - hängt pro Treffer die nächste vorausgehende Überschrift als `heading` an
 //  - markiert Dateien deren Titel/Pfad/Name auf einen Token passt mit `titleMatch`
 //  - vergibt einen numerischen `score` (graded titleMatch, Punkt 10) und sortiert danach
 //  - strippt trailing \r aus dem Treffer-Text
@@ -487,7 +487,7 @@ function enrichResults(vaultPath, results, tokens, query) {
       });
     }
 
-    // geteilte Obergrenze fuer Treffer pro Datei (Punkt 4): gilt fuer BEIDE
+    // geteilte Obergrenze für Treffer pro Datei (Punkt 4): gilt für BEIDE
     // Branches, damit auch single-token nicht eine Datei mit Treffern flutet.
     if (matches.length > MAX_MATCHES_PER_FILE) {
       matches.length = MAX_MATCHES_PER_FILE;
@@ -507,20 +507,20 @@ function enrichResults(vaultPath, results, tokens, query) {
       if (matches.length === 0) continue;
     }
 
-    // term-frequency ueber alle Treffer-Texte (klein gewichtet, Punkt 9)
+    // term-frequency über alle Treffer-Texte (klein gewichtet, Punkt 9)
     const bodyScore = scoreBody(matches, tokens);
     const score = titleScore + bodyScore;
 
     enriched.push({ ...result, matches, titleMatch, score });
   }
 
-  // hoeherer score zuerst, sonst stabile Eingangsreihenfolge
+  // höherer score zuerst, sonst stabile Eingangsreihenfolge
   enriched.sort((a, b) => b.score - a.score);
   return enriched;
 }
 
 // graded titleMatch (Punkt 10): liefert boolean titleMatch + numerischen Beitrag.
-//  - normalisierter Titel == Query -> grosser Boost
+//  - normalisierter Titel == Query -> großer Boost
 //  - alle Tokens im Titel -> mittlerer Boost
 //  - Basename/Pfad-Token-Treffer -> kleiner Boost
 function scoreTitle(result, tokens, query) {
@@ -595,7 +595,7 @@ function scoreBody(matches, tokens) {
 }
 
 // synthetisiert einen Snippet aus der ersten nicht-leeren Body-Zeile, sonst
-// aus der ersten Ueberschrift nach dem Frontmatter (Punkt 11).
+// aus der ersten Überschrift nach dem Frontmatter (Punkt 11).
 function synthesizeSnippet(lines, frontmatterEnd, headings) {
   for (let i = frontmatterEnd; i < lines.length; i++) {
     const text = lines[i].replace(/\r$/, '');
@@ -611,8 +611,8 @@ function synthesizeSnippet(lines, frontmatterEnd, headings) {
 }
 
 // Pre-Slice-Ranking: nutzt denselben Score wie enrichResults (titleScore +
-// bodyScore), damit titleMatch-Seiten den candidateCap-Slice ueberleben und
-// nicht hinter coverage-staerkeren Beispielseiten weggeschnitten werden.
+// bodyScore), damit titleMatch-Seiten den candidateCap-Slice überleben und
+// nicht hinter coverage-stärkeren Beispielseiten weggeschnitten werden.
 // Titel werden vorab aus dem Index nachgezogen (rg/node liefern leeren Titel),
 // sonst greift der Titel-Boost hier noch nicht.
 function rankByTokenCoverage(vaultPath, results, tokens, query) {
@@ -638,8 +638,8 @@ function rankByTokenCoverage(vaultPath, results, tokens, query) {
 // fixed: bei true wird -F/--fixed-strings gesetzt (literal match, Punkt 6).
 function searchWithRipgrep(vaultPath, searchPath, query, contextLines, maxResults, fixed) {
   // dieselbe Skip-Semantik wie der node-fallback: crawl/, node_modules/ und
-  // _-/.-praefixierte Ordner sind kein Vault-Content.
-  // --json (Punkt 1): strukturierter Stream loest CRLF-, greedy-regex- und
+  // _-/.-präfixierte Ordner sind kein Vault-Content.
+  // --json (Punkt 1): strukturierter Stream löst CRLF-, greedy-regex- und
   // embedded-path-Probleme in einem Schritt.
   const args = [
     '-i', '--json', '-C', String(contextLines),
@@ -685,7 +685,7 @@ function searchWithRipgrep(vaultPath, searchPath, query, contextLines, maxResult
 function foldVariants(query) {
   const out = new Set();
   out.add(foldText(query));
-  // umgekehrt: ae->ä etc. (nur die haeufigste Rueckrichtung)
+  // umgekehrt: ae->ä etc. (nur die häufigste Rückrichtung)
   out.add(query.toLowerCase()
     .replace(/ae/g, 'ä')
     .replace(/oe/g, 'ö')

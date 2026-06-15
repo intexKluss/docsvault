@@ -1,10 +1,10 @@
 # MCP mit deinem Coding-Agent nutzen
 
-Wenn der docsvault Server im LAN läuft, kannst du deinen Coding-Agent direkt damit verbinden — ohne lokale Installation. Der Agent bekommt dann direkten Zugriff auf otris-Dokumentation: suchen, lesen, auflisten.
+Wenn der docsvault Server im LAN läuft, kannst du deinen Coding-Agent direkt damit verbinden, ganz ohne lokale Installation. Der Agent bekommt dann direkten Zugriff auf die otris-Dokumentation: suchen, lesen, auflisten.
 
 ## Verfügbare Tools nach der Einrichtung
 
-Pro Wissensbereich (Vault) auf dem Server gibt es fünf Tools mit dem Vault-Prefix. Beim Standard-Setup mit nur dem otris-Vault sind das:
+Pro Wissensbereich (Vault) auf dem Server gibt es fünf Tools mit dem Vault-Prefix. Beim Standard-Setup mit nur dem otris-Vault sind das diese:
 
 | Tool | Funktion |
 |------|----------|
@@ -14,7 +14,7 @@ Pro Wissensbereich (Vault) auf dem Server gibt es fünf Tools mit dem Vault-Pref
 | `otris_overview` | Übersicht über verfügbare Inhalte |
 | `otris_status` | Serverstatus prüfen |
 
-Falls weitere Vaults konfiguriert sind (z.B. `intex-regeln`), kommen entsprechende Tools wie `intex_regeln_search` dazu. Die vollständige Liste liefert `http://<SERVER-IP>:3000/api/vaults`.
+Falls weitere Vaults konfiguriert sind (z.B. `intex-regeln`), kommen entsprechende Tools wie `intex_regeln_search` dazu. Die vollständige Liste liefert dir `http://<SERVER-IP>:3000/api/vaults`.
 
 ## Claude Code
 
@@ -26,7 +26,7 @@ claude mcp add --transport sse docsvault http://<SERVER-IP>:3000/sse
 
 ### Option B: Projekt-spezifisch (.mcp.json)
 
-Erstelle eine `.mcp.json` im Projektverzeichnis:
+Leg eine `.mcp.json` im Projektverzeichnis an:
 
 ```json
 {
@@ -52,7 +52,7 @@ Erstelle eine `.mcp.json` im Projektverzeichnis:
 }
 ```
 
-Starte Claude Code neu und prüfe mit `/mcp` ob der Server erkannt wird.
+Danach Claude Code neu starten und mit `/mcp` prüfen, ob der Server erkannt wird.
 
 ## Codex CLI
 
@@ -69,11 +69,11 @@ Oder manuell in `~/.codex/config.toml`:
 url = "http://<SERVER-IP>:3000/mcp"
 ```
 
-Prüfe danach mit `codex mcp list` ob der Server `docsvault` erscheint.
+Danach mit `codex mcp list` prüfen, ob der Server `docsvault` auftaucht.
 
-## Verbindung bricht weg? Auf Streamable HTTP (`/mcp`) umsteigen
+## Verbindung bricht weg? Dann auf Streamable HTTP (`/mcp`) umsteigen
 
-SSE (`/sse`, `type: sse`) ist der Legacy-Transport und braucht eine dauerhaft offene Verbindung. Hinter einem Reverse-Proxy (z.B. auf einem Docker-Dev-Server) wird diese Verbindung oft nach kurzer Idle-Zeit gekappt. Typisches Symptom: der Client zeigt kurz die Tools an, dann ist der Server wieder weg.
+SSE (`/sse`, `type: sse`) ist der Legacy-Transport und braucht eine dauerhaft offene Verbindung. Hinter einem Reverse-Proxy (z.B. auf einem Docker-Dev-Server) wird diese Verbindung oft schon nach kurzer Idle-Zeit gekappt. Typisches Symptom: der Client zeigt kurz die Tools an, dann ist der Server wieder weg.
 
 Lösung: statt `/sse` den moderneren Streamable-HTTP-Endpunkt `/mcp` nutzen (`type: http`). Der hängt nicht an einer Dauerverbindung und kommt mit Proxies deutlich besser klar.
 
@@ -96,7 +96,7 @@ claude mcp add --transport http docsvault http://<SERVER-IP>:3000/mcp
 }
 ```
 
-Codex nutzt ohnehin schon `/mcp` (siehe oben). Hinter HTTPS entsprechend `https://...` statt `http://...`.
+Codex nutzt sowieso schon `/mcp` (siehe oben). Hinter HTTPS entsprechend `https://...` statt `http://...`.
 
 ## Hinweis
 

@@ -1,6 +1,6 @@
-# docsvault — Architektur
+# docsvault: Architektur
 
-Web-Chat UI für die otris DOCUMENTS Dokumentation. Bot nutzt entweder Claude Agent SDK oder OpenAI Codex SDK. Die MCP-Tools (search, read, list, overview, status) sind direkt im Server internalisiert (`src/tools/`).
+Web-Chat UI für die otris DOCUMENTS Dokumentation. Der Bot läuft entweder über das Claude Agent SDK oder das OpenAI Codex SDK. Die MCP-Tools (search, read, list, overview, status) stecken direkt im Server drin, kein externer Tool-Server nötig (`src/tools/`).
 
 ## Dateistruktur
 
@@ -12,7 +12,7 @@ src/
   codex-bridge.js        Bridge zu OpenAI Codex SDK (@openai/codex-sdk)
   api-routes.js          REST API für externe MCP-Clients
   mcp-handler.js         MCP SSE + Streamable HTTP Endpoints (createMcpServer, version 0.2.0)
-  mcp-stdio.js           MCP stdio-Transport (lokaler Start ohne HTTP-Server, z.B. fuer CLI-Clients)
+  mcp-stdio.js           MCP stdio-Transport (lokaler Start ohne HTTP-Server, z.B. für CLI-Clients)
   vault-registry.js      Vault-Discovery, _meta.json, toolPrefix, describeVaults()
   system-prompt.js       System-Prompt mit Safety- + Behavior-Rules
   tools/                 Internalisierte Tool-Handler (vault, search, read, list, overview, status)
@@ -24,7 +24,7 @@ public/
   help/                  Installationshilfe
 ```
 
-Transporte fuer die MCP-Tools: SSE (`/sse` + `/messages`), Streamable HTTP (`/mcp`) und stdio (`src/mcp-stdio.js`, fuer lokal gestartete MCP-Clients ohne laufenden HTTP-Server).
+Transporte für die MCP-Tools: SSE (`/sse` + `/messages`), Streamable HTTP (`/mcp`) und stdio (`src/mcp-stdio.js`, für lokal gestartete MCP-Clients ohne laufenden HTTP-Server).
 
 ## Architektur-Überblick
 
@@ -52,7 +52,7 @@ vaults/
 
 ## Bridge-Switching
 
-Per Environment Variable:
+Läuft komplett über eine Environment Variable:
 
 ```bash
 npm run dev           # Claude (default)
@@ -66,10 +66,10 @@ npm run dev:claude    # Claude (explizit)
 | Model (fast) | claude-sonnet-4-6 | gpt-5.4 |
 | Model (thorough) | claude-opus-4-6 | gpt-5.4 (Prompt-Prefix) |
 | Session | `query()` mit `--resume` | `thread.runStreamed()` (persistent) |
-| Mode-Steuerung | Model + maxTurns wechsel | Prompt-Prefix pro Nachricht |
+| Mode-Steuerung | Model + maxTurns wechseln | Prompt-Prefix pro Nachricht |
 | Tool Events | `message.type === 'assistant'/'tool'/'result'` | `event.type === 'item.started/completed'` |
 
-Beide Bridges exportieren das gleiche Interface:
+Beide Bridges exportieren dasselbe Interface, austauschbar ohne dass der Rest was merkt:
 - `createSession()` → `{ warmUp(), send(content, mode), destroy(), ready, destroyed }`
 
 ## WebSocket-Protokoll
@@ -78,8 +78,8 @@ Beide Bridges exportieren das gleiche Interface:
 
 ```js
 { type: 'session_init' }                                     // Session wird erstellt
-{ type: 'vaults', list: [{ toolPrefix, name, description }] } // verfuegbare Vaults (direkt nach Connect)
-{ type: 'session_ready', toolPrefix: 'otris' }               // Warm-up fertig, Input frei (mit gewaehltem Vault)
+{ type: 'vaults', list: [{ toolPrefix, name, description }] } // verfügbare Vaults (direkt nach Connect)
+{ type: 'session_ready', toolPrefix: 'otris' }               // Warm-up fertig, Input frei (mit gewähltem Vault)
 { type: 'chunk', content: '...' }                            // Text-Stream
 { type: 'tool_use', tool: 'otris_search', status: 'running' } // Tool gestartet
 { type: 'tool_use', tool: 'otris_search', status: 'done' }    // Tool fertig
@@ -91,27 +91,27 @@ Beide Bridges exportieren das gleiche Interface:
 ### Client → Server
 
 ```js
-{ type: 'select_vault', toolPrefix: 'otris' }                // Vault waehlen (vor erster Nachricht)
+{ type: 'select_vault', toolPrefix: 'otris' }                // Vault wählen (vor erster Nachricht)
 { type: 'message', content: '...', mode: 'fast'|'thorough' } // Chat-Nachricht
 { type: 'report', description: '...', chatContext: [...] }    // Bug-Report
 ```
 
 ## Session-Lifecycle
 
-1. **Connect**: Client öffnet WebSocket → Server sendet `session_init` und direkt danach `vaults` (Liste aller verfuegbaren Vaults)
-2. **Vault-Auswahl**: Bei genau 1 Vault waermt der Server automatisch auf. Bei 2+ Vaults wartet er auf `select_vault` vom Client (das Frontend schickt den Default direkt mit). Nach der ersten `message` ist der Vault gelockt, ein spaeteres `select_vault` wird ignoriert.
-3. **Warm-Up**: Bridge erstellt Session, sendet Init-Query → Server sendet `session_ready` (inkl. `toolPrefix` des gewaehlten Vaults)
-4. **Chat**: Client sendet `message` → Server streamt `tool_use`/`chunk`/`done`
-5. **Disconnect**: WebSocket schließt → Session wird sofort destroyed
+1. **Connect**: Client öffnet WebSocket, Server schickt `session_init` und direkt danach `vaults` (Liste aller verfügbaren Vaults)
+2. **Vault-Auswahl**: Bei genau 1 Vault wärmt der Server automatisch auf. Bei 2+ Vaults wartet er auf `select_vault` vom Client (das Frontend schickt den Default gleich mit). Sobald die erste `message` durch ist, ist der Vault gelockt, ein späteres `select_vault` wird einfach ignoriert.
+3. **Warm-Up**: Bridge erstellt die Session, schickt eine Init-Query, Server antwortet mit `session_ready` (inkl. `toolPrefix` des gewählten Vaults)
+4. **Chat**: Client schickt `message`, Server streamt `tool_use`/`chunk`/`done`
+5. **Disconnect**: WebSocket schließt, Session wird sofort destroyed
 
-Kein Reconnect, kein Session-Persist. Jeder Page-Load = neue Session.
+Kein Reconnect, kein Session-Persist. Jeder Page-Load ist eine frische Session.
 
 ## MCP-Integration
 
-Tools sind in `src/tools/` internalisiert und werden über drei Wege bereitgestellt:
+Die Tools liegen in `src/tools/` und kommen über drei Wege raus:
 1. **Intern (Bridges)**: Claude Bridge verbindet sich per MCP SSE zum eigenen Server
 2. **MCP SSE** (`/sse` + `/messages`): Für externe MCP-Clients (Claude Code, Codex CLI, VS Code Copilot)
-3. **REST API** (`/api/*`): Für einfache HTTP-Clients
+3. **REST API** (`/api/*`): Für simple HTTP-Clients
 4. **MCP Streamable HTTP** (`/mcp`): Alternatives MCP-Transportprotokoll
 
 | Tool | Zweck |
@@ -124,8 +124,8 @@ Tools sind in `src/tools/` internalisiert und werden über drei Wege bereitgeste
 
 > Pro Vault werden diese 5 Tools mit dem `toolPrefix` aus `_meta.json` registriert.
 
-Claude Bridge: Explizit als `allowedTools` + `disallowedTools` (alle Built-in Tools gesperrt).
-Codex Bridge: Nutzt MCP über Codex CLI Config.
+Claude Bridge: explizit über `allowedTools` + `disallowedTools` (alle Built-in Tools gesperrt).
+Codex Bridge: nutzt MCP über die Codex CLI Config.
 
 ## Environment Variables
 
@@ -137,33 +137,33 @@ Codex Bridge: Nutzt MCP über Codex CLI Config.
 | `MAX_SESSIONS` | `50` | Max gleichzeitige Sessions |
 | `RATE_LIMIT_PER_MIN` | `10` | Max WebSocket-Messages pro Minute/IP |
 | `MAX_MESSAGE_LENGTH` | `2000` | Max Zeichen pro Nachricht |
-| `TRUST_PROXY` | — | Express trust proxy (für Reverse Proxy) |
-| `ALLOW_NO_ORIGIN` | `false` | WebSocket ohne Origin-Header erlauben (für REST/MCP-Clients noetig) |
-| `ALLOWED_ORIGINS` | — | Komma-separierte erlaubte WebSocket-Origins |
-| `CLAUDE_PATH` | — | Pfad zur Claude Code CLI |
-| `CODEX_PATH` | — | Pfad zur Codex CLI |
+| `TRUST_PROXY` | kein | Express trust proxy (für Reverse Proxy) |
+| `ALLOW_NO_ORIGIN` | `false` | WebSocket ohne Origin-Header erlauben (für REST/MCP-Clients nötig) |
+| `ALLOWED_ORIGINS` | kein | Komma-separierte erlaubte WebSocket-Origins |
+| `CLAUDE_PATH` | kein | Pfad zur Claude Code CLI |
+| `CODEX_PATH` | kein | Pfad zur Codex CLI |
 | `CODEX_MODEL` | `gpt-5.4` | Model für Codex Bridge |
 | `MCP_CWD` | Projekt-Root | Arbeitsverzeichnis für MCP |
 | `MCP_SSE_URL` | `http://localhost:$PORT/sse` | SSE-URL für Claude Bridge MCP-Verbindung |
 | `API_RATE_LIMIT_PER_MIN` | `60` | Max REST API Requests pro Minute/IP |
-| `API_TOKEN` | — | Wenn gesetzt: erzwingt Bearer-Token-Auth (`Authorization: Bearer <TOKEN>`) auf `/api`, `/sse`, `/messages`, `/mcp` und dem WebSocket. Unset = offen (Default) |
+| `API_TOKEN` | kein | Wenn gesetzt: erzwingt Bearer-Token-Auth (`Authorization: Bearer <TOKEN>`) auf `/api`, `/sse`, `/messages`, `/mcp` und dem WebSocket. Unset = offen (Default) |
 
 ## Frontend (app.js)
 
 ### Features
 - **Typewriter-Effekt**: Chunks werden zeichenweise gerendert (3 chars/12ms)
 - **Tool-Block**: Klappbarer Fortschrittsblock ("Doku wird durchsucht..." → "X Quellen durchsucht")
-- **Auto-Scroll**: Stoppt bei manuellem Hochscrollen (wheel/touch), Scroll-to-Bottom Button
-- **Speed Toggle**: Schnell (Lightning) / Gründlich (Search) — sendet `mode` mit
-- **Bug-Report**: Overlay-Modal, sammelt letzte 10 Chat-Messages als Kontext
+- **Auto-Scroll**: Stoppt sobald man manuell hochscrollt (wheel/touch), plus Scroll-to-Bottom Button
+- **Speed Toggle**: Schnell (Lightning) / Gründlich (Search), schickt `mode` mit
+- **Bug-Report**: Overlay-Modal, sammelt die letzten 10 Chat-Messages als Kontext
 - **Session-Status**: "Wird vorbereitet..." → "Bereit" mit Fade-Out
 - **Markdown**: marked.js + highlight.js + DOMPurify (XSS-Schutz)
 
 ### Cancel-Mechanismus
-1. Client schließt WebSocket (`ws.onmessage = null, ws.close()`)
-2. Server erkennt `ws.readyState !== 1` → bricht Generator ab
-3. Bridge: `AbortController.abort()` killt laufende SDK-Query
-4. Client öffnet neuen WebSocket → neue Session
+1. Client schließt den WebSocket (`ws.onmessage = null, ws.close()`)
+2. Server merkt `ws.readyState !== 1` und bricht den Generator ab
+3. Bridge: `AbortController.abort()` killt die laufende SDK-Query
+4. Client öffnet einen neuen WebSocket, frische Session
 
 ## Sicherheit
 
@@ -172,11 +172,11 @@ Codex Bridge: Nutzt MCP über Codex CLI Config.
 - **Rate Limiting**: IP-basiert, proxy-aware via `trust proxy` (WebSocket + REST)
 - **WebSocket**: Origin-Validierung, 16KB Payload-Limit, Heartbeat
 - **XSS**: DOMPurify auf allen Markdown-Outputs, `CSS.escape` in Selektoren
-- **Error Filtering**: Generische Messages an Client, keine Internals
+- **Error Filtering**: generische Messages an den Client, keine Internals
 - **Bug Reports**: JSONL append-only (keine Race Condition), chatContext sanitized
-- **Auth (opt-in)**: `API_TOKEN` aktiviert Bearer-Token-Auth auf `/api`, `/sse`, `/messages`, `/mcp` und dem WebSocket. Ohne `API_TOKEN` sind diese Endpoints offen.
+- **Auth (opt-in)**: `API_TOKEN` schaltet Bearer-Token-Auth auf `/api`, `/sse`, `/messages`, `/mcp` und dem WebSocket frei. Ohne `API_TOKEN` sind diese Endpoints offen.
 
-> **Wichtig, keine Illusionen:** Die Origin-Validierung schuetzt **nur den WebSocket**. REST (`/api`) und MCP (`/sse`, `/messages`, `/mcp`) haben **keinen Origin-Check** und ohne gesetztes `API_TOKEN` **keine Auth**. Wer den Port erreicht, kann den Vault lesen. Rate Limiting bremst Missbrauch, ist aber keine Zugriffskontrolle. Fuer oeffentliche Deployments `API_TOKEN` setzen oder den Port hinter Reverse Proxy / VPN dichtmachen.
+> **Wichtig, mach dir keine Illusionen:** Die Origin-Validierung schützt **nur den WebSocket**. REST (`/api`) und MCP (`/sse`, `/messages`, `/mcp`) haben **keinen Origin-Check** und ohne gesetztes `API_TOKEN` auch **keine Auth**. Wer den Port erreicht, kann den Vault lesen. Rate Limiting bremst Missbrauch, ist aber keine Zugriffskontrolle. Für öffentliche Deployments also `API_TOKEN` setzen oder den Port hinter Reverse Proxy / VPN dichtmachen.
 
 ## Dependencies
 

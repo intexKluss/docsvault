@@ -3,7 +3,7 @@ import { mkdtempSync, writeFileSync, mkdirSync, rmSync } from 'node:fs';
 import { join } from 'node:path';
 import { tmpdir } from 'node:os';
 
-// Erstellt ein temporaeres VAULTS_ROOT mit beliebigen Vaults darin.
+// Erstellt ein temporäres VAULTS_ROOT mit beliebigen Vaults darin.
 // vaults: { [folderName]: { meta?: object, files?: { [relPath]: string } } }
 // Returns: { root: string, cleanup: () => void }
 export function createTempVaultsRoot(vaults = {}) {

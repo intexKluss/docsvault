@@ -2,25 +2,25 @@
 
 ## Konfiguration
 
-### Option A: CLI-Befehl (empfohlen)
+### Option A: Über die CLI (der einfache Weg)
 
 ```bash
 codex mcp add docsvault --url http://<SERVER-IP>:3000/mcp
 ```
 
-### Option B: Manuell in ~/.codex/config.toml
+### Option B: Von Hand in ~/.codex/config.toml eintragen
 
 ```toml
 [mcp_servers.docsvault]
 url = "http://<SERVER-IP>:3000/mcp"
 ```
 
-Ersetze `<SERVER-IP>` durch die IP des Servers (z.B. `192.168.2.100`).
+Ersetz `<SERVER-IP>` durch die IP deines Servers (z.B. `192.168.2.100`).
 
-## Verifizierung
+## Kurz prüfen ob alles läuft
 
 ```bash
 codex mcp list
 ```
 
-Der Server `docsvault` sollte in der Liste erscheinen mit Status `enabled`.
+Der Server `docsvault` sollte jetzt in der Liste auftauchen, mit Status `enabled`. Wenn ja, passt alles.

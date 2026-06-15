@@ -11,7 +11,7 @@ describe('Multi-vault integration', () => {
       meta: { name: 'otris', toolPrefix: 'otris', description: 'otris Doku' },
       files: {
         'api/DocFile.md': '# DocFile\n\nDas ist eine otris-API-Klasse zur Dateiverwaltung.',
-        'howtos/upload.md': '# Upload\n\nSo laedst du Dateien hoch.',
+        'howtos/upload.md': '# Upload\n\nSo lädst du Dateien hoch.',
       },
     },
     'intex-regeln': {

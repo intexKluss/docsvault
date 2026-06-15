@@ -60,18 +60,29 @@
 
   const PLACEHOLDERS = [
     'Wo stehst du auf dem Schlauch?',
-    'Was moechtest du wissen?',
+    'Was möchtest du wissen?',
     'Wie kann ich helfen?',
     'Stell mir eine Frage zur Doku...',
     'Was suchst du in der Dokumentation?',
     'Wobei brauchst du Hilfe?',
+    'Welches Dokument versteckt sich vor dir?',
+    'Bevor du den Aktenkeller durchwühlst: frag mich',
+    'Welche Akte raubt dir gerade den Schlaf?',
+    'Papierstau im Kopf? Einfach fragen.',
+    'Suchst du die Nadel im Akten-Heuhaufen?',
+    'Welches PDF macht dir gerade Ärger?',
   ];
 
   const INIT_MESSAGES = [
-    'Wir richten alles fuer dich ein...',
+    'Wir richten alles für dich ein...',
     'Einen kleinen Moment noch...',
     'Wird alles vorbereitet...',
     'Gleich kann es losgehen...',
+    'Wir sortieren noch schnell die Akten...',
+    'Der Aktenschrank wird aufgeschlossen...',
+    'Wir heften alles sauber ab...',
+    'Noch schnell den Locher nachladen...',
+    'Wir wischen den Staub vom Archiv...',
   ];
 
   function randomFrom(arr) {
@@ -123,7 +134,7 @@
     } else {
       vaultSelectorEl.classList.add('hidden');
       updateVaultBadge();
-      // Single-vault-case: Server waermt selbst, kein select_vault noetig
+      // Single-vault-case: Server wärmt selbst, kein select_vault nötig
     }
 
     landingInput.placeholder = sessionReady ? buildInputPlaceholder() : randomFrom(INIT_MESSAGES);
@@ -160,7 +171,7 @@
       btn.setAttribute('aria-selected', isActive ? 'true' : 'false');
     });
     updateVaultBadge();
-    // Umschalten heisst: Server baut Session neu auf -> ab jetzt wieder warten
+    // Umschalten heißt: Server baut Session neu auf -> ab jetzt wieder warten
     sessionReady = false;
     landingInput.disabled = true;
     landingSend.disabled = true;
@@ -220,7 +231,7 @@
   }
 
   // status setzen: icon ist trusted svg-konstante, text via textContent (kein innerHTML
-  // fuer dynamische werte wie vault-namen)
+  // für dynamische werte wie vault-namen)
   function setSessionStatus(iconSvg, text) {
     if (!sessionStatus) return;
     sessionStatus.innerHTML = iconSvg || '';
@@ -241,8 +252,8 @@
   let typewriterTimer = null;
   const CHARS_PER_TICK = 3;
   const TICK_MS = 12;
-  // render throttle: text-buffer waechst jeden tick, aber das teure marked.parse +
-  // sanitize laeuft nur ~alle 60ms statt jede 12ms (sonst O(n^2) auf wachsendem doku)
+  // render throttle: text-buffer wächst jeden tick, aber das teure marked.parse +
+  // sanitize läuft nur ~alle 60ms statt jede 12ms (sonst O(n^2) auf wachsendem doku)
   const RENDER_MS = 60;
   let lastRenderTs = 0;
 
@@ -271,7 +282,7 @@
   // muss zum server-default passen (MAX_MESSAGE_LENGTH, src/session-manager.js)
   const MAX_MESSAGE_LENGTH = 2000;
 
-  // gemeinsame aufraeumlogik: typewriter leeren, laufenden tool-block abschliessen,
+  // gemeinsame aufräumlogik: typewriter leeren, laufenden tool-block abschließen,
   // leere ai-bubble entfernen. die input-freigabe machen die aufrufer selbst, weil
   // cancel/onclose/error/timeout sie unterschiedlich behandeln.
   function finalizeActiveResponse() {
@@ -423,7 +434,7 @@
         break;
 
       case 'session_ready':
-        // stale session_ready vom vorherigen vault ignorieren — kann bei schnellem
+        // stale session_ready vom vorherigen vault ignorieren, kann bei schnellem
         // switch passieren, wenn der alte warmup erst nach dem neuen fertig wird
         if (typeof msg.toolPrefix === 'string' && activeVaultPrefix && msg.toolPrefix !== activeVaultPrefix) {
           break;
@@ -482,7 +493,7 @@
 
       case 'error': {
         const errMsg = typeof msg.message === 'string' ? msg.message : 'Unbekannter Fehler';
-        // fehler waehrend ein report laeuft: im overlay zeigen statt im chat verstecken
+        // fehler während ein report läuft: im overlay zeigen statt im chat verstecken
         if (reportPending && !reportOverlay.classList.contains('hidden')) {
           reportPending = false;
           showReportError(errMsg);
@@ -502,8 +513,8 @@
     text = text.trim();
     if (!text || !ws || ws.readyState !== WebSocket.OPEN || !sessionReady) return;
 
-    // laengencheck VOR jeglicher ui-mutation: sonst geht die nachricht verloren,
-    // wenn der server sie ablehnt (bubble waere schon weg, input geleert)
+    // längencheck VOR jeglicher ui-mutation: sonst geht die nachricht verloren,
+    // wenn der server sie ablehnt (bubble wäre schon weg, input geleert)
     if (text.length > MAX_MESSAGE_LENGTH) {
       showLengthHint(text.length);
       return;
@@ -595,7 +606,7 @@
       textBuffer = '';
     }
     // immer final rendern, auch wenn der buffer leer war (gedrosselte ticks
-    // koennten den letzten stand sonst ausgelassen haben)
+    // könnten den letzten stand sonst ausgelassen haben)
     if (currentAiText) {
       renderAiContent();
       scrollToBottom();
@@ -610,8 +621,8 @@
         setTimeout(tryFinish, 50);
         return;
       }
-      // immer final flushen/rendern: durch das render-throttling koennen die letzten
-      // zeichen im currentAiText haengen ohne im dom zu sein
+      // immer final flushen/rendern: durch das render-throttling können die letzten
+      // zeichen im currentAiText hängen ohne im dom zu sein
       flushTypewriter();
 
       if (currentAiMsg) {
@@ -818,7 +829,7 @@
     messageId++;
     finalizeActiveResponse();
     if (ws) {
-      // bewusster close: onclose soll keinen reconnect ausloesen
+      // bewusster close: onclose soll keinen reconnect auslösen
       intentionalClose = true;
       ws.close();
     }
@@ -940,7 +951,7 @@
   });
 
   btnNewChat.addEventListener('click', function () {
-    // bewusster reload: socket-close soll keinen reconnect-flash ausloesen
+    // bewusster reload: socket-close soll keinen reconnect-flash auslösen
     intentionalClose = true;
     location.reload();
   });

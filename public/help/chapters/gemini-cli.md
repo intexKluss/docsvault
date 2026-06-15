@@ -2,7 +2,7 @@
 
 ## Konfiguration
 
-Seit Gemini CLI Remote-MCP unterstuetzt, ist kein lokaler Proxy mehr noetig — du verbindest direkt per SSE.
+Gemini CLI kann mittlerweile Remote-MCP, du brauchst also keinen lokalen Proxy mehr. Du verbindest dich direkt per SSE.
 
 ### Option A: CLI-Befehl (empfohlen)
 
@@ -12,7 +12,7 @@ gemini mcp add --transport sse docsvault http://<SERVER-IP>:3000/sse
 
 ### Option B: Manuell in ~/.gemini/settings.json
 
-User-Scope (global, in jedem Projekt verfuegbar):
+User-Scope (global, in jedem Projekt verfügbar):
 
 ```json
 {
@@ -24,11 +24,11 @@ User-Scope (global, in jedem Projekt verfuegbar):
 }
 ```
 
-Projekt-Scope statt User-Scope: die gleiche Config in `.gemini/settings.json` im Projektordner.
+Wenn du es lieber pro Projekt willst statt global: die gleiche Config in `.gemini/settings.json` im Projektordner ablegen.
 
-**Wichtig:** Die `url`-Eigenschaft allein markiert den SSE-Transport — kein `"type": "sse"` wie bei Claude Code.
+**Wichtig:** Allein die `url`-Eigenschaft markiert schon den SSE-Transport. Du brauchst hier kein `"type": "sse"` wie bei Claude Code.
 
-Ersetze `<SERVER-IP>` durch die IP des Servers (z.B. `192.168.2.100`).
+Ersetze `<SERVER-IP>` durch die IP deines Servers (z.B. `192.168.2.100`).
 
 ## Verifizierung
 
@@ -36,6 +36,6 @@ Ersetze `<SERVER-IP>` durch die IP des Servers (z.B. `192.168.2.100`).
 gemini mcp list
 ```
 
-Der Server `docsvault` sollte in der Liste erscheinen.
+Der Server `docsvault` sollte jetzt in der Liste auftauchen.
 
-Starte Gemini CLI und stelle eine Testfrage zur otris Dokumentation oder Intex-Regeln — die Tools werden automatisch genutzt.
+Starte Gemini CLI und stell eine Testfrage zur otris Dokumentation oder zu den Intex-Regeln. Die Tools werden automatisch genutzt.
