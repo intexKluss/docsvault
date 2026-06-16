@@ -464,6 +464,7 @@
           currentAiMsg = appendAiMessage();
           currentAiText = '';
         }
+        removeThinking(currentAiMsg);
         startResponseTimeout();
         textBuffer += msg.content;
         startTypewriter();
@@ -475,6 +476,7 @@
           currentAiMsg = appendAiMessage();
           currentAiText = '';
         }
+        removeThinking(currentAiMsg);
         startResponseTimeout();
         handleToolUse(msg);
         scrollToBottom();
@@ -487,8 +489,16 @@
 
       case 'report_saved':
         reportPending = false;
-        closeReportOverlay();
-        appendSystemMessage('Bug-Report gespeichert. Danke!');
+        if (!reportOverlay.classList.contains('hidden')) {
+          // overlay offen lassen + feld leeren: wer aktiv testet, findet mehrere
+          // bugs hintereinander und soll sie ohne neu-öffnen melden können
+          reportText.value = '';
+          reportSend.disabled = true;
+          showReportSuccess('Gespeichert, danke! Du kannst direkt den nächsten Bug melden.');
+          reportText.focus();
+        } else {
+          appendSystemMessage('Bug-Report gespeichert. Danke!');
+        }
         break;
 
       case 'error': {
@@ -532,8 +542,11 @@
     ws.send(JSON.stringify({ type: 'message', content: text, mode: mode }));
 
     messageId++;
-    currentAiMsg = null;
+    // sofort eine ai-bubble mit denkt-indikator zeigen, damit klar ist dass
+    // gearbeitet wird, auch während warm-up/erstem tool-call noch nichts zurückkommt
+    currentAiMsg = appendAiMessage();
     currentAiText = '';
+    showThinking(currentAiMsg);
     userScrolledUp = false;
     scrollToBottom();
 
@@ -573,6 +586,24 @@
     wrap.appendChild(content);
     messagesEl.appendChild(wrap);
     return wrap;
+  }
+
+  // denkt-indikator in eine frische ai-bubble setzen. wird vom ersten chunk oder
+  // tool_use wieder entfernt. liegt vor der msg-content, damit renderAiContent
+  // (das nur die msg-content füllt) ihn nicht überschreibt.
+  function showThinking(aiMsg) {
+    if (!aiMsg || aiMsg.querySelector('.thinking-indicator')) return;
+    const ind = document.createElement('div');
+    ind.className = 'thinking-indicator';
+    ind.innerHTML = '<span class="thinking-dots"><span></span><span></span><span></span></span>'
+      + '<span class="thinking-label">Suche in der Dokumentation...</span>';
+    aiMsg.insertBefore(ind, aiMsg.firstChild);
+  }
+
+  function removeThinking(aiMsg) {
+    if (!aiMsg) return;
+    const ind = aiMsg.querySelector('.thinking-indicator');
+    if (ind) ind.remove();
   }
 
   function startTypewriter() {
@@ -1026,15 +1057,26 @@
     // fehler im overlay anzeigen und senden wieder freigeben statt overlay zu blocken
     if (reportError) {
       reportError.textContent = text;
-      reportError.classList.remove('hidden');
+      reportError.classList.remove('hidden', 'success');
     }
     reportSend.disabled = !reportText.value.trim();
+  }
+
+  // bestätigung im overlay (grün) statt das overlay zu schließen, damit man
+  // direkt den nächsten report tippen kann
+  function showReportSuccess(text) {
+    if (reportError) {
+      reportError.textContent = text;
+      reportError.classList.remove('hidden');
+      reportError.classList.add('success');
+    }
   }
 
   function clearReportError() {
     if (reportError) {
       reportError.textContent = '';
       reportError.classList.add('hidden');
+      reportError.classList.remove('success');
     }
   }
 

@@ -750,6 +750,37 @@ body.landing #chat { display: none !important; }
   to { transform: rotate(360deg); }
 }
 
+/* denkt-indikator: sofort beim senden sichtbar, bis der erste chunk/tool-call kommt */
+.thinking-indicator {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 2px 0 6px;
+  font-size: 13px;
+  color: var(--text-muted);
+}
+
+.thinking-dots {
+  display: inline-flex;
+  gap: 4px;
+}
+
+.thinking-dots span {
+  width: 6px;
+  height: 6px;
+  border-radius: 50%;
+  background: var(--accent);
+  animation: thinking-bounce 1.4s ease-in-out infinite;
+}
+
+.thinking-dots span:nth-child(2) { animation-delay: 0.2s; }
+.thinking-dots span:nth-child(3) { animation-delay: 0.4s; }
+
+@keyframes thinking-bounce {
+  0%, 60%, 100% { opacity: 0.35; transform: translateY(0); }
+  30% { opacity: 1; transform: translateY(-4px); }
+}
+
 /* overlay */
 
 .overlay {
@@ -815,6 +846,10 @@ body.landing #chat { display: none !important; }
 
 .overlay-error.hidden {
   display: none;
+}
+
+.overlay-error.success {
+  color: var(--green);
 }
 
 .overlay-actions {
