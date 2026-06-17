@@ -27,10 +27,47 @@ const BEHAVIOR_RULES = `VERHALTEN:
 - Erkläre NICHT deinen Suchprozess. Sage NICHT "Ich suche jetzt...", "Die Suche war zu eng...", "Ich hole jetzt...". Gib NUR die fertige Antwort.
 - Liste KEINE Quellen-URLs oder "Quellen:"-Abschnitte am Ende der Antwort auf. Die Source-URLs aus den Tools sind nur für dich zur Orientierung, nicht für den User.`;
 
+// otris-spezifischer few-shot: schwache modelle (mini) rekonstruieren gadget-code
+// aus verstreuten doku-seiten und vergessen dabei das gerüst (gadgetContext +
+// context.returnValue = gadgetAPI.transfer()). das vollständige muster als vorlage
+// hier zwingt sie zum kopieren statt rekonstruieren. bei mehreren vaults gehört
+// das in den vault-spezifischen searchHint (_meta.json), nicht in den prompt.
+const GADGET_GUIDANCE = `GRUNDGERÜST FÜR GADGET-SKRIPTE (otris, aktueller Stil):
+Wenn die Frage ein Gadget-Skript betrifft, nutze GENAU dieses Grundgerüst als Vorlage und ändere nur Felder und Logik. Bei anderen Themen ignoriere dieses Beispiel.
+
+\`\`\`javascript
+context.enableModules();
+const gadgetAPI = require("gadgetAPI.module.gadgetAPI");
+
+gadgetAPI.registerGadgetAction("showFormGadget", function (gadgetContext) {
+  if (gadgetContext.gadgetEvent === "send") {
+    const htmlGadget = gadgetAPI.getHTMLInstance();
+    htmlGadget.setTitle("Eingegebene Daten");
+    htmlGadget.appendHtml(["<div>Danke für die Eingabe</div>"]);
+    return htmlGadget;
+  }
+
+  const formGadget = gadgetAPI.getFormInstance();
+  formGadget.setTitle("Bitte Daten eingeben");
+  formGadget.addTextField("firstname", "Vorname").setInLine(true).setMandatory(true);
+  formGadget.addGadgetActionButton("send", "Absenden");
+  return formGadget;
+});
+
+context.returnValue = gadgetAPI.transfer();
+\`\`\`
+
+PFLICHT bei Gadget-Code, niemals weglassen:
+- require("gadgetAPI.module.gadgetAPI") am Anfang.
+- Die Action wird mit registerGadgetAction(name, function (gadgetContext) { ... }) registriert und bekommt IMMER den gadgetContext-Parameter.
+- Felder kommen über die Instanz (formGadget.addX(...)), nie über direkte Konstruktoren.
+- Das Skript ENDET IMMER mit context.returnValue = gadgetAPI.transfer();
+Geh deine Code-Antwort vor dem Abschicken einmal durch und ergänze fehlende dieser Punkte.`;
+
 export function buildSystemPrompt(vaultRegistry) {
   const intro = vaultRegistry.length > 0
     ? `Du bist ein Dokumentations-Assistent für die folgenden Wissensbereiche:\n\n${describeVaults(vaultRegistry)}`
     : `Du bist ein Dokumentations-Assistent. Aktuell sind keine Vaults konfiguriert.`;
 
-  return `${intro}\n\n${SAFETY_RULES}\n\n${BEHAVIOR_RULES}`;
+  return `${intro}\n\n${SAFETY_RULES}\n\n${BEHAVIOR_RULES}\n\n${GADGET_GUIDANCE}`;
 }
