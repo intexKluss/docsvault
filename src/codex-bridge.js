@@ -83,7 +83,7 @@ export class CodexBridge {
 
         const modePrefix = mode === 'thorough'
           ? '[GRÜNDLICH] Recherchiere gründlich. Lies relevante Dokumente komplett. Prüfe ob deine Antwort wirklich korrekt und vollständig ist. Gib ausführliche Erklärungen mit Code-Beispielen.\n\n'
-          : '[SCHNELL] Der Nutzer will eine schnelle, knappe Antwort. Arbeite sparsam: hol dir mit einer overview- oder search-Suche die besten Treffer, lies höchstens die 1-2 relevantesten Seiten ganz, dann antworte sofort. Mache HÖCHSTENS 5 Tool-Aufrufe, niemals mehr als 10. Mehr Suchen machen die Antwort nicht besser, nur langsamer und widersprüchlicher (du mischst sonst alte und aktuelle API-Stile). Lieber knapp aus einer guten Quelle als breit aus vielen.\n\n';
+          : '[SCHNELL] Der Nutzer will eine schnelle, knappe Antwort. Such fokussiert statt planlos breit: nimm die API-Referenz als Leitquelle und lies sie wirklich, statt dutzendfach quer zu suchen. WICHTIGER als die Geschwindigkeit ist Konsistenz: entscheide dich für EINEN, den aktuellen API-Stil und ziehe ihn in der ganzen Antwort durch. Mische niemals Varianten (mal formGadget.addX, mal form.addX, mal mit/ohne context.enableModules).\n\n';
 
         const fullPrompt = modePrefix + content;
 
