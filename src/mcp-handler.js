@@ -23,6 +23,11 @@ function isErrorResult(value) {
     && typeof value.error === 'string';
 }
 
+// alle docsvault-tools lesen nur, nie schreiben. die annotation sagt codex das,
+// sonst schiebt die cli sie unter read-only-sandbox in einen approval-flow und
+// cancelt den call headless ("user cancelled MCP tool call").
+const READONLY_TOOL = { readOnlyHint: true, openWorldHint: false };
+
 function registerVaultTools(server, vault) {
   const { toolPrefix, description } = vault;
   const vaultPath = vault.path;
@@ -43,6 +48,7 @@ function registerVaultTools(server, vault) {
     {
       section: z.string().optional().describe(`Section name to get detailed listing for. Use exact names as shown by ${toolPrefix}_overview.`),
     },
+    READONLY_TOOL,
     async (params) => {
       const result = handleOverview(vaultPath, params, vault.name);
       return { content: [{ type: 'text', text: result }] };
@@ -58,6 +64,7 @@ function registerVaultTools(server, vault) {
       max_results: z.number().int().min(1).max(100).optional().describe('Maximum number of results (default: 10, max: 100)'),
       context_lines: z.number().int().min(0).max(20).optional().describe('Number of context lines around each match (default: 3, max: 20)'),
     },
+    READONLY_TOOL,
     async (params) => {
       const results = handleSearch(vaultPath, params);
       if (isErrorResult(results)) {
@@ -75,6 +82,7 @@ function registerVaultTools(server, vault) {
       max_length: z.number().int().min(1).max(200000).optional().describe('Maximum content length in characters (default: 50000, max: 200000).'),
       heading: z.string().optional().describe('Optional heading text from a search result. When set, returns only that section instead of the full page.'),
     },
+    READONLY_TOOL,
     async (params) => {
       const result = handleRead(vaultPath, params);
       if (result.error) {
@@ -96,6 +104,7 @@ function registerVaultTools(server, vault) {
       section: z.string().describe(`Section name. Use exact names as shown by ${toolPrefix}_overview.`),
       subfolder: z.string().optional().describe('Subfolder within the section'),
     },
+    READONLY_TOOL,
     async (params) => {
       const files = handleList(vaultPath, params);
       if (isErrorResult(files)) {
@@ -109,6 +118,7 @@ function registerVaultTools(server, vault) {
     `${toolPrefix}_status`,
     `Check the freshness status of: ${description}\n\nReturns page count, PDF count, and how old the vault is.`,
     {},
+    READONLY_TOOL,
     async () => {
       const result = handleStatus(vaultPath);
       return { content: [{ type: 'text', text: JSON.stringify(result) }] };
