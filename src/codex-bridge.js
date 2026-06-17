@@ -51,14 +51,18 @@ export class CodexBridge {
       codexPathOverride: process.env.CODEX_PATH,
     });
     const model = process.env.CODEX_MODEL || 'gpt-5.4';
+    // reasoning-modelle (gpt-5.5) denken sonst voll durch -> sehr langsam. low
+    // reicht für doku-suche + formulieren locker. tunebar: minimal..xhigh.
+    const reasoningEffort = process.env.CODEX_REASONING_EFFORT || 'low';
     let thread = codex.startThread({
       model,
+      modelReasoningEffort: reasoningEffort,
       workingDirectory: MCP_CWD,
       sandboxMode: 'read-only',
       approvalPolicy: 'never',
       skipGitRepoCheck: true,
     });
-    console.log(`[codex-sdk] session ${id} angelegt, model=${model}, vaults=[${registry.map(v => v.toolPrefix).join(',')}]`);
+    console.log(`[codex-sdk] session ${id} angelegt, model=${model} (reasoning=${reasoningEffort}), vaults=[${registry.map(v => v.toolPrefix).join(',')}]`);
 
     return {
       id,
