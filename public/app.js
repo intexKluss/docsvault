@@ -296,7 +296,7 @@
       });
       finalizeToolBlock(currentAiMsg);
       if (currentAiText) {
-        highlightCodeBlocks(currentAiMsg);
+        decorateCodeBlocks(currentAiMsg);
       } else if (!currentAiMsg.querySelector('.tool-block')) {
         currentAiMsg.remove();
       }
@@ -662,7 +662,7 @@
           currentAiMsg.remove();
         } else {
           finalizeToolBlock(currentAiMsg);
-          highlightCodeBlocks(currentAiMsg);
+          decorateCodeBlocks(currentAiMsg);
         }
       }
       currentAiMsg = null;
@@ -677,6 +677,9 @@
     const contentEl = currentAiMsg.querySelector('.msg-content');
     if (contentEl) {
       contentEl.innerHTML = sanitizeMarkdown(currentAiText);
+      // fertige codebloecke sofort einfaerben + copy-button, der noch offene
+      // (letzte) block bleibt aus bis er zu ist
+      decorateCodeBlocks(contentEl, currentAiText);
     }
     lastRenderTs = Date.now();
   }
@@ -777,24 +780,37 @@
     scrollToBottom();
   }
 
-  function highlightCodeBlocks(container) {
+  // highlightet codebloecke + haengt copy-buttons drunter. beim streaming
+  // (streamingText gesetzt) wird der letzte block ausgelassen solange er noch
+  // offen ist (ungerade ```-anzahl), damit fertige bloecke sofort farbig werden
+  // und der noch tippende nicht halb-gehighlightet flackert.
+  function decorateCodeBlocks(container, streamingText) {
     if (!container) return;
-    container.querySelectorAll('pre code').forEach(function (block) {
-      if (window.hljs) hljs.highlightElement(block);
-      addCopyButton(block.parentElement);
+    const skipLast = typeof streamingText === 'string'
+      && (streamingText.match(/```/g) || []).length % 2 === 1;
+    const pres = container.querySelectorAll('pre');
+    pres.forEach(function (pre, i) {
+      if (skipLast && i === pres.length - 1) return;
+      const code = pre.querySelector('code');
+      if (code && window.hljs && code.dataset.highlighted !== 'yes') {
+        hljs.highlightElement(code);
+      }
+      addCopyButton(pre);
     });
   }
 
-  // copy-button oben rechts an jeden codeblock. idempotent, click läuft über
-  // delegation auf messagesEl (siehe unten).
+  // copy-button DIREKT UNTER dem codeblock (eigenes element, nicht im pre).
+  // idempotent, click laeuft ueber delegation auf messagesEl (siehe unten).
   function addCopyButton(pre) {
-    if (!pre || pre.tagName !== 'PRE' || pre.querySelector('.code-copy-btn')) return;
+    if (!pre || pre.tagName !== 'PRE') return;
+    const next = pre.nextElementSibling;
+    if (next && next.classList && next.classList.contains('code-copy-btn')) return;
     const btn = document.createElement('button');
     btn.className = 'code-copy-btn';
     btn.type = 'button';
     btn.setAttribute('aria-label', 'Code kopieren');
     btn.innerHTML = SVG_COPY + '<span>Kopieren</span>';
-    pre.appendChild(btn);
+    pre.insertAdjacentElement('afterend', btn);
   }
 
   function setCopyBtnState(btn, ok) {
@@ -839,8 +855,8 @@
   messagesEl.addEventListener('click', function (e) {
     const btn = e.target.closest('.code-copy-btn');
     if (!btn || !messagesEl.contains(btn)) return;
-    const pre = btn.closest('pre');
-    if (!pre) return;
+    const pre = btn.previousElementSibling;
+    if (!pre || pre.tagName !== 'PRE') return;
     const code = pre.querySelector('code');
     copyCode(code ? code.textContent : pre.textContent, btn);
   });
