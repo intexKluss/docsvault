@@ -280,6 +280,15 @@
   const RESPONSE_TIMEOUT_MS = 120000;
   // report-overlay state, damit fehler im overlay statt im chat landen
   let reportPending = false;
+
+  // ring-buffer für client-seitige logs (events, ws-status, fehler). geht beim
+  // bug-melden mit, damit man den verlauf auf der client-seite mit-debuggen kann.
+  const CLIENT_LOG_MAX = 200;
+  const clientLog = [];
+  function logClient(msg) {
+    clientLog.push({ ts: new Date().toISOString(), msg: String(msg).slice(0, 500) });
+    if (clientLog.length > CLIENT_LOG_MAX) clientLog.shift();
+  }
   // muss zum server-default passen (MAX_MESSAGE_LENGTH, src/session-manager.js)
   const MAX_MESSAGE_LENGTH = 2000;
 
@@ -342,9 +351,11 @@
 
     ws.onopen = function () {
       reconnectAttempts = 0;
+      logClient('ws open');
     };
 
     ws.onclose = function () {
+      logClient('ws close' + (intentionalClose ? ' (gewollt)' : ' (unerwartet)'));
       // bewusster close (cancel/new-chat): nichts tun, der jeweilige pfad regelt das
       if (intentionalClose) {
         intentionalClose = false;
@@ -357,6 +368,7 @@
     };
 
     ws.onerror = function () {
+      logClient('ws error');
       console.warn('[ws] connection error');
     };
   }
@@ -418,6 +430,13 @@
   function handleEvent(msg) {
     if (!msg || typeof msg.type !== 'string') return;
     if (cancelled && STREAMING_EVENTS[msg.type]) return;
+
+    // alles ausser chunk loggen (chunks kommen zu oft): tool-calls, lifecycle, fehler
+    if (msg.type !== 'chunk') {
+      logClient('event ' + msg.type
+        + (msg.tool ? ' ' + msg.tool + '/' + msg.status : '')
+        + (msg.message ? ' ' + String(msg.message).slice(0, 140) : ''));
+    }
 
     switch (msg.type) {
       case 'vaults':
@@ -540,6 +559,7 @@
     appendUserMessage(text);
 
     const mode = getActiveSpeed().dataset.mode;
+    logClient('frage senden (mode=' + mode + '): ' + text.slice(0, 80));
     ws.send(JSON.stringify({ type: 'message', content: text, mode: mode }));
 
     messageId++;
@@ -1180,6 +1200,7 @@
       type: 'report',
       description: desc,
       chatContext: context.slice(-10),
+      clientLog: clientLog.slice(-200),
     }));
 
     reportSend.disabled = true;

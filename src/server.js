@@ -10,6 +10,7 @@ import { handleSseGet, handleSsePost, handleStreamablePost } from './mcp-handler
 import { createApiRouter } from './api-routes.js';
 import { loadVaultRegistry, TOOL_SUFFIXES } from './vault-registry.js';
 import { requireToken, wsAuthOk } from './auth.js';
+import { installLogCapture, recentLogs } from './log-buffer.js';
 
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = dirname(__filename);
@@ -29,6 +30,8 @@ async function loadBridge(bridgeMode, vaultRegistry) {
 }
 
 export async function createServer(opts = {}) {
+  // console.* in den ring-buffer spiegeln, damit ein bug-report die server-logs mitliefert
+  installLogCapture();
   // env vars erst zur laufzeit lesen, damit tests VAULTS_ROOT überschreiben können
   const bridgeMode = process.env.BRIDGE || 'claude';
   const vaultsRoot = process.env.VAULTS_ROOT || join(__dirname, '..', 'vaults');
@@ -322,7 +325,7 @@ async function handleMessage(ws, manager, req, raw, vaultRegistry) {
       ws.send(JSON.stringify({ type: 'error', message: err.message }));
       return;
     }
-    await handleReport(ws, msg);
+    await handleReport(ws, msg, manager);
     return;
   }
 
@@ -387,6 +390,20 @@ function sanitizeChatContext(context) {
   }).filter(Boolean);
 }
 
+// client-log vom frontend kappen (anzahl + länge) bevor es gespeichert wird
+function sanitizeClientLog(log) {
+  if (!Array.isArray(log)) return [];
+  return log.slice(-200).map((e) => {
+    if (typeof e === 'string') return e.slice(0, 500);
+    if (e && typeof e === 'object') {
+      const ts = typeof e.ts === 'string' ? e.ts.slice(0, 30) : '';
+      const msg = typeof e.msg === 'string' ? e.msg.slice(0, 500) : '';
+      return { ts, msg };
+    }
+    return null;
+  }).filter(Boolean);
+}
+
 async function handleSelectVault(ws, manager, msg, vaultRegistry, ip) {
   // rate-limit wie message/report, sonst kann ein client vault-wechsel spammen
   // und damit SDK-subprozesse fork-bomben.
@@ -441,17 +458,22 @@ async function handleSelectVault(ws, manager, msg, vaultRegistry, ip) {
   warmUpSession(ws, manager, ws.clientId, toolPrefix);
 }
 
-async function handleReport(ws, msg) {
+async function handleReport(ws, msg, manager) {
   const desc = typeof msg.description === 'string' ? msg.description.trim() : '';
   if (!desc || desc.length > 5000) {
     ws.send(JSON.stringify({ type: 'error', message: 'Ungültiger Bug-Report.' }));
     return;
   }
 
+  // session-id der meldenden verbindung, um die server-logs darauf zu filtern
+  const sessionId = manager?.getSessionRaw?.(ws.clientId)?.id || null;
   const report = {
     timestamp: new Date().toISOString(),
     description: desc,
     chatContext: sanitizeChatContext(msg.chatContext),
+    clientLog: sanitizeClientLog(msg.clientLog),
+    serverLog: recentLogs(150, sessionId),
+    sessionId,
     clientId: ws.clientId,
   };
 
