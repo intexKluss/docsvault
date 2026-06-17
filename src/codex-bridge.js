@@ -57,6 +57,10 @@ export class CodexBridge {
     let thread = codex.startThread({
       model,
       modelReasoningEffort: reasoningEffort,
+      // docsvault sucht nur in den otris-mcp-tools, kein web. ausschalten, sonst
+      // bricht reasoning-effort 'minimal' (web_search ist mit minimal inkompatibel).
+      webSearchEnabled: false,
+      webSearchMode: 'disabled',
       workingDirectory: MCP_CWD,
       sandboxMode: 'read-only',
       approvalPolicy: 'never',
