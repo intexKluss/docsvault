@@ -888,6 +888,14 @@ body.landing #chat { display: none !important; }
   color: var(--green);
 }
 
+/* kleine antwortzeit unter der ai-antwort */
+.msg-meta {
+  font-size: 11px;
+  color: var(--text-faint);
+  margin-top: 6px;
+  font-family: var(--font-mono, monospace);
+}
+
 .overlay-actions {
   display: flex;
   justify-content: flex-end;

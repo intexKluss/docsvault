@@ -280,6 +280,9 @@
   const RESPONSE_TIMEOUT_MS = 120000;
   // report-overlay state, damit fehler im overlay statt im chat landen
   let reportPending = false;
+  // antwortzeit messen (senden -> done), wird als kleine meta unter der antwort gezeigt
+  let responseStartTs = 0;
+  let responseElapsed = null;
 
   // ring-buffer für client-seitige logs (events, ws-status, fehler). geht beim
   // bug-melden mit, damit man den verlauf auf der client-seite mit-debuggen kann.
@@ -504,6 +507,7 @@
 
       case 'done':
         clearResponseTimeout();
+        responseElapsed = responseStartTs ? ((Date.now() - responseStartTs) / 1000).toFixed(1) : null;
         finishResponse(messageId);
         break;
 
@@ -559,6 +563,7 @@
     appendUserMessage(text);
 
     const mode = getActiveSpeed().dataset.mode;
+    responseStartTs = Date.now();
     logClient('frage senden (mode=' + mode + '): ' + text.slice(0, 80));
     ws.send(JSON.stringify({ type: 'message', content: text, mode: mode }));
 
@@ -683,6 +688,7 @@
         } else {
           finalizeToolBlock(currentAiMsg);
           decorateCodeBlocks(currentAiMsg);
+          appendResponseMeta(currentAiMsg);
         }
       }
       currentAiMsg = null;
@@ -787,6 +793,15 @@
     }
     header.addEventListener('click', toggleExpand);
     header._toggleExpand = toggleExpand;
+  }
+
+  // kleine zeit-anzeige unter der fertigen antwort, damit man sieht wie schnell es war
+  function appendResponseMeta(aiMsg) {
+    if (!aiMsg || responseElapsed == null) return;
+    const meta = document.createElement('div');
+    meta.className = 'msg-meta';
+    meta.textContent = responseElapsed + 's';
+    aiMsg.appendChild(meta);
   }
 
   function appendError(text) {
