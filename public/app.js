@@ -835,7 +835,7 @@
   }
 
   // copy-button DIREKT UNTER dem codeblock (eigenes element, nicht im pre).
-  // idempotent, click laeuft ueber delegation auf messagesEl (siehe unten).
+  // idempotent, click läuft über delegation auf messagesEl (siehe unten).
   function addCopyButton(pre) {
     if (!pre || pre.tagName !== 'PRE') return;
     const next = pre.nextElementSibling;
@@ -869,7 +869,7 @@
     }
   }
 
-  // fallback fuer non-secure-context (http ueber IP), wo navigator.clipboard fehlt
+  // fallback für non-secure-context (http über IP), wo navigator.clipboard fehlt
   function fallbackCopy(text) {
     try {
       const ta = document.createElement('textarea');
