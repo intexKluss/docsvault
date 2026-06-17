@@ -452,6 +452,22 @@ function matchesForFile(vaultPath, relPath, tokens, contextLines) {
 //    bekommen einen synthetisierten Snippet statt gedroppt zu werden
 // Das bestehende Schema { file, title, matches: [{ line, text, heading }], titleMatch }
 // bleibt erhalten, `score` kommt additiv dazu.
+// Manche Quellen zeigen veraltete Stile (z.B. samples.md baut Gadgets noch per
+// `new otris.gadget.gui.X()` statt der aktuellen funktionalen gadgetAPI). Solche
+// Treffer kriegen einen Score-Malus, damit die aktuelle API-Referenz oben steht.
+// Kein Ausschluss, nur Absenkung: fehlt eine Alternative, rankt die Quelle weiter.
+// Malus ~ "alle Tokens im Titel"-Boost, neutralisiert also den Body-Vorteil einer
+// Sample-Datei gegenueber einer Datei mit echtem Titel-Treffer.
+const STALE_SOURCE_PENALTY = 30;
+const STALE_SOURCE_PATTERNS = [
+  /(^|\/)samples?(\/|$)/i,   // Sample-Verzeichnisse/-Dateien
+  /(^|\/)archiv(\/|$)/i,     // archivierte/veraltete Staende
+];
+
+function staleSourcePenalty(filePath) {
+  return STALE_SOURCE_PATTERNS.some(re => re.test(filePath)) ? STALE_SOURCE_PENALTY : 0;
+}
+
 function enrichResults(vaultPath, results, tokens, query) {
   const enriched = [];
   const titleByPath = new Map(getCachedTitleIndex(vaultPath).map(e => [e.path, e.title]));
@@ -509,7 +525,7 @@ function enrichResults(vaultPath, results, tokens, query) {
 
     // term-frequency über alle Treffer-Texte (klein gewichtet, Punkt 9)
     const bodyScore = scoreBody(matches, tokens);
-    const score = titleScore + bodyScore;
+    const score = titleScore + bodyScore - staleSourcePenalty(result.file);
 
     enriched.push({ ...result, matches, titleMatch, score });
   }
