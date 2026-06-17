@@ -535,7 +535,11 @@
         }
         // laufenden tool-block sauber beenden (finalizeActiveResponse), dann fehler zeigen
         finalizeActiveResponse();
-        appendError(errMsg);
+        if (msg.kind === 'limit') {
+          appendLimitNotice(errMsg);
+        } else {
+          appendError(errMsg);
+        }
         setInputEnabled(true);
         break;
       }
@@ -802,6 +806,21 @@
     meta.className = 'msg-meta';
     meta.textContent = responseElapsed + 's';
     aiMsg.appendChild(meta);
+  }
+
+  // deutlicher banner wenn das ki-kontingent erschöpft ist, damit klar ist warum
+  // nichts mehr kommt (statt generischem "nochmal versuchen").
+  function appendLimitNotice(text) {
+    const wrap = document.createElement('div');
+    wrap.className = 'msg-wrap';
+    const box = document.createElement('div');
+    box.className = 'msg-limit';
+    const icon = '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="10"/><line x1="12" y1="8" x2="12" y2="12"/><line x1="12" y1="16" x2="12.01" y2="16"/></svg>';
+    box.innerHTML = icon + '<span></span>';
+    box.querySelector('span').textContent = text;
+    wrap.appendChild(box);
+    messagesEl.appendChild(wrap);
+    scrollToBottom();
   }
 
   function appendError(text) {

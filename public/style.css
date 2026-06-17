@@ -896,6 +896,28 @@ body.landing #chat { display: none !important; }
   font-family: var(--font-mono, monospace);
 }
 
+/* kontingent-/rate-limit-banner: deutlich amber, klar abgesetzt vom roten fehler */
+.msg-limit {
+  display: flex;
+  align-items: flex-start;
+  gap: 10px;
+  padding: 12px 14px;
+  border-radius: 10px;
+  background: rgba(224, 162, 58, 0.12);
+  border: 1px solid rgba(224, 162, 58, 0.4);
+  color: var(--text);
+  font-size: 14px;
+  line-height: 1.5;
+}
+
+.msg-limit svg {
+  width: 18px;
+  height: 18px;
+  flex-shrink: 0;
+  margin-top: 1px;
+  color: #e0a23a;
+}
+
 .overlay-actions {
   display: flex;
   justify-content: flex-end;

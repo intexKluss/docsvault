@@ -27,6 +27,15 @@ function previewToolArgs(item) {
   return ' args=' + truncate(raw, 120);
 }
 
+// erkennt das codex usage/rate-limit und macht daraus eine klare deutsche meldung
+// mit reset-zeit, statt es als generisches "nochmal versuchen" zu tarnen.
+function rateLimitNotice(raw) {
+  const text = typeof raw === 'string' ? raw : (raw && raw.message) || (raw ? JSON.stringify(raw) : '');
+  if (!/usage limit|rate limit|quota|hit your[\s\S]*limit|Upgrade to Plus/i.test(text)) return null;
+  const m = text.match(/try again at ([^."]+)/i);
+  return `Das KI-Kontingent ist aufgebraucht (Codex Usage-Limit).${m ? ` Neue Anfragen erst wieder ab ${m[1].trim()}.` : ''}`;
+}
+
 export class CodexBridge {
   constructor(vaultRegistry) {
     this.vaultRegistry = (vaultRegistry || []).filter(
@@ -125,6 +134,7 @@ export class CodexBridge {
         let lastMessage = null;
         let toolCalls = 0;
         let answerChars = 0;
+        let errorYielded = false;
 
         try {
           const { events } = await thread.runStreamed(fullPrompt, {
@@ -177,12 +187,20 @@ export class CodexBridge {
 
             if (event.type === 'error') {
               console.error(`[codex] ${id} error-event:`, truncate(event.message || event));
-              yield { type: 'error', message: 'Fehler bei der Verarbeitung. Bitte versuche es erneut.' };
+              const limit = rateLimitNotice(event.message || event);
+              errorYielded = true;
+              yield limit
+                ? { type: 'error', kind: 'limit', message: limit }
+                : { type: 'error', message: 'Fehler bei der Verarbeitung. Bitte versuche es erneut.' };
             }
 
             if (event.type === 'turn.failed') {
               console.error(`[codex] ${id} turn.failed:`, truncate(event.error?.message || event.error || event));
-              yield { type: 'error', message: 'Anfrage fehlgeschlagen. Bitte versuche es erneut.' };
+              const limit = rateLimitNotice(event.error?.message || event.error || event);
+              errorYielded = true;
+              yield limit
+                ? { type: 'error', kind: 'limit', message: limit }
+                : { type: 'error', message: 'Anfrage fehlgeschlagen. Bitte versuche es erneut.' };
             }
           }
 
@@ -203,7 +221,12 @@ export class CodexBridge {
             return;
           }
           console.error(`[codex-sdk] ${id} error nach ${toolCalls} tool-calls: ${err.message}`);
-          yield { type: 'error', message: 'Fehler bei der Verarbeitung. Bitte versuche es erneut.' };
+          if (!errorYielded) {
+            const limit = rateLimitNotice(err && err.message);
+            yield limit
+              ? { type: 'error', kind: 'limit', message: limit }
+              : { type: 'error', message: 'Fehler bei der Verarbeitung. Bitte versuche es erneut.' };
+          }
         } finally {
           activeAbort = null;
           if (destroyed) {
