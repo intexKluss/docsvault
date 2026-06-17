@@ -9,6 +9,24 @@ const __dirname = dirname(__filename);
 
 const MCP_CWD = resolve(__dirname, '..');
 
+// ausführliches session-logging fürs debugging. CODEX_DEBUG=1 schaltet zusätzlich
+// jedes roh-event frei (sehr gesprächig), sonst nur tool-calls, modell und fehler.
+const CODEX_DEBUG = process.env.CODEX_DEBUG === '1' || process.env.CODEX_DEBUG === 'true';
+
+// langen text fürs log kappen, damit eine zeile lesbar bleibt
+function truncate(v, n = 300) {
+  const s = typeof v === 'string' ? v : JSON.stringify(v);
+  return s && s.length > n ? s.slice(0, n) + '…' : (s || '');
+}
+
+// tool-argumente knapp anzeigen. je nach sdk-version liegen sie unter
+// arguments/input/args, drum defensiv lesen statt auf ein feld zu wetten.
+function previewToolArgs(item) {
+  const raw = item?.arguments ?? item?.input ?? item?.args;
+  if (raw == null) return '';
+  return ' args=' + truncate(raw, 120);
+}
+
 export class CodexBridge {
   constructor(vaultRegistry) {
     this.vaultRegistry = (vaultRegistry || []).filter(
@@ -32,13 +50,15 @@ export class CodexBridge {
     let codex = new Codex({
       codexPathOverride: process.env.CODEX_PATH,
     });
+    const model = process.env.CODEX_MODEL || 'gpt-5.4';
     let thread = codex.startThread({
-      model: process.env.CODEX_MODEL || 'gpt-5.4',
+      model,
       workingDirectory: MCP_CWD,
       sandboxMode: 'read-only',
       approvalPolicy: 'never',
       skipGitRepoCheck: true,
     });
+    console.log(`[codex-sdk] session ${id} angelegt, model=${model}, vaults=[${registry.map(v => v.toolPrefix).join(',')}]`);
 
     return {
       id,
@@ -68,7 +88,7 @@ export class CodexBridge {
             console.log(`[codex-sdk] warm-up abgebrochen`);
             return;
           }
-          console.error(`[codex-sdk] warm-up error: ${err.message}`);
+          console.error(`[codex-sdk] ${id} warm-up error: ${err.message}`);
           throw err;
         } finally {
           activeAbort = null;
@@ -87,7 +107,7 @@ export class CodexBridge {
 
         const fullPrompt = modePrefix + content;
 
-        console.log(`[codex-sdk] mode=${mode}, thread=${thread.id || 'new'}`);
+        console.log(`[codex-sdk] ${id} frage (mode=${mode}, model=${model}): "${truncate(content, 100)}"`);
         const startTime = Date.now();
 
         const abort = new AbortController();
@@ -95,6 +115,8 @@ export class CodexBridge {
         let toolRunning = false;
         let currentToolName = null;
         let lastMessage = null;
+        let toolCalls = 0;
+        let answerChars = 0;
 
         try {
           const { events } = await thread.runStreamed(fullPrompt, {
@@ -102,15 +124,27 @@ export class CodexBridge {
           });
 
           for await (const event of events) {
-            if (destroyed || abort.signal.aborted) break;
+            if (destroyed || abort.signal.aborted) {
+              console.log(`[codex-sdk] ${id} schleife abgebrochen (destroyed=${destroyed}, aborted=${abort.signal.aborted}) nach ${toolCalls} tool-calls`);
+              break;
+            }
+
+            // roh-event-trace nur mit CODEX_DEBUG, sonst zu gesprächig
+            if (CODEX_DEBUG) {
+              console.log(`[codex-sdk] ${id} event: ${event.type}${event.item?.type ? '/' + event.item.type : ''}`);
+            }
 
             if (event.type === 'item.started' && event.item.type === 'mcp_tool_call') {
               toolRunning = true;
+              toolCalls++;
               currentToolName = event.item.tool || 'unknown';
+              console.log(`[codex-sdk] ${id} tool-start #${toolCalls}: ${currentToolName}${previewToolArgs(event.item)}`);
               yield { type: 'tool_use', tool: currentToolName, status: 'running' };
             }
 
             if (event.type === 'item.completed' && event.item.type === 'mcp_tool_call') {
+              const toolErr = event.item.error || event.item.is_error;
+              console.log(`[codex-sdk] ${id} tool-done: ${currentToolName}` + (toolErr ? ` FEHLER: ${truncate(toolErr)}` : ' ok'));
               if (toolRunning) {
                 yield { type: 'tool_use', tool: currentToolName, status: 'done' };
                 toolRunning = false;
@@ -123,6 +157,7 @@ export class CodexBridge {
                 toolRunning = false;
               }
               lastMessage = event.item.text;
+              answerChars += (event.item.text || '').length;
             }
 
             if (event.type === 'turn.completed') {
@@ -133,12 +168,12 @@ export class CodexBridge {
             }
 
             if (event.type === 'error') {
-              console.error('[codex] Error:', event.message);
+              console.error(`[codex] ${id} error-event:`, truncate(event.message || event));
               yield { type: 'error', message: 'Fehler bei der Verarbeitung. Bitte versuche es erneut.' };
             }
 
             if (event.type === 'turn.failed') {
-              console.error('[codex] Turn failed:', event.error?.message);
+              console.error(`[codex] ${id} turn.failed:`, truncate(event.error?.message || event.error || event));
               yield { type: 'error', message: 'Anfrage fehlgeschlagen. Bitte versuche es erneut.' };
             }
           }
@@ -148,7 +183,7 @@ export class CodexBridge {
           }
 
           const elapsed = ((Date.now() - startTime) / 1000).toFixed(1);
-          console.log(`[codex-sdk] fertig in ${elapsed}s`);
+          console.log(`[codex-sdk] ${id} fertig in ${elapsed}s, ${toolCalls} tool-calls, ${answerChars} antwort-zeichen`);
 
           yield { type: 'done' };
         } catch (err) {
@@ -156,10 +191,10 @@ export class CodexBridge {
             yield { type: 'tool_use', tool: currentToolName, status: 'done' };
           }
           if (abort.signal.aborted) {
-            console.log(`[codex-sdk] query abgebrochen`);
+            console.log(`[codex-sdk] ${id} query abgebrochen nach ${toolCalls} tool-calls`);
             return;
           }
-          console.error(`[codex-sdk] error: ${err.message}`);
+          console.error(`[codex-sdk] ${id} error nach ${toolCalls} tool-calls: ${err.message}`);
           yield { type: 'error', message: 'Fehler bei der Verarbeitung. Bitte versuche es erneut.' };
         } finally {
           activeAbort = null;
