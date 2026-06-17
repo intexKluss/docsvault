@@ -597,7 +597,7 @@
     const ind = document.createElement('div');
     ind.className = 'thinking-indicator';
     ind.innerHTML = '<span class="thinking-dots"><span></span><span></span><span></span></span>'
-      + '<span class="thinking-label">Suche in der Dokumentation...</span>';
+      + '<span class="thinking-label">Antwort wird vorbereitet...</span>';
     aiMsg.insertBefore(ind, aiMsg.firstChild);
   }
 
