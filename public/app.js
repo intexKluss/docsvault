@@ -31,6 +31,7 @@
   const SVG_SEARCH = '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="11" cy="11" r="8"/><line x1="21" y1="21" x2="16.65" y2="16.65"/></svg>';
   const SVG_SEND = '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><line x1="12" y1="19" x2="12" y2="5"/><polyline points="5 12 12 5 19 12"/></svg>';
   const SVG_STOP = '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><rect x="6" y="6" width="12" height="12" rx="1"/></svg>';
+  const SVG_COPY = '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="9" y="9" width="13" height="13" rx="2"/><path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1"/></svg>';
 
   const landingEl = document.getElementById('landing');
   const chatEl = document.getElementById('chat');
@@ -777,11 +778,72 @@
   }
 
   function highlightCodeBlocks(container) {
-    if (!container || !window.hljs) return;
+    if (!container) return;
     container.querySelectorAll('pre code').forEach(function (block) {
-      hljs.highlightElement(block);
+      if (window.hljs) hljs.highlightElement(block);
+      addCopyButton(block.parentElement);
     });
   }
+
+  // copy-button oben rechts an jeden codeblock. idempotent, click läuft über
+  // delegation auf messagesEl (siehe unten).
+  function addCopyButton(pre) {
+    if (!pre || pre.tagName !== 'PRE' || pre.querySelector('.code-copy-btn')) return;
+    const btn = document.createElement('button');
+    btn.className = 'code-copy-btn';
+    btn.type = 'button';
+    btn.setAttribute('aria-label', 'Code kopieren');
+    btn.innerHTML = SVG_COPY + '<span>Kopieren</span>';
+    pre.appendChild(btn);
+  }
+
+  function setCopyBtnState(btn, ok) {
+    btn.classList.remove('copied', 'failed');
+    btn.classList.add(ok ? 'copied' : 'failed');
+    btn.innerHTML = (ok ? SVG_CHECK : SVG_COPY) + '<span>' + (ok ? 'Kopiert' : 'Fehler') + '</span>';
+    setTimeout(function () {
+      btn.classList.remove('copied', 'failed');
+      btn.innerHTML = SVG_COPY + '<span>Kopieren</span>';
+    }, 1500);
+  }
+
+  function copyCode(text, btn) {
+    if (navigator.clipboard && navigator.clipboard.writeText) {
+      navigator.clipboard.writeText(text).then(
+        function () { setCopyBtnState(btn, true); },
+        function () { setCopyBtnState(btn, fallbackCopy(text)); }
+      );
+    } else {
+      setCopyBtnState(btn, fallbackCopy(text));
+    }
+  }
+
+  // fallback fuer non-secure-context (http ueber IP), wo navigator.clipboard fehlt
+  function fallbackCopy(text) {
+    try {
+      const ta = document.createElement('textarea');
+      ta.value = text;
+      ta.style.position = 'fixed';
+      ta.style.opacity = '0';
+      document.body.appendChild(ta);
+      ta.select();
+      const ok = document.execCommand('copy');
+      document.body.removeChild(ta);
+      return ok;
+    } catch (e) {
+      return false;
+    }
+  }
+
+  // copy-button-klicks delegiert (buttons werden dynamisch pro antwort erzeugt)
+  messagesEl.addEventListener('click', function (e) {
+    const btn = e.target.closest('.code-copy-btn');
+    if (!btn || !messagesEl.contains(btn)) return;
+    const pre = btn.closest('pre');
+    if (!pre) return;
+    const code = pre.querySelector('code');
+    copyCode(code ? code.textContent : pre.textContent, btn);
+  });
 
   let userScrolledUp = false;
 
