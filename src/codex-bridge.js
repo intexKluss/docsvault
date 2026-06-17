@@ -83,7 +83,7 @@ export class CodexBridge {
 
         const modePrefix = mode === 'thorough'
           ? '[GRÜNDLICH] Recherchiere gründlich. Lies relevante Dokumente komplett. Prüfe ob deine Antwort wirklich korrekt und vollständig ist. Gib ausführliche Erklärungen mit Code-Beispielen.\n\n'
-          : '[SCHNELL] Antworte kurz und präzise. Suche gezielt, nicht breit.\n\n';
+          : '[SCHNELL] Der Nutzer will eine schnelle, knappe Antwort. Arbeite sparsam: hol dir mit einer overview- oder search-Suche die besten Treffer, lies höchstens die 1-2 relevantesten Seiten ganz, dann antworte sofort. Mache HÖCHSTENS 5 Tool-Aufrufe, niemals mehr als 10. Mehr Suchen machen die Antwort nicht besser, nur langsamer und widersprüchlicher (du mischst sonst alte und aktuelle API-Stile). Lieber knapp aus einer guten Quelle als breit aus vielen.\n\n';
 
         const fullPrompt = modePrefix + content;
 
