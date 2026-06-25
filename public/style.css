@@ -360,6 +360,43 @@ button {
   transform: translateX(-50%) translateY(8px);
 }
 
+/* burn-rate: restliches KI-Kontingent überm input. kurze bar links, fill-breite
+   = rest, farbe blau (viel) -> amber -> rot (wenig, ab ~30%). farbe setzt JS. */
+.burn-rate {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  margin: 0 6px 8px;
+  font-size: 11px;
+  color: var(--text-muted);
+  font-family: var(--font-mono, monospace);
+  transition: opacity 0.3s;
+}
+
+.burn-rate.hidden { display: none; }
+
+.burn-rate-track {
+  width: 80px;
+  flex: none;
+  height: 5px;
+  border-radius: 3px;
+  background: var(--bg-hover);
+  overflow: hidden;
+}
+
+.burn-rate-fill {
+  height: 100%;
+  width: 0%;
+  border-radius: 3px;
+  background: var(--burn, #4f8ff7);
+  transition: width 0.5s ease, background-color 0.5s ease;
+}
+
+.burn-rate-label {
+  flex-shrink: 0;
+  white-space: nowrap;
+}
+
 .input-box {
   background: var(--bg-elevated);
   border: 1px solid var(--border);

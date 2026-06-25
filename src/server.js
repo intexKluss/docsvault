@@ -11,6 +11,7 @@ import { createApiRouter } from './api-routes.js';
 import { loadVaultRegistry, TOOL_SUFFIXES } from './vault-registry.js';
 import { requireToken, wsAuthOk } from './auth.js';
 import { installLogCapture, recentLogs } from './log-buffer.js';
+import { readBurnRate } from './codex-usage.js';
 
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = dirname(__filename);
@@ -27,6 +28,21 @@ async function loadBridge(bridgeMode, vaultRegistry) {
   const { ClaudeBridge } = await import('./claude-bridge.js');
   console.log(`[server] bridge: claude (Claude Agent SDK)`);
   return new ClaudeBridge(vaultRegistry);
+}
+
+// Schickt einem Client die aktuelle KI-Burnrate (Codex-Kontingent). Nur für die
+// Codex-Bridge sinnvoll - Claude hat keine Rollout-Quote. Schlucke fehlende
+// Daten still: kein Rollout -> kein Event, das Frontend blendet den Balken aus.
+async function sendBurnRate(ws, force = false) {
+  if ((process.env.BRIDGE || 'claude') !== 'codex') return;
+  if (!ws || ws.readyState !== 1) return;
+  try {
+    const data = await readBurnRate({ force });
+    if (!data || ws.readyState !== 1) return;
+    ws.send(JSON.stringify({ type: 'burn_rate', ...data }));
+  } catch (err) {
+    console.error(`[server] burn-rate send error: ${err.message}`);
+  }
 }
 
 export async function createServer(opts = {}) {
@@ -174,9 +190,31 @@ export async function createServer(opts = {}) {
     }
   }, 30000);
 
+  // burnrate periodisch an alle pushen, damit der balken auch ohne eigene anfrage
+  // aktuell bleibt (das kontingent sinkt auch durch andere sessions). nur codex.
+  const burnRateInterval = (bridgeMode === 'codex')
+    ? setInterval(async () => {
+        // try/catch um den ganzen tick: ein wurf hier wäre eine unhandled
+        // rejection und würde den prozess (alle sessions) runterreissen.
+        try {
+          const data = await readBurnRate();
+          if (!data) return;
+          const payload = JSON.stringify({ type: 'burn_rate', ...data });
+          for (const ws of wss.clients) {
+            if (ws.readyState === 1) ws.send(payload);
+          }
+        } catch (err) {
+          console.error(`[server] burn-rate broadcast error: ${err.message}`);
+        }
+      }, 60000)
+    : null;
+  // der periodische push soll den prozess nicht am leben halten
+  if (burnRateInterval) burnRateInterval.unref();
+
   // nur an einer stelle cleanen
   server.on('close', () => {
     clearInterval(heartbeatInterval);
+    if (burnRateInterval) clearInterval(burnRateInterval);
     wss.close();
     manager.shutdown();
   });
@@ -253,6 +291,8 @@ function warmUpSession(ws, manager, clientId, toolPrefix) {
     if (!current || current.toolPrefix !== toolPrefix) return;
     if (ws.readyState !== 1) return;
     ws.send(JSON.stringify({ type: 'session_ready', toolPrefix }));
+    // direkt nach dem warm-up steht im rollout schon eine frische quote -> mitgeben
+    sendBurnRate(ws);
   }).catch((err) => {
     // superseded ist erwartetes verhalten beim vault-wechsel, kein fehler für den user.
     if (err.message === 'Session superseded') return;
@@ -367,6 +407,8 @@ async function handleMessage(ws, manager, req, raw, vaultRegistry) {
       if (ws.readyState !== 1) break;
       ws.send(JSON.stringify(event));
     }
+    // turn ist durch -> quote hat sich gerade geändert, frisch nachschieben
+    sendBurnRate(ws, true);
   } catch (err) {
     console.error(`[server] query error: ${err.message}`);
     if (ws.readyState === 1) {
@@ -376,8 +418,12 @@ async function handleMessage(ws, manager, req, raw, vaultRegistry) {
   }
 }
 
-// append-only JSONL, no race conditions
-const REPORTS_PATH = join(__dirname, '..', 'reports.json');
+// append-only JSONL, no race conditions. pfad per env überschreibbar (docker-
+// volume / tests), default liegt neben dem projekt-root. zur laufzeit gelesen,
+// damit env-overrides nach modul-import noch greifen.
+function reportsPath() {
+  return process.env.REPORTS_PATH || join(__dirname, '..', 'reports.json');
+}
 const MAX_CONTEXT_ITEM_LENGTH = 600;
 
 function sanitizeChatContext(context) {
@@ -388,6 +434,20 @@ function sanitizeChatContext(context) {
     const text = typeof item.text === 'string' ? item.text.substring(0, MAX_CONTEXT_ITEM_LENGTH) : '';
     return { role, text };
   }).filter(Boolean);
+}
+
+// lesbares deutsches datum+uhrzeit (Europe/Berlin) fürs report-json, damit man
+// einen eingehenden report direkt zeitlich zuordnen kann statt rohes ISO/UTC.
+function localTimestamp(date) {
+  try {
+    return date.toLocaleString('de-DE', {
+      timeZone: 'Europe/Berlin',
+      dateStyle: 'medium',
+      timeStyle: 'medium',
+    });
+  } catch {
+    return '';
+  }
 }
 
 // client-log vom frontend kappen (anzahl + länge) bevor es gespeichert wird
@@ -467,8 +527,10 @@ async function handleReport(ws, msg, manager) {
 
   // session-id der meldenden verbindung, um die server-logs darauf zu filtern
   const sessionId = manager?.getSessionRaw?.(ws.clientId)?.id || null;
+  const now = new Date();
   const report = {
-    timestamp: new Date().toISOString(),
+    timestamp: now.toISOString(),
+    localTime: localTimestamp(now),
     description: desc,
     chatContext: sanitizeChatContext(msg.chatContext),
     clientLog: sanitizeClientLog(msg.clientLog),
@@ -478,7 +540,7 @@ async function handleReport(ws, msg, manager) {
   };
 
   try {
-    await appendFile(REPORTS_PATH, JSON.stringify(report) + '\n');
+    await appendFile(reportsPath(), JSON.stringify(report) + '\n');
     console.log(`[server] bug report saved`);
     ws.send(JSON.stringify({ type: 'report_saved' }));
   } catch (err) {

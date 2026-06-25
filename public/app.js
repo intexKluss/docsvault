@@ -50,6 +50,7 @@
   const reportSend = document.getElementById('report-send');
   const reportCancel = document.getElementById('report-cancel');
   const sessionStatus = document.getElementById('session-status');
+  const burnEls = document.querySelectorAll('[data-burn]');
   const btnTheme = document.getElementById('btn-theme');
   const landingTheme = document.getElementById('landing-theme');
   const hljsTheme = document.getElementById('hljs-theme');
@@ -511,6 +512,10 @@
         finishResponse(messageId);
         break;
 
+      case 'burn_rate':
+        updateBurnRate(msg);
+        break;
+
       case 'report_saved':
         reportPending = false;
         if (!reportOverlay.classList.contains('hidden')) {
@@ -806,6 +811,85 @@
     meta.className = 'msg-meta';
     meta.textContent = responseElapsed + 's';
     aiMsg.appendChild(meta);
+  }
+
+  // burn-rate balken überm input: zeigt das restliche KI-Kontingent. fill-breite
+  // = rest in %, farbe blau (viel übrig) über amber nach rot (wenig, ab ~30%).
+  function burnLerp(a, b, t) {
+    return [
+      Math.round(a[0] + (b[0] - a[0]) * t),
+      Math.round(a[1] + (b[1] - a[1]) * t),
+      Math.round(a[2] + (b[2] - a[2]) * t),
+    ];
+  }
+
+  function burnColor(remaining) {
+    const blue = [79, 143, 247];
+    const amber = [230, 160, 40];
+    const red = [222, 70, 66];
+    // blau bleibt die basis bis ~50% rest, dann zügig über amber nach rot, voll
+    // rot ab ~30%. so dominiert blau und rot kommt klar an wenns eng wird.
+    let rgb;
+    if (remaining >= 50) rgb = blue;
+    else if (remaining <= 30) rgb = red;
+    else if (remaining >= 42) rgb = burnLerp(blue, amber, (50 - remaining) / 8);
+    else rgb = burnLerp(amber, red, (42 - remaining) / 12);
+    return 'rgb(' + rgb[0] + ',' + rgb[1] + ',' + rgb[2] + ')';
+  }
+
+  function burnWindowName(min) {
+    if (min === 300) return '5h';
+    if (min === 10080) return 'Woche';
+    if (typeof min === 'number' && min > 0) return Math.round(min / 60) + 'h';
+    return 'Fenster';
+  }
+
+  // reset-zeit lesbar: heute -> nur uhrzeit, später -> mit datum
+  function burnReset(sec) {
+    if (!sec) return '';
+    const d = new Date(sec * 1000);
+    if (isNaN(d.getTime())) return '';
+    const time = d.toLocaleTimeString('de-DE', { hour: '2-digit', minute: '2-digit' });
+    if ((d.getTime() - Date.now()) > 22 * 3600 * 1000) {
+      return d.toLocaleDateString('de-DE', { day: '2-digit', month: '2-digit' }) + ' ' + time;
+    }
+    return time;
+  }
+
+  function burnWindowText(label, w) {
+    if (!w) return '';
+    const reset = burnReset(w.resetsAt);
+    return label + ': ' + Math.round(w.remainingPercent) + '% frei' + (reset ? ', Reset ' + reset : '');
+  }
+
+  function updateBurnRate(data) {
+    const b = data && data.binding;
+    if (!b || !Number.isFinite(b.remainingPercent)) {
+      burnEls.forEach(function (el) { el.classList.add('hidden'); });
+      return;
+    }
+    const remaining = Math.max(0, Math.min(100, b.remainingPercent));
+    const color = burnColor(remaining);
+    const label = 'übrig: ' + Math.round(remaining) + '%';
+
+    // tooltip mit beiden fenstern + plan
+    const lines = [];
+    if (data.planType) lines.push('KI-Kontingent (' + data.planType + ')');
+    const p = burnWindowText(burnWindowName(data.primary && data.primary.windowMinutes), data.primary);
+    const s = burnWindowText(burnWindowName(data.secondary && data.secondary.windowMinutes), data.secondary);
+    if (p) lines.push(p);
+    if (s) lines.push(s);
+    const title = lines.join('\n');
+
+    burnEls.forEach(function (el) {
+      el.classList.remove('hidden');
+      el.style.setProperty('--burn', color);
+      el.setAttribute('title', title);
+      const fill = el.querySelector('.burn-rate-fill');
+      if (fill) fill.style.width = remaining + '%';
+      const lbl = el.querySelector('.burn-rate-label');
+      if (lbl) lbl.textContent = label;
+    });
   }
 
   // deutlicher banner wenn das ki-kontingent erschöpft ist, damit klar ist warum
