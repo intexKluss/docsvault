@@ -1,10 +1,10 @@
-# Vault-Updates
+# Vault Updates
 
-Die Vaults liegen außerhalb des Docker-Images auf dem Host. Der Container wird nur neu gestartet, nicht neu gebaut.
+Die Vaults liegen außerhalb des Docker Images auf dem Host. Der Container wird nur neu gestartet, nicht neu gebaut.
 
-Der otris-Vault hat sein eigenes Repo: [otris-docs-vault](https://github.com/intexKluss/otris-docs-vault).
+Der otris Vault hat sein eigenes Repo: [otris-docs-vault](https://github.com/intexKluss/otris-docs-vault).
 
-## otris-Vault: Erst-Einrichtung
+## otris Vault: Erst Einrichtung
 
 Repo klonen (Git legt den `vaults/`-Parent automatisch mit an):
 
@@ -18,7 +18,7 @@ Container starten oder neustarten:
 docker restart docsvault
 ```
 
-## otris-Vault aktualisieren (neue Doku-Version einspielen)
+## otris Vault aktualisieren (neue Doku Version einspielen)
 
 Auf dem Server:
 
@@ -36,9 +36,9 @@ docker restart docsvault
 
 Fertig, kein Rebuild nötig.
 
-## otris-Vault neu crawlen (Dev-Rechner, Playwright)
+## otris Vault neu crawlen (Dev Rechner, Playwright)
 
-Der Crawler lebt im `otris-docs-vault`-Repo unter `crawl/`. Er schreibt direkt in den Vault-Root.
+Der Crawler lebt im `otris-docs-vault`-Repo unter `crawl/`. Er schreibt direkt in den Vault Root.
 
 ```bash
 cd /path/to/otris-docs-vault/crawl
@@ -58,7 +58,7 @@ git push
 
 Danach auf dem Server `git pull` + `docker restart` (siehe oben).
 
-## Neuen Vault hinzufügen (z.B. Intex-Regeln)
+## Neuen Vault hinzufügen (z.B. Intex Regeln)
 
 Verzeichnis anlegen:
 
@@ -78,15 +78,15 @@ cat > /srv/otris/vaults/<name>/_meta.json <<'EOF'
 EOF
 ```
 
-Markdown-Dateien reinlegen, dann Container neustarten:
+Markdown Dateien reinlegen, dann Container neustarten:
 
 ```bash
 docker restart docsvault
 ```
 
-## Bestehenden Non-otris-Vault aktualisieren
+## Bestehenden Non-otris Vault aktualisieren
 
-Dateien im Host-Verzeichnis ändern oder austauschen, dann:
+Dateien im Host Verzeichnis ändern oder austauschen, dann:
 
 ```bash
 docker restart docsvault
@@ -102,6 +102,6 @@ rm -rf /srv/otris/vaults/<name>
 docker restart docsvault
 ```
 
-## Warum kein Live-Reload?
+## Warum kein Live Reload?
 
-Sonst könnten mehrere Nutzer unterschiedlichen Tool-Stand sehen. Der Container-Restart hält alle Sessions konsistent und dauert eh nur ein paar Sekunden.
+Sonst könnten mehrere Nutzer unterschiedlichen Tool Stand sehen. Der Container Restart hält alle Sessions konsistent und dauert eh nur ein paar Sekunden.

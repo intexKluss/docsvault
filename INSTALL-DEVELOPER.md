@@ -1,17 +1,17 @@
 # MCP Tool für Entwickler
 
-Dein Coding-Agent (Claude Code, Codex CLI, Gemini CLI, VS Code Copilot, etc.) bekommt Zugriff auf alle Wissensbereiche (Vaults) die auf dem Server konfiguriert sind. Also z.B. die otris DOCUMENTS Dokumentation plus die internen Firmenregeln. Die Inhalte liegen auf dem Server, du brauchst keinen eigenen Vault.
+Dein Coding Agent (Claude Code, Codex CLI, Gemini CLI, VS Code Copilot, etc.) bekommt Zugriff auf alle Wissensbereiche (Vaults) die auf dem Server konfiguriert sind. Also z.B. die otris DOCUMENTS Dokumentation plus die internen Firmenregeln. Die Inhalte liegen auf dem Server, du brauchst keinen eigenen Vault.
 
-Welche Vaults der Server gerade bereitstellt siehst du unter `http://SERVER-IP:3000/api/vaults`. Pro Vault gibt es fünf Tools, benannt nach dem `toolPrefix` aus der Vault-Konfiguration (z.B. `otris_search`, `intex_regeln_search`, ...).
+Welche Vaults der Server gerade bereitstellt siehst du unter `http://SERVER-IP:3000/api/vaults`. Pro Vault gibt es fünf Tools, benannt nach dem `toolPrefix` aus der Vault Konfiguration (z.B. `otris_search`, `intex_regeln_search`, ...).
 
 ## Voraussetzungen
 
-- Ein Coding-Agent der MCP unterstützt
+- Ein Coding Agent der MCP unterstützt
 - Netzwerkzugriff zum docsvault Server
 
 ## Option 1: Remote MCP (empfohlen)
 
-Du verbindest deinen Agent direkt per MCP-Netzwerkprotokoll mit dem Server. Keine lokale Installation nötig.
+Du verbindest deinen Agent direkt per MCP Netzwerkprotokoll mit dem Server. Keine lokale Installation nötig.
 
 ### Claude Code
 
@@ -123,11 +123,11 @@ curl "http://SERVER-IP:3000/api/otris/read?path=<exakter%20pfad%20aus%20search>"
 curl "http://SERVER-IP:3000/api/intex_regeln/search?query=commit"
 ```
 
-`SERVER-IP` natürlich immer durch die echte Server-Adresse ersetzen.
+`SERVER-IP` natürlich immer durch die echte Server Adresse ersetzen.
 
 ## Verfügbare Tools
 
-Pro Vault registriert der Server fünf MCP-Tools, benannt nach dem `toolPrefix` aus der Vault-Konfiguration:
+Pro Vault registriert der Server fünf MCP Tools, benannt nach dem `toolPrefix` aus der Vault Konfiguration:
 
 | Tool | Beschreibung |
 |------|--------------|
@@ -135,9 +135,9 @@ Pro Vault registriert der Server fünf MCP-Tools, benannt nach dem `toolPrefix` 
 | `<prefix>_read` | Einzelne Dokumentationsseite lesen |
 | `<prefix>_list` | Seiten in einem Bereich auflisten |
 | `<prefix>_overview` | Übersicht über alle Bereiche und Sektionen |
-| `<prefix>_status` | Vault-Status und Aktualität prüfen |
+| `<prefix>_status` | Vault Status und Aktualität prüfen |
 
-Beispiel: Beim Default-Setup heißt der otris-Vault-Prefix `otris`, also gibt es die Tools `otris_search`, `otris_read`, `otris_list`, `otris_overview`, `otris_status`. Ein zusätzlicher `intex-regeln`-Vault mit `toolPrefix: "intex_regeln"` bringt entsprechend `intex_regeln_search` usw.
+Beispiel: Beim Default Setup heißt der otris Vault Prefix `otris`, also gibt es die Tools `otris_search`, `otris_read`, `otris_list`, `otris_overview`, `otris_status`. Ein zusätzlicher `intex-regeln`-Vault mit `toolPrefix: "intex_regeln"` bringt entsprechend `intex_regeln_search` usw.
 
 ## Testen
 

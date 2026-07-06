@@ -1,19 +1,19 @@
 # docsvault
 
-Web-Chat UI und MCP-Server für die otris DOCUMENTS Dokumentation. Als AI-Backend läuft entweder das Claude Agent SDK oder das OpenAI Codex SDK. Die Dokumentation selbst liegt in einem separaten Vault-Repo (z.B. [otris-docs-vault](https://github.com/intexKluss/otris-docs-vault)) und wird zur Laufzeit als Volume gemountet, also nicht ins Docker-Image gebacken. Die aktuelle Seitenanzahl liefert dir das `<prefix>_status` Tool bzw. `GET /api/<prefix>/status`.
+Web Chat UI und MCP Server für die otris DOCUMENTS Dokumentation. Als AI Backend läuft entweder das Claude Agent SDK oder das OpenAI Codex SDK. Die Dokumentation selbst liegt in einem separaten Vault Repo (z.B. [otris-docs-vault](https://github.com/intexKluss/otris-docs-vault)) und wird zur Laufzeit als Volume gemountet, also nicht ins Docker Image gebacken. Die aktuelle Seitenanzahl liefert dir das `<prefix>_status` Tool bzw. `GET /api/<prefix>/status`.
 
 ## Features
 
-- **Web-Chat**: Landing Page + Chat-UI mit Typewriter-Effekt, Tool-Fortschrittsanzeige, Speed-Toggle
-- **MCP-Endpoints**: SSE (`/sse`) und Streamable HTTP (`/mcp`) für externe MCP-Clients
+- **Web Chat**: Landing Page + Chat UI mit Typewriter Effekt, Tool Fortschrittsanzeige, Speed Toggle
+- **MCP Endpoints**: SSE (`/sse`) und Streamable HTTP (`/mcp`) für externe MCP Clients
 - **REST API**: `/api/vaults` (Liste), `/api/<prefix>/{search,read,list,overview,status}` pro Vault
-- **Bridge-Switching**: Claude oder Codex per `BRIDGE` ENV Variable (Code-Default `claude`, das mitgelieferte Docker-Image setzt `BRIDGE=codex`)
-- **Volltextsuche**: nutzt [ripgrep](https://github.com/BurntSushi/ripgrep) (`rg`) für schnelle Suche, mit reinem Node-Fallback falls `rg` fehlt
-- **Sicherheit**: Rate Limiting, DOMPurify, Tool-Whitelisting, Prompt-Injection-Schutz. Die Origin-Validierung schützt allerdings nur den WebSocket. Optionale Bearer-Token-Auth für REST/MCP per `API_TOKEN` (siehe unten)
+- **Bridge Switching**: Claude oder Codex per `BRIDGE` ENV Variable (Code Default `claude`, das mitgelieferte Docker Image setzt `BRIDGE=codex`)
+- **Volltextsuche**: nutzt [ripgrep](https://github.com/BurntSushi/ripgrep) (`rg`) für schnelle Suche, mit reinem Node Fallback falls `rg` fehlt
+- **Sicherheit**: Rate Limiting, DOMPurify, Tool Whitelisting, Prompt Injection Schutz. Die Origin Validierung schützt allerdings nur den WebSocket. Optionale Bearer Token Auth für REST/MCP per `API_TOKEN` (siehe unten)
 
 ## Volltextsuche
 
-`<prefix>_search` durchsucht den Vault mit **ripgrep** (`rg`), sofern es im `PATH` liegt. Das ist deutlich schneller als der Node-Fallback, der greift nur wenn `rg` fehlt. Deshalb installiert das Docker-Image `ripgrep` gleich mit (siehe `Dockerfile`). Lokal (Dev) ohne installiertes `rg` läuft automatisch der Fallback. Das Suchergebnis ist identisch, nur langsamer.
+`<prefix>_search` durchsucht den Vault mit **ripgrep** (`rg`), sofern es im `PATH` liegt. Das ist deutlich schneller als der Node Fallback, der greift nur wenn `rg` fehlt. Deshalb installiert das Docker Image `ripgrep` gleich mit (siehe `Dockerfile`). Lokal (Dev) ohne installiertes `rg` läuft automatisch der Fallback. Das Suchergebnis ist identisch, nur langsamer.
 
 ## Quick Start
 
@@ -23,11 +23,11 @@ npm run dev           # Claude Bridge (Code-Default)
 npm run dev:codex     # Codex Bridge
 ```
 
-> **Windows-Hinweis:** `dev:codex` und `dev:claude` nutzen die bash-typische `BRIDGE=... node ...` Inline-Syntax und laufen so nur unter bash/WSL/Git Bash. Auf nativer PowerShell stattdessen:
+> **Windows Hinweis:** `dev:codex` und `dev:claude` nutzen die bash-typische `BRIDGE=... node ...` Inline Syntax und laufen so nur unter bash/WSL/Git Bash. Auf nativer PowerShell stattdessen:
 > ```powershell
 > $env:BRIDGE="codex"; node --watch src/server.js
 > ```
-> (`npm run dev` ohne ENV läuft überall und nutzt den Code-Default `claude`.)
+> (`npm run dev` ohne ENV läuft überall und nutzt den Code Default `claude`.)
 
 ## Deployment (Docker)
 
@@ -37,7 +37,7 @@ Image bauen:
 docker build -t docsvault .
 ```
 
-otris-Vault aufs Host-System klonen (dafür brauchst du Zugriff aufs [otris-docs-vault](https://github.com/intexKluss/otris-docs-vault) Repo):
+otris Vault aufs Host System klonen (dafür brauchst du Zugriff aufs [otris-docs-vault](https://github.com/intexKluss/otris-docs-vault) Repo):
 
 ```bash
 git clone https://github.com/intexKluss/otris-docs-vault.git /srv/otris/vaults/otris
@@ -57,9 +57,9 @@ docker run -d \
 
 Details stehen in [INSTALL-SERVER.md](INSTALL-SERVER.md).
 
-## Vault-Format: `_meta.json`
+## Vault Format: `_meta.json`
 
-Jeder Vault-Ordner kann (und sollte!) eine `_meta.json` im Root haben. Der Server liest sie beim Start und nutzt die Werte für Tool-Namen und -Beschreibungen:
+Jeder Vault Ordner kann (und sollte!) eine `_meta.json` im Root haben. Der Server liest sie beim Start und nutzt die Werte für Tool Namen und Beschreibungen:
 
 ```json
 {
@@ -71,17 +71,17 @@ Jeder Vault-Ordner kann (und sollte!) eine `_meta.json` im Root haben. Der Serve
 
 | Feld | Pflicht | Default | Effekt |
 |---|---|---|---|
-| `name` | nein | Ordnername | Anzeigename im System-Prompt und `/api/vaults` |
-| `description` | nein, aber empfohlen | `"Documentation vault '<name>'"` | **Geht in die Tool-Description.** Davon hängt ab ob der LLM den Vault richtig auswählt |
-| `toolPrefix` | nein | `slugify(Ordnername)` | Prefix für Tool-Namen (`<prefix>_search` etc.), muss `/^[a-z][a-z0-9_]*$/` matchen |
+| `name` | nein | Ordnername | Anzeigename im System Prompt und `/api/vaults` |
+| `description` | nein, aber empfohlen | `"Documentation vault '<name>'"` | **Geht in die Tool Description.** Davon hängt ab ob der LLM den Vault richtig auswählt |
+| `toolPrefix` | nein | `slugify(Ordnername)` | Prefix für Tool Namen (`<prefix>_search` etc.), muss `/^[a-z][a-z0-9_]*$/` matchen |
 
 Ohne `_meta.json` läuft der Vault trotzdem, kriegt aber nur generische Defaults. Der LLM weiß dann nicht worum's im Vault geht. Also immer dranbauen.
 
-Der otris-Vault hat seine `_meta.json` schon im [otris-docs-vault Repo](https://github.com/intexKluss/otris-docs-vault) drin, da musst du nichts anlegen.
+Der otris Vault hat seine `_meta.json` schon im [otris-docs-vault Repo](https://github.com/intexKluss/otris-docs-vault) drin, da musst du nichts anlegen.
 
 ## Weitere Vaults hinzufügen
 
-Jeder Unterordner unter dem gemounteten Vaults-Verzeichnis wird zu einem eigenen Vault mit eigenen MCP-Tools (`<prefix>_search`, `<prefix>_read`, `<prefix>_list`, `<prefix>_overview`, `<prefix>_status`).
+Jeder Unterordner unter dem gemounteten Vaults Verzeichnis wird zu einem eigenen Vault mit eigenen MCP Tools (`<prefix>_search`, `<prefix>_read`, `<prefix>_list`, `<prefix>_overview`, `<prefix>_status`).
 
 Verzeichnis anlegen:
 
@@ -101,15 +101,15 @@ cat > /srv/otris/vaults/intex-regeln/_meta.json <<'EOF'
 EOF
 ```
 
-Markdown-Dateien reinkopieren, dann Container neustarten:
+Markdown Dateien reinkopieren, dann Container neustarten:
 
 ```bash
 docker restart docsvault
 ```
 
-## Für Entwickler (MCP-Client)
+## Für Entwickler (MCP Client)
 
-Verbinde deinen Coding-Agent per MCP mit dem Server:
+Verbinde deinen Coding Agent per MCP mit dem Server:
 
 ```bash
 claude mcp add --transport sse docsvault http://SERVER-IP:3000/sse
@@ -128,7 +128,7 @@ Oder manuell in `.mcp.json`:
 }
 ```
 
-**Bricht die Verbindung weg?** SSE (`type: sse`) braucht eine dauerhaft offene Verbindung, und die kappt ein Reverse-Proxy gern nach kurzer Idle-Zeit (typisches Symptom: der Client zeigt kurz die Tools, dann ist der Server weg). Nutze dann den Streamable-HTTP-Endpunkt `/mcp` (`type: http`), der ist proxy-robust:
+**Bricht die Verbindung weg?** SSE (`type: sse`) braucht eine dauerhaft offene Verbindung, und die kappt ein Reverse Proxy gern nach kurzer Idle Zeit (typisches Symptom: der Client zeigt kurz die Tools, dann ist der Server weg). Nutze dann den Streamable HTTP Endpunkt `/mcp` (`type: http`), der ist proxy-robust:
 
 ```bash
 claude mcp add --transport http docsvault http://SERVER-IP:3000/mcp
@@ -140,11 +140,11 @@ Alle Optionen findest du in [INSTALL-DEVELOPER.md](INSTALL-DEVELOPER.md).
 
 Ehrlich gesagt, damit niemand falsche Annahmen trifft:
 
-- **REST API (`/api`) und MCP (`/sse`, `/messages`, `/mcp`) sind standardmäßig ohne Authentifizierung erreichbar.** Es gibt dort weder Origin-Check noch (ohne Token) eine Zugriffskontrolle. Wer den Port erreicht, kann lesen.
-- **Origin-Validierung greift nur für den WebSocket** (Web-Chat), nicht für REST/MCP.
+- **REST API (`/api`) und MCP (`/sse`, `/messages`, `/mcp`) sind standardmäßig ohne Authentifizierung erreichbar.** Es gibt dort weder Origin Check noch (ohne Token) eine Zugriffskontrolle. Wer den Port erreicht, kann lesen.
+- **Origin Validierung greift nur für den WebSocket** (Web Chat), nicht für REST/MCP.
 - **Rate Limiting** (`RATE_LIMIT_PER_MIN` für WebSocket, `API_RATE_LIMIT_PER_MIN` für REST) bremst Missbrauch, ist aber keine Auth.
 
-**Opt-in Auth via `API_TOKEN`:** Setzt du die ENV-Variable `API_TOKEN`, verlangen `/api`, `/sse`, `/messages`, `/mcp` und der WebSocket einen Bearer-Token (`Authorization: Bearer <TOKEN>`). Ist `API_TOKEN` nicht gesetzt, bleiben alle Endpoints offen (aktuelles Default-Verhalten). Für öffentlich erreichbare Deployments solltest du das dringend setzen oder den Port hinter einem Reverse Proxy / VPN dichtmachen.
+**Opt-in Auth via `API_TOKEN`:** Setzt du die ENV Variable `API_TOKEN`, verlangen `/api`, `/sse`, `/messages`, `/mcp` und der WebSocket einen Bearer Token (`Authorization: Bearer <TOKEN>`). Ist `API_TOKEN` nicht gesetzt, bleiben alle Endpoints offen (aktuelles Default Verhalten). Für öffentlich erreichbare Deployments solltest du das dringend setzen oder den Port hinter einem Reverse Proxy / VPN dichtmachen.
 
 ## Nützliche Befehle
 
@@ -168,7 +168,7 @@ docker exec docsvault codex auth status                    # Auth-Status prüfen
 docker exec docsvault codex mcp list                       # MCP-Server prüfen
 ```
 
-### Bug-Reports auslesen
+### Bug Reports auslesen
 
 ```bash
 docker exec docsvault cat /app/reports.json                # Alle Reports anzeigen
@@ -200,13 +200,13 @@ docker run -d --name docsvault --restart unless-stopped \
   docsvault
 ```
 
-Die Codex-Auth bleibt im Volume `docsvault-codex` erhalten. Die Vaults liegen auf dem Host (siehe `-v /srv/otris/vaults`).
+Die Codex Auth bleibt im Volume `docsvault-codex` erhalten. Die Vaults liegen auf dem Host (siehe `-v /srv/otris/vaults`).
 
 ## Vault aktualisieren
 
-docsvault selbst hat keinen Crawler. Der Content wird in einem separaten Vault-Repo gepflegt (z.B. [otris-docs-vault](https://github.com/intexKluss/otris-docs-vault)). Wie man das updated, steht dort in `crawl/README.md`.
+docsvault selbst hat keinen Crawler. Der Content wird in einem separaten Vault Repo gepflegt (z.B. [otris-docs-vault](https://github.com/intexKluss/otris-docs-vault)). Wie man das updated, steht dort in `crawl/README.md`.
 
-Den kompletten Deployment-Flow (Pull im Vault-Repo, Container sieht neue Version sofort) findest du in [UPDATE-VAULT.md](UPDATE-VAULT.md).
+Den kompletten Deployment Flow (Pull im Vault Repo, Container sieht neue Version sofort) findest du in [UPDATE-VAULT.md](UPDATE-VAULT.md).
 
 ## Tests
 
