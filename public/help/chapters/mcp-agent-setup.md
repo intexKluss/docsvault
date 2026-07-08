@@ -1,20 +1,20 @@
 # MCP mit deinem Coding-Agent nutzen
 
-Wenn der docsvault Server im LAN läuft, kannst du deinen Coding-Agent direkt damit verbinden, ganz ohne lokale Installation. Der Agent bekommt dann direkten Zugriff auf die otris-Dokumentation: suchen, lesen, auflisten.
+Wenn der docsvault Server im LAN läuft, kannst du deinen Coding-Agent direkt damit verbinden, ganz ohne lokale Installation. Der Agent bekommt dann direkten Zugriff auf deine Dokumentation: suchen, lesen, auflisten.
 
 ## Verfügbare Tools nach der Einrichtung
 
-Pro Wissensbereich (Vault) auf dem Server gibt es fünf Tools mit dem Vault-Prefix. Beim Standard-Setup mit nur dem otris-Vault sind das diese:
+Pro Wissensbereich (Vault) auf dem Server gibt es fünf Tools mit dem Vault-Prefix. Bei einem Vault mit `toolPrefix: "docs"` sind das diese:
 
 | Tool | Funktion |
 |------|----------|
-| `otris_search` | Volltextsuche in der Dokumentation |
-| `otris_read` | Einzelnes Dokument lesen |
-| `otris_list` | Dokumente auflisten |
-| `otris_overview` | Übersicht über verfügbare Inhalte |
-| `otris_status` | Serverstatus prüfen |
+| `docs_search` | Volltextsuche in der Dokumentation |
+| `docs_read` | Einzelnes Dokument lesen |
+| `docs_list` | Dokumente auflisten |
+| `docs_overview` | Übersicht über verfügbare Inhalte |
+| `docs_status` | Serverstatus prüfen |
 
-Falls weitere Vaults konfiguriert sind (z.B. `intex-regeln`), kommen entsprechende Tools wie `intex_regeln_search` dazu. Die vollständige Liste liefert dir `http://<SERVER-IP>:3000/api/vaults`.
+Falls weitere Vaults konfiguriert sind (z.B. `team-notes`), kommen entsprechende Tools wie `team_notes_search` dazu. Die vollständige Liste liefert dir `http://<SERVER-IP>:3000/api/vaults`.
 
 ## Claude Code
 

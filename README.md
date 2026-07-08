@@ -1,6 +1,6 @@
 # docsvault
 
-Web Chat UI und MCP Server für jegliche Dokumentation. Als AI Backend läuft entweder das Claude Agent SDK oder das OpenAI Codex SDK. Die Dokumentation für otris selbst liegt in einem separaten Vault Repo (z.B. [otris-docs-vault](https://github.com/intexKluss/otris-docs-vault)) und wird zur Laufzeit als Volume gemountet, also nicht ins Docker Image gebacken. Die aktuelle Seitenanzahl liefert dir das `<prefix>_status` Tool bzw. `GET /api/<prefix>/status`.
+Web Chat UI und MCP Server für deine Markdown-Dokumentation. Als AI Backend läuft entweder das Claude Agent SDK oder das OpenAI Codex SDK. Die Dokumentation selbst liegt in einem separaten Vault Repo (oder einfach einem Ordner mit `.md`-Dateien) und wird zur Laufzeit als Volume gemountet, also nicht ins Docker Image gebacken. Die aktuelle Seitenanzahl liefert dir das `<prefix>_status` Tool bzw. `GET /api/<prefix>/status`.
 
 ## Features
 
@@ -37,10 +37,10 @@ Image bauen:
 docker build -t docsvault .
 ```
 
-otris Vault aufs Host System klonen (dafür brauchst du Zugriff aufs [otris-docs-vault](https://github.com/intexKluss/otris-docs-vault) Repo):
+Vault aufs Host System klonen (dein eigenes Repo mit der Dokumentation):
 
 ```bash
-git clone https://github.com/intexKluss/otris-docs-vault.git /srv/otris/vaults/otris
+git clone https://github.com/<dein-org>/<dein-vault-repo>.git /srv/docsvault/vaults/docs
 ```
 
 Git legt `vaults/` automatisch mit an.
@@ -49,7 +49,7 @@ Container starten:
 
 ```bash
 docker run -d \
-  -v /srv/otris/vaults:/app/vaults:ro \
+  -v /srv/docsvault/vaults:/app/vaults:ro \
   -p 3000:3000 \
   --name docsvault \
   docsvault
@@ -77,7 +77,7 @@ Jeder Vault Ordner kann (und sollte!) eine `_meta.json` im Root haben. Der Serve
 
 Ohne `_meta.json` läuft der Vault trotzdem, kriegt aber nur generische Defaults. Der LLM weiß dann nicht worum's im Vault geht. Also immer dranbauen.
 
-Der otris Vault hat seine `_meta.json` schon im [otris-docs-vault Repo](https://github.com/intexKluss/otris-docs-vault) drin, da musst du nichts anlegen.
+Bringt dein Vault Repo schon eine `_meta.json` mit, musst du selbst nichts anlegen.
 
 ## Weitere Vaults hinzufügen
 
@@ -86,17 +86,17 @@ Jeder Unterordner unter dem gemounteten Vaults Verzeichnis wird zu einem eigenen
 Verzeichnis anlegen:
 
 ```bash
-mkdir -p /srv/otris/vaults/intex-regeln
+mkdir -p /srv/docsvault/vaults/team-notes
 ```
 
 `_meta.json` anlegen (Linux / bash):
 
 ```bash
-cat > /srv/otris/vaults/intex-regeln/_meta.json <<'EOF'
+cat > /srv/docsvault/vaults/team-notes/_meta.json <<'EOF'
 {
-  "name": "Intex Regeln",
+  "name": "Team Notes",
   "description": "Interne Richtlinien und Team-Konventionen.",
-  "toolPrefix": "intex_regeln"
+  "toolPrefix": "team_notes"
 }
 EOF
 ```
@@ -181,9 +181,9 @@ docker exec docsvault wc -l /app/reports.json              # Anzahl Reports
 ```bash
 curl http://SERVER-IP:3000/api/health                       # Health Check + Vault-Anzahl
 curl http://SERVER-IP:3000/api/vaults                       # Konfigurierte Vaults auflisten
-curl http://SERVER-IP:3000/api/otris/status                 # Vault-Status (otris)
-curl "http://SERVER-IP:3000/api/otris/search?query=DocFile" # Suche im otris-Vault
-curl "http://SERVER-IP:3000/api/otris/overview"             # Sektionsübersicht des otris-Vaults
+curl http://SERVER-IP:3000/api/docs/status                  # Vault-Status (docs)
+curl "http://SERVER-IP:3000/api/docs/search?query=Installation" # Suche im docs-Vault
+curl "http://SERVER-IP:3000/api/docs/overview"               # Sektionsübersicht des docs-Vaults
 ```
 
 ### Komplett neu bauen
@@ -195,16 +195,16 @@ docker build -t docsvault .
 docker run -d --name docsvault --restart unless-stopped \
   -p 3000:3000 -e BRIDGE=codex \
   -e ALLOW_NO_ORIGIN=true \
-  -v /srv/otris/vaults:/app/vaults:ro \
+  -v /srv/docsvault/vaults:/app/vaults:ro \
   -v docsvault-codex:/home/node/.codex \
   docsvault
 ```
 
-Die Codex Auth bleibt im Volume `docsvault-codex` erhalten. Die Vaults liegen auf dem Host (siehe `-v /srv/otris/vaults`).
+Die Codex Auth bleibt im Volume `docsvault-codex` erhalten. Die Vaults liegen auf dem Host (siehe `-v /srv/docsvault/vaults`).
 
 ## Vault aktualisieren
 
-docsvault selbst hat keinen Crawler. Der Content wird in einem separaten Vault Repo gepflegt (z.B. [otris-docs-vault](https://github.com/intexKluss/otris-docs-vault)). Wie man das updated, steht dort in `crawl/README.md`.
+docsvault selbst hat keinen Crawler. Der Content wird in einem separaten Vault Repo gepflegt. Wie du den aktualisierst, hängt von diesem Repo ab (z.B. eigener Generator, manuelles Editieren, oder ein Crawler falls dein Repo einen mitbringt).
 
 Den kompletten Deployment Flow (Pull im Vault Repo, Container sieht neue Version sofort) findest du in [UPDATE-VAULT.md](UPDATE-VAULT.md).
 

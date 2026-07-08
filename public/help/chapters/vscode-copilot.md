@@ -74,7 +74,7 @@ Die MCP-Tools laufen nur im **Agent Mode** von Copilot Chat:
 
 Im Agent Mode einfach eine Testfrage stellen:
 
-> Suche in der otris Doku nach FileType
+> Suche in der Doku nach Installation
 
 Copilot sollte die MCP-Tools ziehen und dir Ergebnisse aus der Dokumentation liefern.
 

@@ -26,7 +26,7 @@ Das Image ist schlank. Der Vault wird nicht mehr mitgebaut, sondern per Volume g
 
 **Das Konzept:** Der Container selbst enthält keinen Vault. Er liest sie zur Laufzeit aus einem Verzeichnis auf dem **Host**, das per `-v` in den Container Pfad `/app/vaults` gemountet wird.
 
-- **Der Host Pfad ist frei wählbar.** Auf Linux Servern ist `/srv/otris/vaults` Konvention. Auf einem Windows Dev Rechner kann es z.B. `C:\otris-test\vaults` sein. Wichtig ist nur: derselbe Pfad muss in Schritt 4 beim `docker run -v <HOSTPFAD>:/app/vaults` auftauchen.
+- **Der Host Pfad ist frei wählbar.** Auf Linux Servern ist `/srv/docsvault/vaults` Konvention. Auf einem Windows Dev Rechner kann es z.B. `C:\docsvault-test\vaults` sein. Wichtig ist nur: derselbe Pfad muss in Schritt 4 beim `docker run -v <HOSTPFAD>:/app/vaults` auftauchen.
 - **Kein `mkdir`, kein `cd` nötig.** `git clone URL TARGET-PFAD` legt alle Parent Ordner automatisch an.
 - **`/app/vaults` existiert nur im Container.** Vom Dockerfile angelegt, nicht auf deinem Host.
 
@@ -37,7 +37,7 @@ cd ..
 ```
 
 ```bash
-git clone https://github.com/intexKluss/otris-docs-vault.git vaults/otris
+git clone https://github.com/<dein-org>/<dein-vault-repo>.git vaults/docs
 ```
 
 Ergibt folgende Struktur:
@@ -46,33 +46,33 @@ Ergibt folgende Struktur:
 <dein-arbeitsordner>/
 ├── docsvault/      <- der gerade geklonte Server-Code
 └── vaults/
-    └── otris/           <- der Vault mit _meta.json + den Markdown-Seiten
+    └── docs/            <- der Vault mit _meta.json + den Markdown-Seiten
 ```
 
-> **Server Setup (Linux Konvention):** Vaults oft unter `/srv/otris/vaults/`, ausführbar aus beliebigem Arbeitsverzeichnis:
+> **Server Setup (Linux Konvention):** Vaults oft unter `/srv/docsvault/vaults/`, ausführbar aus beliebigem Arbeitsverzeichnis:
 > ```bash
-> git clone https://github.com/intexKluss/otris-docs-vault.git /srv/otris/vaults/otris
+> git clone https://github.com/<dein-org>/<dein-vault-repo>.git /srv/docsvault/vaults/docs
 > ```
-> Falls `/srv/` root gehört: `sudo git clone ...` oder ein anderes Verzeichnis wählen (z.B. `/home/<user>/otris-vaults/otris`).
+> Falls `/srv/` root gehört: `sudo git clone ...` oder ein anderes Verzeichnis wählen (z.B. `/home/<user>/docsvault-vaults/docs`).
 >
 > **Windows Variante** (PowerShell):
 > ```powershell
-> git clone https://github.com/intexKluss/otris-docs-vault.git C:\otris-test\vaults\otris
+> git clone https://github.com/<dein-org>/<dein-vault-repo>.git C:\docsvault-test\vaults\docs
 > ```
-> Im `docker run -v` in Schritt 4 dann `C:/otris-test/vaults:/app/vaults` (Forward Slashes).
+> Im `docker run -v` in Schritt 4 dann `C:/docsvault-test/vaults:/app/vaults` (Forward Slashes).
 
 **Weitere Vaults hinzufügen**, manuell, z.B.:
 
 ```bash
-mkdir -p /srv/otris/vaults/intex-regeln
+mkdir -p /srv/docsvault/vaults/team-notes
 ```
 
 ```bash
-cat > /srv/otris/vaults/intex-regeln/_meta.json <<'EOF'
+cat > /srv/docsvault/vaults/team-notes/_meta.json <<'EOF'
 {
-  "name": "Intex Regeln",
+  "name": "Team Notes",
   "description": "Interne Richtlinien und Team-Konventionen.",
-  "toolPrefix": "intex_regeln"
+  "toolPrefix": "team_notes"
 }
 EOF
 ```
@@ -90,7 +90,7 @@ docker run -d \
   -p 3000:3000 \
   -e BRIDGE=codex \
   -e ALLOW_NO_ORIGIN=true \
-  -v /srv/otris/vaults:/app/vaults:ro \
+  -v /srv/docsvault/vaults:/app/vaults:ro \
   -v docsvault-codex:/home/node/.codex \
   docsvault
 ```
@@ -102,14 +102,14 @@ docker run -d --name docsvault --restart unless-stopped -p 3000:3000 -e BRIDGE=c
 ```
 
 **Dieser Platzhalter muss im `docker run` ersetzt werden:**
-- `/srv/otris/vaults` (Linux) bzw. `C:/dein/pfad/zu/vaults` (Windows): dein Host Pfad aus Schritt 3, also wohin du den Vault geklont hast
+- `/srv/docsvault/vaults` (Linux) bzw. `C:/dein/pfad/zu/vaults` (Windows): dein Host Pfad aus Schritt 3, also wohin du den Vault geklont hast
 
 Ein `ALLOWED_ORIGINS` brauchst du **nicht**: der Web Chat verbindet immer same-origin, und same-origin lässt der Server automatisch durch, egal über welche IP, Domain oder welchen Port die Seite aufgerufen wird. `ALLOWED_ORIGINS` braucht man nur, wenn das Frontend von einer **anderen** Origin aus zugreift (z.B. Reverse Proxy, der den `Host`-Header umschreibt).
 
 **Zum Volume Format `-v ...`:** Docker erwartet drei Teile getrennt mit `:`, also `HOSTPFAD:CONTAINERPFAD:OPTIONEN`.
 
 ```
--v "C:/otris web test/vaults : /app/vaults : ro"
+-v "C:/docsvault web test/vaults : /app/vaults : ro"
       └─────────┬──────────┘   └────┬────┘  └┬┘
             Host-Pfad        Container-Pfad  read-only
       (dein Windows-Ordner)  (server liest   (optional)
@@ -124,9 +124,9 @@ Analog für das zweite Volume `-v docsvault-codex:/home/node/.codex`:
 - Keine Optionen (read-write)
 
 > **Bug Reports persistent machen** (optional): Standardmäßig landen Bug Reports in `/app/reports.json` **im Container**, verschwinden also beim `docker rm`. Wenn du sie über Container Rebuilds hinweg behalten willst, mounte eine Host Datei drauf:
-> - Host Datei vorher anlegen: Linux `touch /srv/otris/reports.json` bzw. Windows `New-Item -ItemType File "C:\pfad\reports.json" -Force`
-> - Beim `docker run` ergänzen: `-v /srv/otris/reports.json:/app/reports.json` (Linux) bzw. `-v "C:/pfad/reports.json:/app/reports.json"` (Windows)
-> - **Wichtig (Linux):** Der Container läuft als User `node` (uid 1000). Die gemountete Host Datei muss diesem User gehören, sonst kann der Server nicht reinschreiben: `chown 1000:1000 /srv/otris/reports.json`. Sonst landen Reports nur im Container Log als Fehler.
+> - Host Datei vorher anlegen: Linux `touch /srv/docsvault/reports.json` bzw. Windows `New-Item -ItemType File "C:\pfad\reports.json" -Force`
+> - Beim `docker run` ergänzen: `-v /srv/docsvault/reports.json:/app/reports.json` (Linux) bzw. `-v "C:/pfad/reports.json:/app/reports.json"` (Windows)
+> - **Wichtig (Linux):** Der Container läuft als User `node` (uid 1000). Die gemountete Host Datei muss diesem User gehören, sonst kann der Server nicht reinschreiben: `chown 1000:1000 /srv/docsvault/reports.json`. Sonst landen Reports nur im Container Log als Fehler.
 
 Die Volumes sorgen dafür, dass Vaults, Codex Auth und Bug Reports bei Container Rebuilds erhalten bleiben.
 
@@ -167,11 +167,11 @@ curl http://localhost:3000/api/health
 # Liste der konfigurierten Vaults
 curl http://localhost:3000/api/vaults
 
-# Vault-Status des otris-Vaults (Seitenanzahl, Sektionen, Aktualität)
-curl http://localhost:3000/api/otris/status
+# Vault-Status des docs-Vaults (Seitenanzahl, Sektionen, Aktualität)
+curl http://localhost:3000/api/docs/status
 
 # Suche testen (Pfad = /api/<toolPrefix>/search)
-curl "http://localhost:3000/api/otris/search?query=DocFile&max_results=3"
+curl "http://localhost:3000/api/docs/search?query=Installation&max_results=3"
 
 # Web UI im Browser öffnen
 open http://localhost:3000
@@ -239,7 +239,7 @@ Details: [INSTALL-DEVELOPER.md](INSTALL-DEVELOPER.md)
 | `/sse` | MCP | SSE Transport für MCP Clients |
 | `/mcp` | MCP | Streamable HTTP Transport |
 
-`<prefix>` ist der `toolPrefix` aus der `_meta.json` des jeweiligen Vaults (Default Setup: `otris`).
+`<prefix>` ist der `toolPrefix` aus der `_meta.json` des jeweiligen Vaults (Beispiel oben: `docs`).
 
 ## Sicherheit
 
@@ -257,10 +257,10 @@ Details: [INSTALL-DEVELOPER.md](INSTALL-DEVELOPER.md)
 
 ### Vault aktualisieren (neue Doku Version)
 
-Der otris Vault liegt im [otris-docs-vault](https://github.com/intexKluss/otris-docs-vault) Repo. Update Workflow auf dem Server:
+Dein Vault liegt in seinem eigenen Repo. Update Workflow auf dem Server:
 
 ```bash
-cd /srv/otris/vaults/otris
+cd /srv/docsvault/vaults/docs
 ```
 
 ```bash
@@ -271,7 +271,7 @@ git pull
 docker restart docsvault
 ```
 
-Details zum Neu Crawlen und Pushen des Vault Repos: [UPDATE-VAULT.md](UPDATE-VAULT.md).
+Details zum Aktualisieren und Pushen des Vault Repos: [UPDATE-VAULT.md](UPDATE-VAULT.md).
 
 Kein Rebuild nötig, die Vaults liegen außerhalb des Images.
 
@@ -288,7 +288,7 @@ docker run -d \
   -p 3000:3000 \
   -e BRIDGE=codex \
   -e ALLOW_NO_ORIGIN=true \
-  -v /srv/otris/vaults:/app/vaults:ro \
+  -v /srv/docsvault/vaults:/app/vaults:ro \
   -v docsvault-codex:/home/node/.codex \
   docsvault
 ```

@@ -38,4 +38,4 @@ gemini mcp list
 
 Der Server `docsvault` sollte jetzt in der Liste auftauchen.
 
-Starte Gemini CLI und stell eine Testfrage zur otris Dokumentation oder zu den Intex-Regeln. Die Tools werden automatisch genutzt.
+Starte Gemini CLI und stell eine Testfrage zu deiner Dokumentation. Die Tools werden automatisch genutzt.

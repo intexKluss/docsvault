@@ -2,14 +2,14 @@
 
 Die Vaults liegen außerhalb des Docker Images auf dem Host. Der Container wird nur neu gestartet, nicht neu gebaut.
 
-Der otris Vault hat sein eigenes Repo: [otris-docs-vault](https://github.com/intexKluss/otris-docs-vault).
+Am saubersten hat jeder Vault sein eigenes Git Repo, dann läuft ein Update über `git pull`. Ein Vault kann aber genauso gut einfach ein Ordner mit Markdown Dateien ohne Git sein, dann ersetzt du die Dateien direkt.
 
-## otris Vault: Erst Einrichtung
+## Vault: Erst Einrichtung
 
 Repo klonen (Git legt den `vaults/`-Parent automatisch mit an):
 
 ```bash
-git clone https://github.com/intexKluss/otris-docs-vault.git /srv/otris/vaults/otris
+git clone https://github.com/<dein-org>/<dein-vault-repo>.git /srv/docsvault/vaults/docs
 ```
 
 Container starten oder neustarten:
@@ -18,12 +18,12 @@ Container starten oder neustarten:
 docker restart docsvault
 ```
 
-## otris Vault aktualisieren (neue Doku Version einspielen)
+## Vault aktualisieren (neue Doku Version einspielen)
 
 Auf dem Server:
 
 ```bash
-cd /srv/otris/vaults/otris
+cd /srv/docsvault/vaults/docs
 ```
 
 ```bash
@@ -36,21 +36,13 @@ docker restart docsvault
 
 Fertig, kein Rebuild nötig.
 
-## otris Vault neu crawlen (Dev Rechner, Playwright)
+## Content erzeugen (Dev Rechner)
 
-Der Crawler lebt im `otris-docs-vault`-Repo unter `crawl/`. Er schreibt direkt in den Vault Root.
+Wie die Markdown Dateien im Vault Repo entstehen, ist docsvault egal: von Hand geschrieben, aus einer bestehenden Doku exportiert, oder mit einem eigenen Crawler/Generator erzeugt. Falls dein Vault Repo so ein Tooling mitbringt, liegt es meist in einem eigenen Unterordner (z.B. `crawl/`) mit eigenem `README.md`, das den Ablauf beschreibt.
 
-```bash
-cd /path/to/otris-docs-vault/crawl
-npm install             # einmalig, zieht playwright
-npm run crawl:login     # einmalig, browser-login, legt .auth.json an
-npm run crawl           # vault komplett neu scrapen
-```
-
-Nach dem Crawl committen und pushen:
+Nach der Content Erzeugung committen und pushen:
 
 ```bash
-cd ..
 git add -A
 git commit -m "update vault content"
 git push
@@ -58,18 +50,18 @@ git push
 
 Danach auf dem Server `git pull` + `docker restart` (siehe oben).
 
-## Neuen Vault hinzufügen (z.B. Intex Regeln)
+## Neuen Vault hinzufügen
 
 Verzeichnis anlegen:
 
 ```bash
-mkdir -p /srv/otris/vaults/<name>
+mkdir -p /srv/docsvault/vaults/<name>
 ```
 
 `_meta.json` anlegen:
 
 ```bash
-cat > /srv/otris/vaults/<name>/_meta.json <<'EOF'
+cat > /srv/docsvault/vaults/<name>/_meta.json <<'EOF'
 {
   "name": "Anzeigename",
   "description": "Wofür ist dieser Vault da? Landet in Tool-Descriptions.",
@@ -84,7 +76,7 @@ Markdown Dateien reinlegen, dann Container neustarten:
 docker restart docsvault
 ```
 
-## Bestehenden Non-otris Vault aktualisieren
+## Bestehenden Vault aktualisieren
 
 Dateien im Host Verzeichnis ändern oder austauschen, dann:
 
@@ -95,7 +87,7 @@ docker restart docsvault
 ## Vault entfernen
 
 ```bash
-rm -rf /srv/otris/vaults/<name>
+rm -rf /srv/docsvault/vaults/<name>
 ```
 
 ```bash

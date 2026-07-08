@@ -1,6 +1,6 @@
 # docsvault: Architektur
 
-Web Chat UI für die otris DOCUMENTS Dokumentation. Der Bot läuft entweder über das Claude Agent SDK oder das OpenAI Codex SDK. Die MCP Tools (search, read, list, overview, status) stecken direkt im Server drin, kein externer Tool Server nötig (`src/tools/`).
+Web Chat UI für deine Markdown-Dokumentation. Der Bot läuft entweder über das Claude Agent SDK oder das OpenAI Codex SDK. Die MCP Tools (search, read, list, overview, status) stecken direkt im Server drin, kein externer Tool Server nötig (`src/tools/`).
 
 ## Dateistruktur
 
@@ -45,8 +45,8 @@ src/tools/ (search, read, list, overview, status)
     |
     v
 vaults/
-  ├── otris/        (via Volume-Mount, _meta.json; Seitenzahl via <prefix>_status)
-  ├── intex-regeln/ (via Volume-Mount, _meta.json)
+  ├── docs/         (via Volume-Mount, _meta.json; Seitenzahl via <prefix>_status)
+  ├── team-notes/   (via Volume-Mount, _meta.json)
   └── ...
 ```
 
@@ -79,10 +79,10 @@ Beide Bridges exportieren dasselbe Interface, austauschbar ohne dass der Rest wa
 ```js
 { type: 'session_init' }                                     // Session wird erstellt
 { type: 'vaults', list: [{ toolPrefix, name, description }] } // verfügbare Vaults (direkt nach Connect)
-{ type: 'session_ready', toolPrefix: 'otris' }               // Warm-up fertig, Input frei (mit gewähltem Vault)
+{ type: 'session_ready', toolPrefix: 'docs' }                 // Warm-up fertig, Input frei (mit gewähltem Vault)
 { type: 'chunk', content: '...' }                            // Text-Stream
-{ type: 'tool_use', tool: 'otris_search', status: 'running' } // Tool gestartet
-{ type: 'tool_use', tool: 'otris_search', status: 'done' }    // Tool fertig
+{ type: 'tool_use', tool: 'docs_search', status: 'running' }  // Tool gestartet
+{ type: 'tool_use', tool: 'docs_search', status: 'done' }     // Tool fertig
 { type: 'done' }                                             // Antwort komplett
 { type: 'error', message: '...' }                            // Fehler
 { type: 'report_saved' }                                     // Bug-Report gespeichert
@@ -91,7 +91,7 @@ Beide Bridges exportieren dasselbe Interface, austauschbar ohne dass der Rest wa
 ### Client → Server
 
 ```js
-{ type: 'select_vault', toolPrefix: 'otris' }                // Vault wählen (vor erster Nachricht)
+{ type: 'select_vault', toolPrefix: 'docs' }                 // Vault wählen (vor erster Nachricht)
 { type: 'message', content: '...', mode: 'fast'|'thorough' } // Chat-Nachricht
 { type: 'report', description: '...', chatContext: [...] }    // Bug-Report
 ```

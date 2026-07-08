@@ -7,9 +7,8 @@ docsvault ist quelloffen. Wenn du es auf deiner eigenen Infrastruktur betreiben 
 | Repo | Was drin ist |
 |------|--------------|
 | [docsvault](https://github.com/intexKluss/docsvault) | Der komplette Server: Web-Chat, MCP-Server, Codex-/Claude-Bridge und das Dockerfile. |
-| [otris-docs-vault](https://github.com/intexKluss/otris-docs-vault) | Der Wissensbereich (Vault) mit der otris-DOCUMENTS-Dokumentation, die docsvault durchsucht. |
 
-Server und Inhalte sind bewusst getrennt: docsvault ist die Engine, der Vault sind die Daten. So kannst du auch eigene Vaults einhängen, ohne den Server anzufassen.
+Server und Inhalte sind bewusst getrennt: docsvault ist die Engine, deine Dokumentation sind die Daten. Die Vault-Inhalte leben in einem eigenen Repo (oder einfach einem Ordner mit `.md`-Dateien) - docsvault bringt selbst keinen Content mit, du kannst beliebig viele eigene Vaults einhängen.
 
 ## Schnellstart mit Docker
 
@@ -18,8 +17,8 @@ Server und Inhalte sind bewusst getrennt: docsvault ist die Engine, der Vault si
 git clone https://github.com/intexKluss/docsvault.git
 cd docsvault
 
-# 2. Vault als Unterordner danebenlegen
-git clone https://github.com/intexKluss/otris-docs-vault.git vaults/otris
+# 2. Vault als Unterordner danebenlegen (dein eigenes Repo oder einfach ein Ordner mit .md-Dateien)
+git clone https://github.com/<dein-org>/<dein-vault-repo>.git vaults/docs
 
 # 3. Image bauen und starten
 docker build -t docsvault .

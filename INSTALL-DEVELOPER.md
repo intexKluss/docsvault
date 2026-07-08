@@ -1,8 +1,8 @@
 # MCP Tool für Entwickler
 
-Dein Coding Agent (Claude Code, Codex CLI, Gemini CLI, VS Code Copilot, etc.) bekommt Zugriff auf alle Wissensbereiche (Vaults) die auf dem Server konfiguriert sind. Also z.B. die otris DOCUMENTS Dokumentation plus die internen Firmenregeln. Die Inhalte liegen auf dem Server, du brauchst keinen eigenen Vault.
+Dein Coding Agent (Claude Code, Codex CLI, Gemini CLI, VS Code Copilot, etc.) bekommt Zugriff auf alle Wissensbereiche (Vaults) die auf dem Server konfiguriert sind. Also z.B. Produktdokumentation, interne Richtlinien oder API-Referenzen. Die Inhalte liegen auf dem Server, du brauchst keinen eigenen Vault.
 
-Welche Vaults der Server gerade bereitstellt siehst du unter `http://SERVER-IP:3000/api/vaults`. Pro Vault gibt es fünf Tools, benannt nach dem `toolPrefix` aus der Vault Konfiguration (z.B. `otris_search`, `intex_regeln_search`, ...).
+Welche Vaults der Server gerade bereitstellt siehst du unter `http://SERVER-IP:3000/api/vaults`. Pro Vault gibt es fünf Tools, benannt nach dem `toolPrefix` aus der Vault Konfiguration (z.B. `docs_search`, `team_notes_search`, ...).
 
 ## Voraussetzungen
 
@@ -112,15 +112,15 @@ Für Agents oder Tools die kein MCP können. Jeder Vault hat seinen eigenen Pref
 curl "http://SERVER-IP:3000/api/vaults"
 
 # Pro Vault: /api/<toolPrefix>/<aktion>
-curl "http://SERVER-IP:3000/api/otris/search?query=DocFile"
-curl "http://SERVER-IP:3000/api/otris/overview"
-curl "http://SERVER-IP:3000/api/otris/list?section=Scripting"
-curl "http://SERVER-IP:3000/api/otris/status"
+curl "http://SERVER-IP:3000/api/docs/search?query=Installation"
+curl "http://SERVER-IP:3000/api/docs/overview"
+curl "http://SERVER-IP:3000/api/docs/list?section=Setup"
+curl "http://SERVER-IP:3000/api/docs/status"
 # read: immer den exakten Pfad aus search/list nehmen (URL-encoded), nie selbst zusammenbauen
-curl "http://SERVER-IP:3000/api/otris/read?path=<exakter%20pfad%20aus%20search>"
+curl "http://SERVER-IP:3000/api/docs/read?path=<exakter%20pfad%20aus%20search>"
 
 # Falls der Server noch weitere Vaults anbietet, analog:
-curl "http://SERVER-IP:3000/api/intex_regeln/search?query=commit"
+curl "http://SERVER-IP:3000/api/team_notes/search?query=commit"
 ```
 
 `SERVER-IP` natürlich immer durch die echte Server Adresse ersetzen.
@@ -137,14 +137,14 @@ Pro Vault registriert der Server fünf MCP Tools, benannt nach dem `toolPrefix` 
 | `<prefix>_overview` | Übersicht über alle Bereiche und Sektionen |
 | `<prefix>_status` | Vault Status und Aktualität prüfen |
 
-Beispiel: Beim Default Setup heißt der otris Vault Prefix `otris`, also gibt es die Tools `otris_search`, `otris_read`, `otris_list`, `otris_overview`, `otris_status`. Ein zusätzlicher `intex-regeln`-Vault mit `toolPrefix: "intex_regeln"` bringt entsprechend `intex_regeln_search` usw.
+Beispiel: Ein Vault mit `toolPrefix: "docs"` bringt die Tools `docs_search`, `docs_read`, `docs_list`, `docs_overview`, `docs_status`. Ein zusätzlicher `team-notes`-Vault mit `toolPrefix: "team_notes"` bringt entsprechend `team_notes_search` usw.
 
 ## Testen
 
 Agent starten und fragen:
 
-> Welche Klassen gibt es in der PortalScript API?
+> Welche Themen deckt die Dokumentation ab?
 
 oder:
 
-> Zeig mir die Dokumentation zu DocFile
+> Zeig mir die Dokumentation zur Installation
