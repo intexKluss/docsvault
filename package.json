@@ -1,7 +1,7 @@
 {
   "name": "docsvault",
   "version": "0.2.0",
-  "description": "Web-Chat UI für otris DOCUMENTS Dokumentation",
+  "description": "Web-Chat UI und MCP Server für Markdown-Dokumentation",
   "type": "module",
   "engines": {
     "node": ">=20"
