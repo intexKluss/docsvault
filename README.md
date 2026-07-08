@@ -1,6 +1,6 @@
 # docsvault
 
-Web Chat UI und MCP Server für die otris DOCUMENTS Dokumentation. Als AI Backend läuft entweder das Claude Agent SDK oder das OpenAI Codex SDK. Die Dokumentation selbst liegt in einem separaten Vault Repo (z.B. [otris-docs-vault](https://github.com/intexKluss/otris-docs-vault)) und wird zur Laufzeit als Volume gemountet, also nicht ins Docker Image gebacken. Die aktuelle Seitenanzahl liefert dir das `<prefix>_status` Tool bzw. `GET /api/<prefix>/status`.
+Web Chat UI und MCP Server für jegliche Dokumentation. Als AI Backend läuft entweder das Claude Agent SDK oder das OpenAI Codex SDK. Die Dokumentation für otris selbst liegt in einem separaten Vault Repo (z.B. [otris-docs-vault](https://github.com/intexKluss/otris-docs-vault)) und wird zur Laufzeit als Volume gemountet, also nicht ins Docker Image gebacken. Die aktuelle Seitenanzahl liefert dir das `<prefix>_status` Tool bzw. `GET /api/<prefix>/status`.
 
 ## Features
 
