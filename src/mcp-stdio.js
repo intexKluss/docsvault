@@ -3,6 +3,7 @@ import { dirname, resolve } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { createMcpServer } from './mcp-handler.js';
 import { loadVaultRegistry } from './vault-registry.js';
+import { warmSearchIndex } from './tools/vault-cache.js';
 
 const __dirname = dirname(fileURLToPath(import.meta.url));
 const VAULTS_ROOT = process.env.VAULTS_ROOT || resolve(__dirname, '..', 'vaults');
@@ -19,6 +20,15 @@ try {
   const server = createMcpServer(registry);
   const transport = new StdioServerTransport();
   await server.connect(transport);
+
+  // BM25-Index vorab bauen, damit die erste Suche nicht dafür bezahlt.
+  // Nach dem connect, damit der Client nicht auf den Handshake warten muss.
+  for (const vault of registry) {
+    const index = warmSearchIndex(vault.path);
+    if (index) {
+      console.error(`[mcp-stdio] ${vault.toolPrefix}: ${index.fileCount} pages, ${index.segmentCount} sections indexed in ${index.buildMs}ms`);
+    }
+  }
 } catch (err) {
   console.error(`[mcp-stdio] failed to start: ${err.message}`);
   process.exit(1);

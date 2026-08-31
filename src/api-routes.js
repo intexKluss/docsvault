@@ -1,6 +1,7 @@
 import { Router } from 'express';
-import { handleSearch } from './tools/search.js';
+import { handleSearch, DEFAULT_MAX_RESULTS } from './tools/search.js';
 import { handleRead } from './tools/read.js';
+import { DEFAULT_READ_LENGTH } from './tools/vault.js';
 import { handleList } from './tools/list.js';
 import { handleOverview } from './tools/overview.js';
 import { handleStatus } from './tools/status.js';
@@ -59,8 +60,10 @@ function registerVaultRoutes(router, vault) {
     const results = handleSearch(vaultPath, {
       query: query.trim(),
       section: section || undefined,
-      max_results: clampInt(req.query.max_results, 1, 100, 10),
+      max_results: clampInt(req.query.max_results, 1, 100, DEFAULT_MAX_RESULTS),
       context_lines: clampInt(req.query.context_lines, 0, 20, 3),
+      response_format: req.query.response_format === 'detailed' ? 'detailed' : 'concise',
+      max_tokens: req.query.max_tokens,
     });
     if (isErrorResult(results)) return res.status(400).json(results);
     res.json(results);
@@ -73,7 +76,9 @@ function registerVaultRoutes(router, vault) {
     }
     const result = handleRead(vaultPath, {
       path: docPath.trim(),
-      max_length: clampInt(req.query.max_length, 1, 200000, 50000),
+      heading: req.query.heading || undefined,
+      max_length: clampInt(req.query.max_length, 1, 200000, DEFAULT_READ_LENGTH),
+      max_tokens: req.query.max_tokens,
     });
     if (result.error) return res.status(404).json(result);
     res.json(result);
