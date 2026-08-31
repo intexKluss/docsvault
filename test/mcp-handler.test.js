@@ -1,6 +1,9 @@
 import { describe, it } from 'node:test';
 import assert from 'node:assert/strict';
-import { createMcpServer } from '../src/mcp-handler.js';
+import { createMcpServer, buildInstructions } from '../src/mcp-handler.js';
+
+// grobe Token-Schaetzung, ~4 Zeichen pro Token
+const tokens = (text) => Math.round(String(text).length / 4);
 
 const REGISTRY = [
   { name: 'otris',       description: 'otris Docs',   toolPrefix: 'otris',        path: '/tmp/otris' },
@@ -46,10 +49,24 @@ describe('MCP Handler', () => {
     const server = createMcpServer(REGISTRY);
     const tools = server._registeredTools || {};
     const desc = tools['otris_search']?.description || '';
-    assert.match(desc, /"file"/);
+    assert.match(desc, /file/);
+    assert.match(desc, /headings/);
     assert.match(desc, /otris_read/);
-    assert.match(desc, /titleMatch/);
-    assert.match(desc, /score/);
+  });
+
+  // Tool-Beschreibungen liegen dauerhaft im Kontext, einmal pro Vault.
+  it('keeps all tool descriptions of one vault under 300 tokens', () => {
+    const server = createMcpServer(REGISTRY);
+    const tools = server._registeredTools || {};
+    let chars = 0;
+    for (const [name, tool] of Object.entries(tools)) {
+      if (!name.startsWith('otris_')) continue;
+      chars += (tool.description || '').length;
+      for (const field of Object.values(tool.inputSchema?.shape || {})) {
+        chars += (field.description || '').length;
+      }
+    }
+    assert.ok(Math.round(chars / 4) < 300, `tool descriptions zu gross: ~${Math.round(chars / 4)} tokens`);
   });
 
   it('overview description explains the overview -> search -> read flow', () => {
@@ -91,38 +108,56 @@ describe('MCP Handler', () => {
     assert.ok(!schema.safeParse({ query: 'x', context_lines: -1 }).success);
   });
 
-  it('search description includes the multi-source search strategy', () => {
+  it('search accepts response_format and max_tokens', () => {
     const server = createMcpServer(REGISTRY);
-    const tools = server._registeredTools || {};
-    const desc = tools['otris_search']?.description || '';
-    assert.match(desc, /do not stop at the first hit/i);
-    assert.match(desc, /search again/i);
-    assert.match(desc, /check more than one/i);
+    const schema = (server._registeredTools || {})['otris_search']?.inputSchema;
+    assert.ok(schema.safeParse({ query: 'x', response_format: 'concise' }).success);
+    assert.ok(schema.safeParse({ query: 'x', response_format: 'detailed' }).success);
+    assert.ok(!schema.safeParse({ query: 'x', response_format: 'verbose' }).success);
+    assert.ok(schema.safeParse({ query: 'x', max_tokens: 500 }).success);
+    assert.ok(!schema.safeParse({ query: 'x', max_tokens: 10 }).success);
   });
 
-  it('overview description tells agents to check multiple section types', () => {
+  it('read accepts max_tokens', () => {
     const server = createMcpServer(REGISTRY);
-    const tools = server._registeredTools || {};
-    const desc = tools['otris_overview']?.description || '';
-    assert.match(desc, /different section types/i);
-    assert.match(desc, /not just one/i);
+    const schema = (server._registeredTools || {})['otris_read']?.inputSchema;
+    assert.ok(schema.safeParse({ path: 'a/b', max_tokens: 500 }).success);
   });
 
-  it('search description embeds the vault-specific searchHint when present', () => {
-    const withHint = [
-      { name: 'otris', description: 'otris Docs', toolPrefix: 'otris', searchHint: 'Check All Properties first.', path: '/tmp/otris' },
-    ];
-    const server = createMcpServer(withHint);
-    const tools = server._registeredTools || {};
-    const desc = tools['otris_search']?.description || '';
-    assert.match(desc, /Guidance for this vault:/);
-    assert.ok(desc.includes('Check All Properties first.'));
+  it('list accepts max_results', () => {
+    const server = createMcpServer(REGISTRY);
+    const schema = (server._registeredTools || {})['otris_list']?.inputSchema;
+    assert.ok(schema.safeParse({ section: 'a', max_results: 10 }).success);
+    assert.ok(!schema.safeParse({ section: 'a', max_results: 501 }).success);
   });
 
-  it('search description omits vault guidance when no searchHint', () => {
-    const server = createMcpServer(REGISTRY);
-    const tools = server._registeredTools || {};
-    const desc = tools['otris_search']?.description || '';
-    assert.ok(!desc.includes('Guidance for this vault:'));
+  // Die Methodik gehört einmal pro Server in die instructions, nicht in jede
+  // Tool-Beschreibung.
+  describe('instructions', () => {
+    it('carries the research method once per server', () => {
+      const text = buildInstructions(REGISTRY);
+      assert.match(text, /Never guess or construct a path/i);
+      assert.match(text, /search again/i);
+      assert.match(text, /Check every relevant type/i);
+      assert.match(text, /_overview.+_search.+_read/s);
+    });
+
+    it('embeds the vault-specific searchHint when present', () => {
+      const text = buildInstructions([
+        { name: 'otris', description: 'otris Docs', toolPrefix: 'otris', searchHint: 'Check All Properties first.', path: '/tmp/otris' },
+      ]);
+      assert.ok(text.includes('Check All Properties first.'));
+      assert.ok(text.includes('otris_*'));
+    });
+
+    it('omits vault guidance when no searchHint', () => {
+      const text = buildInstructions(REGISTRY);
+      assert.ok(!text.includes('Check All Properties first.'));
+    });
+
+    it('is reachable through the server options', () => {
+      const server = createMcpServer(REGISTRY);
+      assert.ok(server.server.instructions || server.server._instructions);
+    });
   });
 });
