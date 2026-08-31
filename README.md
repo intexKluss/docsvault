@@ -25,6 +25,15 @@ Kosten: ca. 2 bis 8 Sekunden Indexaufbau und ~100 MB Heap pro 1800 Seiten. Exter
 - `read` liefert per Default 8000 Zeichen; bei langen Seiten ohne `heading` kommen Intro plus Inhaltsverzeichnis statt der Rohseite
 - `search` und `read` akzeptieren `max_tokens` als hartes Budget für Clients mit kleinem Kontext
 
+Die REST API teilt sich diese Defaults und nimmt dieselben Parameter als Query String, also `response_format`, `max_tokens` und bei `read` auch `heading`:
+
+```bash
+curl "http://localhost:3000/api/docs/search?query=Installation&max_tokens=300"
+curl "http://localhost:3000/api/docs/read?path=api/DocFile.md&heading=getAttribute"
+```
+
+Achtung beim Update: die Defaults sind kleiner als vorher (`search` 10 auf 5 Treffer, `read` 50000 auf 8000 Zeichen). Wer die alten Mengen braucht, setzt `max_results` bzw. `max_length` explizit.
+
 ## Quick Start
 
 ```bash
