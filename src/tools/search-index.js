@@ -212,6 +212,7 @@ export function buildSearchIndex(vaultPath) {
     fileCount: files.length,
     segmentCount: segments.size,
     idf,
+    hasTerm: (term) => df.has(term),
     buildMs: Date.now() - started,
   };
 }

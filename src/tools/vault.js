@@ -452,7 +452,12 @@ function headingIsQuerySubset(heading, termSet) {
 // abdeckt. Eine Datei die den seltenen Token trifft schlägt damit eine Datei
 // die nur zwei häufige Tokens trifft, egal wie oft.
 function aggregateByFile(hits, index, terms, queryFold) {
-  const idfTotal = terms.reduce((s, t) => s + index.idf(t), 0) || 1;
+  // Tokens die im Vault gar nicht vorkommen zählen nicht in den Nenner. Sonst
+  // drückt ein Tippfehler die Coverage aller Treffer gleichmässig nach unten
+  // und die Scores werden ohne Grund winzig.
+  const known = terms.filter(t => index.hasTerm(t));
+  const scoring = known.length ? known : terms;
+  const idfTotal = scoring.reduce((s, t) => s + index.idf(t), 0) || 1;
   const termSet = new Set(terms);
   const byFile = new Map();
 

@@ -404,6 +404,20 @@ describe('Vault', () => {
       assert.match(doc.content, /Invoice Plugin/);
     });
 
+    it('keeps the section scope', () => {
+      const results = searchDocs(VAULT_PATH, 'Eigenschaft', { section: 'Properties' });
+      assert.ok(results.length > 0);
+      for (const r of results) {
+        assert.ok(r.file.startsWith('Properties/'), `ausserhalb der section: ${r.file}`);
+      }
+    });
+
+    it('falls back to fuzzy matching only when the exact search finds nothing', () => {
+      const typo = searchDocs(VAULT_PATH, 'hasInvoicePlugn');
+      assert.ok(typo.length > 0, 'tippfehler sollte gerettet werden');
+      assert.equal(typo[0].file, 'Properties/DlcFile');
+    });
+
     it('scores results in descending order', () => {
       const results = searchDocs(VAULT_PATH, 'Mappentyp Eigenschaft');
       for (let i = 1; i < results.length; i++) {
