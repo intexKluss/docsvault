@@ -464,6 +464,14 @@ describe('Vault', () => {
       const doc = readDoc(VAULT_PATH, 'guides/Long Flat', 8000, { maxTokens: 100 });
       assert.ok(doc.content.length <= 100 * 4 + 600, `budget verletzt: ${doc.content.length}`);
     });
+
+    // die TOC darf das Budget nicht über die Hintertür sprengen
+    it('caps the table of contents by the budget too', () => {
+      const wide = readDoc(VAULT_PATH, 'guides/Many Sections', 800);
+      const tight = readDoc(VAULT_PATH, 'guides/Many Sections', 200);
+      assert.ok(tight.content.length < wide.content.length, 'kleineres budget muss kuerzer sein');
+      assert.match(tight.content, /Abschnitte \(6\)/);
+    });
   });
 
   describe('handleSearch / handleList bad-section signal', () => {

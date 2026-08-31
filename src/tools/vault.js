@@ -151,13 +151,22 @@ function listHeadings(body) {
 }
 
 // Rendert ein Inhaltsverzeichnis als "weiter mit heading=..."-Hinweis.
-function renderToc(headings, note) {
+// budget begrenzt die Zeichen die die Überschriften-Liste belegen darf, sonst
+// sprengt eine Seite mit 200 Abschnitten das Limit über den Umweg der TOC.
+function renderToc(headings, note, budget = Infinity) {
   if (!headings.length) return '';
-  const shown = headings.slice(0, MAX_TOC_ENTRIES).map(h => h.text);
+  const shown = [];
+  let used = 0;
+  for (const h of headings) {
+    if (shown.length >= MAX_TOC_ENTRIES) break;
+    used += h.text.length + 3;
+    if (shown.length > 0 && used > budget) break;
+    shown.push(h.text);
+  }
   const rest = headings.length - shown.length;
   let out = `\n\n---\n${note}\nWeiter mit heading="<name>", zum Beispiel heading="${shown[0]}".\n\nAbschnitte (${headings.length}):\n`;
   out += shown.join(' | ');
-  if (rest > 0) out += ` | ... +${rest} weitere`;
+  if (rest > 0) out += ` | ... +${rest} weitere, hol sie mit einem groesseren max_length`;
   return out;
 }
 
@@ -229,7 +238,7 @@ export function readDoc(vaultPath, docPath, maxLength = DEFAULT_READ_LENGTH, opt
     return {
       ...meta,
       content: `Abschnitt "${heading}" existiert auf dieser Seite nicht.`
-        + renderToc(subHeadings, `Seite: ${resolvedPath}`),
+        + renderToc(subHeadings, `Seite: ${resolvedPath}`, maxLength),
       truncated: true,
       mode: 'heading-not-found',
     };
@@ -246,7 +255,8 @@ export function readDoc(vaultPath, docPath, maxLength = DEFAULT_READ_LENGTH, opt
     const intro = cutAtLineBoundary(introEnd, Math.floor(maxLength / 3));
     const toc = renderToc(
       subHeadings,
-      `Seite gekuerzt (${body.length} Zeichen, ${subHeadings.length} Abschnitte). Nur Intro oben.`
+      `Seite gekuerzt (${body.length} Zeichen, ${subHeadings.length} Abschnitte). Nur Intro oben.`,
+      maxLength - intro.length
     );
     return {
       ...meta,
@@ -262,7 +272,7 @@ export function readDoc(vaultPath, docPath, maxLength = DEFAULT_READ_LENGTH, opt
   const remaining = subHeadings.filter(h => h.line > cutLine);
   return {
     ...meta,
-    content: cut + renderToc(remaining, `Ab hier gekuerzt (${body.length} Zeichen gesamt).`),
+    content: cut + renderToc(remaining, `Ab hier gekuerzt (${body.length} Zeichen gesamt).`, maxLength),
     truncated: true,
     mode: 'truncated',
   };
