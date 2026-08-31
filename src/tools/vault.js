@@ -9,10 +9,12 @@ export { foldText };
 
 // Obergrenze für Treffer-Zeilen pro Datei im detailed-Format.
 const MAX_MATCHES_PER_FILE = 10;
-// Wieviele gematchte Überschriften pro Datei zurückgegeben werden.
-const MAX_HEADINGS_PER_RESULT = 4;
+// Wieviele gematchte Überschriften pro Datei zurückgegeben werden. Überschriften
+// werden NIE gekürzt, sie müssen als heading-Parameter verbatim wieder
+// reingehen; deshalb wird stattdessen ihre Anzahl klein gehalten.
+const MAX_HEADINGS_PER_RESULT = 3;
 // Harte Obergrenze für ein Snippet, damit ein Treffer nie ausufert.
-const MAX_SNIPPET_CHARS = 400;
+const MAX_SNIPPET_CHARS = 300;
 const MAX_SNIPPET_LINE_CHARS = 200;
 
 // read: Default-Budget. Bewusst klein, damit heading-Targeting der Normalfall
