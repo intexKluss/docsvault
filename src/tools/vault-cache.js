@@ -1,12 +1,13 @@
 import { readdirSync, readFileSync, existsSync, statSync } from 'fs';
 import { join, relative, basename, sep } from 'path';
 import { isSkippedDir } from '../vault-registry.js';
+import { buildSearchIndex } from './search-index.js';
 
 // Modul-weiter Cache pro Vault. Vaults sind zwischen Crawls read-only, daher
-// können wir Manifest, Sections und einen Titel-/Pfad-Index halten und nur
-// invalidieren wenn sich die mtime von _manifest.json (fallback: Vault-Root)
-// ändert.
-const cache = new Map(); // vaultPath -> { mtimeMs, manifest, sections, titleIndex }
+// können wir Manifest, Sections, einen Titel-/Pfad-Index und den BM25-Index
+// halten und nur invalidieren wenn sich die mtime von _manifest.json
+// (fallback: Vault-Root) ändert.
+const cache = new Map(); // vaultPath -> { mtimeMs, manifest, sections, titleIndex, searchIndex }
 
 // Liefert die mtime die für die Invalidierung benutzt wird:
 // bevorzugt _manifest.json, sonst der Vault-Root-Ordner.
@@ -29,7 +30,13 @@ function getEntry(vaultPath) {
   const existing = cache.get(vaultPath);
   if (existing && existing.mtimeMs === mtimeMs) return existing;
 
-  const entry = { mtimeMs, manifest: undefined, sections: undefined, titleIndex: undefined };
+  const entry = {
+    mtimeMs,
+    manifest: undefined,
+    sections: undefined,
+    titleIndex: undefined,
+    searchIndex: undefined,
+  };
   cache.set(vaultPath, entry);
   return entry;
 }
@@ -118,6 +125,27 @@ export function getCachedTitleIndex(vaultPath) {
     entry.titleIndex = buildTitleIndex(vaultPath);
   }
   return entry.titleIndex;
+}
+
+// gecachter BM25-Abschnitts-Index. Lazy: erst beim ersten Suchlauf gebaut,
+// danach bis zur nächsten mtime-Änderung wiederverwendet.
+export function getCachedSearchIndex(vaultPath) {
+  const entry = getEntry(vaultPath);
+  if (entry.searchIndex === undefined) {
+    entry.searchIndex = buildSearchIndex(vaultPath);
+  }
+  return entry.searchIndex;
+}
+
+// Baut den Index vorab, damit der erste Suchlauf nicht dafür bezahlt.
+// Fehler werden geschluckt: ein kaputter Vault darf den Serverstart nicht kippen.
+export function warmSearchIndex(vaultPath) {
+  try {
+    return getCachedSearchIndex(vaultPath);
+  } catch (err) {
+    console.warn(`[vault-cache] index build failed for ${vaultPath}: ${err.message}`);
+    return null;
+  }
 }
 
 // Cache leeren (vor allem für Tests).

@@ -1,13 +1,42 @@
 import { readdirSync, readFileSync, existsSync, statSync } from 'fs';
 import { join, relative, basename, sep, resolve } from 'path';
-import { execFileSync } from 'child_process';
-import { isSkippedDir } from '../vault-registry.js';
-import { getCachedManifest, getCachedSections, getCachedTitleIndex } from './vault-cache.js';
+import { getCachedManifest, getCachedSections, getCachedTitleIndex, getCachedSearchIndex } from './vault-cache.js';
+import { foldText, tokenize, queryTerms } from './search-index.js';
 
-// geteilte Obergrenze für Treffer pro Datei (Punkt 4). Beide Suchpfade
-// (single-token + multi-token) nutzen dieselbe Zahl damit ein einzelnes
-// Dokument die Antwort nicht flutet.
+export { foldText };
+
+// --- Konstanten -------------------------------------------------------------
+
+// Obergrenze für Treffer-Zeilen pro Datei im detailed-Format.
 const MAX_MATCHES_PER_FILE = 10;
+// Wieviele gematchte Überschriften pro Datei zurückgegeben werden.
+const MAX_HEADINGS_PER_RESULT = 4;
+// Harte Obergrenze für ein Snippet, damit ein Treffer nie ausufert.
+const MAX_SNIPPET_CHARS = 400;
+const MAX_SNIPPET_LINE_CHARS = 200;
+
+// read: Default-Budget. Bewusst klein, damit heading-Targeting der Normalfall
+// wird statt einer Option die niemand nutzt.
+export const DEFAULT_READ_LENGTH = 8000;
+// harte Obergrenze auch bei explizit grossem max_length
+export const MAX_READ_LENGTH = 25000;
+// ab sovielen Überschriften gilt eine Seite als "navigierbar" und bekommt bei
+// fehlendem heading-Parameter Intro + Inhaltsverzeichnis statt der Rohseite.
+const TOC_MIN_HEADINGS = 5;
+// Obergrenze für Einträge im Inhaltsverzeichnis.
+const MAX_TOC_ENTRIES = 200;
+
+// Manche Quellen zeigen veraltete Stile (z.B. samples.md baut Gadgets noch per
+// `new otris.gadget.gui.X()` statt der aktuellen funktionalen gadgetAPI). Solche
+// Treffer werden abgesenkt, nicht ausgeschlossen: fehlt eine Alternative,
+// rankt die Quelle weiter.
+const STALE_SOURCE_FACTOR = 0.5;
+const STALE_SOURCE_PATTERNS = [
+  /(^|\/)samples?(\/|$)/i,
+  /(^|\/)archiv(\/|$)/i,
+];
+
+// --- Basics -----------------------------------------------------------------
 
 function isInsideVault(vaultPath, targetPath) {
   const resolvedVault = resolve(vaultPath);
@@ -58,10 +87,32 @@ function collectMdFiles(dir, vaultRoot, results) {
   }
 }
 
-// Liefert nur die gewünschte Abschnittsabschnitt (von der passenden Überschrift
-// bis zur nächsten Überschrift gleichen oder höheren Levels). '' wenn nichts passt.
+function parseFrontmatter(raw) {
+  const match = raw.match(/^﻿?---\r?\n([\s\S]*?)\r?\n---\r?\n?([\s\S]*)$/);
+  if (!match) {
+    return { frontmatter: {}, body: raw };
+  }
+
+  const yamlBlock = match[1];
+  const body = match[2];
+  const frontmatter = {};
+
+  for (const line of yamlBlock.split('\n')) {
+    const kv = line.match(/^(\w+)\s*:\s*"?(.+?)"?\s*$/);
+    if (kv) {
+      frontmatter[kv[1]] = kv[2].replace(/\r$/, '');
+    }
+  }
+
+  return { frontmatter, body };
+}
+
+// --- read -------------------------------------------------------------------
+
+// Liefert nur den gewünschten Abschnitt (von der passenden Überschrift bis zur
+// nächsten Überschrift gleichen oder höheren Levels). '' wenn nichts passt.
 function extractHeadingSection(body, heading) {
-  const wanted = heading.trim().toLowerCase();
+  const wanted = foldText(heading.trim());
   const lines = body.split('\n');
   let startLevel = 0;
   let startIdx = -1;
@@ -69,7 +120,7 @@ function extractHeadingSection(body, heading) {
   for (let i = 0; i < lines.length; i++) {
     const m = lines[i].replace(/\r$/, '').match(/^(#{1,6})\s+(.+?)\s*$/);
     if (!m) continue;
-    if (m[2].trim().toLowerCase() === wanted) {
+    if (foldText(m[2].trim()) === wanted) {
       startLevel = m[1].length;
       startIdx = i;
       break;
@@ -88,15 +139,53 @@ function extractHeadingSection(body, heading) {
   return lines.slice(startIdx, endIdx).join('\n').trimEnd();
 }
 
-export function readDoc(vaultPath, docPath, maxLength = 50000, options = {}) {
-  maxLength = clampInt(maxLength, 1, 200000, 50000);
+// Alle Überschriften eines Bodys als { text, level, line } (0-basierte Zeile).
+function listHeadings(body) {
+  const lines = body.split('\n');
+  const out = [];
+  for (let i = 0; i < lines.length; i++) {
+    const m = lines[i].replace(/\r$/, '').match(/^(#{1,6})\s+(.+?)\s*$/);
+    if (m) out.push({ text: m[2], level: m[1].length, line: i });
+  }
+  return out;
+}
+
+// Rendert ein Inhaltsverzeichnis als "weiter mit heading=..."-Hinweis.
+function renderToc(headings, note) {
+  if (!headings.length) return '';
+  const shown = headings.slice(0, MAX_TOC_ENTRIES).map(h => h.text);
+  const rest = headings.length - shown.length;
+  let out = `\n\n---\n${note}\nWeiter mit heading="<name>", zum Beispiel heading="${shown[0]}".\n\nAbschnitte (${headings.length}):\n`;
+  out += shown.join(' | ');
+  if (rest > 0) out += ` | ... +${rest} weitere`;
+  return out;
+}
+
+// Schneidet an einer Zeilengrenze statt mitten im Wort.
+function cutAtLineBoundary(text, maxLength) {
+  if (text.length <= maxLength) return text;
+  const slice = text.slice(0, maxLength);
+  const lastNl = slice.lastIndexOf('\n');
+  return lastNl > maxLength * 0.5 ? slice.slice(0, lastNl) : slice;
+}
+
+// Liest ein Dokument.
+// options: { heading, maxTokens }
+// Rückgabe: { title, source, content, truncated, mode, headings? }
+//   mode: 'full' | 'heading' | 'toc' | 'truncated' | 'heading-not-found'
+export function readDoc(vaultPath, docPath, maxLength = DEFAULT_READ_LENGTH, options = {}) {
+  maxLength = clampInt(maxLength, 200, MAX_READ_LENGTH, DEFAULT_READ_LENGTH);
   const { heading } = options;
+  if (Number.isFinite(Number(options.maxTokens))) {
+    const budget = clampInt(options.maxTokens, 100, 200000, maxLength / 4) * 4;
+    maxLength = Math.max(200, Math.min(maxLength, budget));
+  }
 
   let resolvedPath = docPath;
   let filePath = join(vaultPath, docPath + '.md');
 
-  // Self-Healing (Punkt 17): wenn der exakte Pfad nicht existiert, über den
-  // Titel-/Pfad-Index nach Basename/Titel suchen.
+  // Self-Healing: wenn der exakte Pfad nicht existiert, über den Titel-/Pfad-
+  // Index nach Basename/Titel suchen.
   if (!isInsideVault(vaultPath, filePath) || !existsSync(filePath)) {
     const healed = healDocPath(vaultPath, docPath);
     if (healed && healed.path) {
@@ -115,28 +204,67 @@ export function readDoc(vaultPath, docPath, maxLength = 50000, options = {}) {
 
   const raw = readFileSync(filePath, 'utf-8');
   const { frontmatter, body } = parseFrontmatter(raw);
+  const meta = {
+    title: frontmatter.title || '',
+    source: frontmatter.source || '',
+    path: resolvedPath,
+  };
+  // nur ##/### sind sinnvolle Sprungziele, # ist der Seitentitel
+  const subHeadings = listHeadings(body).filter(h => h.level >= 2);
 
-  let content = body;
-  let truncated = false;
-
-  // optionales heading-Targeting: nur den passenden Abschnitt zurückgeben
+  // 1) heading-Targeting
   if (heading) {
     const section = extractHeadingSection(body, heading);
     if (section) {
-      content = section;
+      const cut = cutAtLineBoundary(section, maxLength);
+      return {
+        ...meta,
+        content: cut,
+        truncated: cut.length < section.length,
+        mode: 'heading',
+      };
     }
+    // heading existiert nicht: NICHT still die ganze Seite ausliefern (das war
+    // der teuerste Fehlerfall), sondern das Inhaltsverzeichnis anbieten.
+    return {
+      ...meta,
+      content: `Abschnitt "${heading}" existiert auf dieser Seite nicht.`
+        + renderToc(subHeadings, `Seite: ${resolvedPath}`),
+      truncated: true,
+      mode: 'heading-not-found',
+    };
   }
 
-  if (content.length > maxLength) {
-    content = content.slice(0, maxLength) + '\n\n[truncated]';
-    truncated = true;
+  // 2) Seite passt ins Budget: komplett ausliefern
+  if (body.length <= maxLength) {
+    return { ...meta, content: body, truncated: false, mode: 'full' };
   }
 
+  // 3) viele Abschnitte: Intro + Inhaltsverzeichnis statt Rohseite
+  if (subHeadings.length >= TOC_MIN_HEADINGS) {
+    const introEnd = body.split('\n').slice(0, subHeadings[0].line).join('\n').trimEnd();
+    const intro = cutAtLineBoundary(introEnd, Math.floor(maxLength / 3));
+    const toc = renderToc(
+      subHeadings,
+      `Seite gekuerzt (${body.length} Zeichen, ${subHeadings.length} Abschnitte). Nur Intro oben.`
+    );
+    return {
+      ...meta,
+      content: (intro ? intro : `# ${meta.title || resolvedPath}`) + toc,
+      truncated: true,
+      mode: 'toc',
+    };
+  }
+
+  // 4) wenige Abschnitte: abschneiden und die verbleibenden Überschriften nennen
+  const cut = cutAtLineBoundary(body, maxLength);
+  const cutLine = cut.split('\n').length - 1;
+  const remaining = subHeadings.filter(h => h.line > cutLine);
   return {
-    title: frontmatter.title || '',
-    source: frontmatter.source || '',
-    content,
-    truncated,
+    ...meta,
+    content: cut + renderToc(remaining, `Ab hier gekuerzt (${body.length} Zeichen gesamt).`),
+    truncated: true,
+    mode: 'truncated',
   };
 }
 
@@ -165,12 +293,9 @@ function healDocPath(vaultPath, docPath) {
     };
   }
 
-  // 2) Nähe-Treffer: Basename/Titel/Pfad enthält den gesuchten Basename.
-  // Anders als der exakte Treffer wird ein Nähe-Treffer NIE still als einzelnes
-  // Dokument aufgelöst. Ein bloßer Substring (z.B. "doc" in "DocFile") ist
-  // inhärent mehrdeutig und würde sonst stillschweigend das falsche Dokument
-  // liefern statt eines 404. Nähe-Treffer kommen daher immer als "did you mean"-
-  // Kandidaten zurück; der Aufrufer entscheidet (handleRead -> error -> 404).
+  // 2) Nähe-Treffer werden NIE still als einzelnes Dokument aufgelöst. Ein
+  // blosser Substring (z.B. "doc" in "DocFile") ist inhärent mehrdeutig und
+  // würde sonst stillschweigend das falsche Dokument liefern statt eines 404.
   const near = index.filter(e =>
     foldText(e.name.toLowerCase()).includes(wantedBase) ||
     foldText(e.title.toLowerCase()).includes(wantedBase) ||
@@ -186,634 +311,272 @@ function healDocPath(vaultPath, docPath) {
   return null;
 }
 
-// Baut einen Zeilen-Index für eine roh eingelesene Datei:
-//  - frontmatterEnd: 1-basierte Zeilennummer des schließenden '---' (0 = kein Frontmatter)
-//  - headings: { line, text, level } aller Markdown-Überschriften (#, ##, ...)
-function buildLineIndex(raw) {
-  const lines = raw.split('\n');
-  let frontmatterEnd = 0;
+// --- search -----------------------------------------------------------------
 
-  // Frontmatter nur wenn die allererste Zeile genau '---' ist (CRLF-tolerant)
-  if (lines.length && lines[0].replace(/\r$/, '').replace(/^﻿/, '') === '---') {
-    for (let i = 1; i < lines.length; i++) {
-      if (lines[i].replace(/\r$/, '') === '---') {
-        frontmatterEnd = i + 1; // 1-basiert
-        break;
-      }
-    }
-  }
-
-  const headings = [];
-  for (let i = 0; i < lines.length; i++) {
-    const m = lines[i].match(/^(#{1,6})\s+(.+?)\s*$/);
-    if (m) headings.push({ line: i + 1, text: m[2].replace(/\r$/, ''), level: m[1].length });
-  }
-
-  return { frontmatterEnd, headings, lines };
+function staleFactor(filePath) {
+  return STALE_SOURCE_PATTERNS.some(re => re.test(filePath)) ? STALE_SOURCE_FACTOR : 1;
 }
 
-// Nächste vorausgehende Überschrift für eine Trefferzeile (oder '').
-function headingForLine(headings, line) {
-  let current = '';
-  for (const h of headings) {
-    if (h.line <= line) current = h.text;
-    else break;
-  }
-  return current;
+// Zeilen die als Snippet nichts aussagen.
+function isNoiseLine(text) {
+  const t = String(text).trim();
+  if (!t) return true;
+  if (/^`{3,}/.test(t)) return true;            // Code-Fence
+  if (/^#{1,6}(\s|$)/.test(t)) return true;     // Überschrift, steht schon in headings
+  if (/^[|\-+:=_*~\s]+$/.test(t)) return true;  // Tabellen-/Trennlinie
+  if (/^[<>{}[\]()]+$/.test(t)) return true;
+  return false;
 }
 
-function parseFrontmatter(raw) {
-  const match = raw.match(/^﻿?---\r?\n([\s\S]*?)\r?\n---\r?\n?([\s\S]*)$/);
-  if (!match) {
-    return { frontmatter: {}, body: raw };
-  }
-
-  const yamlBlock = match[1];
-  const body = match[2];
-  const frontmatter = {};
-
-  for (const line of yamlBlock.split('\n')) {
-    const kv = line.match(/^(\w+)\s*:\s*"?(.+?)"?\s*$/);
-    if (kv) {
-      frontmatter[kv[1]] = kv[2].replace(/\r$/, '');
-    }
-  }
-
-  return { frontmatter, body };
-}
-
-// Umlaut-/ss-Folding (Punkt 7): normalisiert deutschen Text so dass ae/ä,
-// oe/ö, ue/ü, ss/ß als gleich gelten. Wird symmetrisch auf Query-Tokens UND
-// Suchtext/Titel/Pfad angewandt damit "uebersicht" auch "Übersicht" findet.
-function foldText(str) {
-  return String(str)
-    .toLowerCase()
-    .replace(/ä/g, 'ae')
-    .replace(/ö/g, 'oe')
-    .replace(/ü/g, 'ue')
-    .replace(/ß/g, 'ss');
-}
-
-// Baut aus einem Token ein Regex-Fragment das beide Schreibweisen matcht:
-// 'ue' -> (?:ue|ü), 'ü' -> (?:ü|ue), 'ss' -> (?:ss|ß) usw. Der Token wird zuerst
-// regex-escaped, dann werden die gefoldeten Stellen zu Alternationen aufgeweitet.
-function tokenToFoldedPattern(token) {
-  // erst auf die gefaltete Form bringen, dann Stück für Stück escapen und
-  // an ae/oe/ue/ss Alternationen einsetzen.
-  const folded = foldText(token);
-  let out = '';
-  for (let i = 0; i < folded.length; i++) {
-    const two = folded.slice(i, i + 2);
-    if (two === 'ae') { out += '(?:ae|ä)'; i++; continue; }
-    if (two === 'oe') { out += '(?:oe|ö)'; i++; continue; }
-    if (two === 'ue') { out += '(?:ue|ü)'; i++; continue; }
-    if (two === 'ss') { out += '(?:ss|ß)'; i++; continue; }
-    out += escapeRegex(folded[i]);
-  }
-  return out;
-}
-
-function foldedTokenRegex(token, flags = 'i') {
-  return new RegExp(tokenToFoldedPattern(token), flags);
-}
-
-// Tokenizer (Punkt 8): split auf Whitespace UND Identifier-trennende
-// Interpunktion (. ( ) [ ] :: ->), min length >= 2. Die Original-Phrase bleibt
-// für den Exact-Match-Boost separat erhalten.
-function tokenize(query) {
-  return query
-    .trim()
-    .split(/[\s.()[\]]+|::|->/)
-    .map(t => t.trim())
-    .filter(t => t.length >= 2);
-}
-
-// splits query into tokens, searches each, ranks by number of distinct token hits
-export function searchDocs(vaultPath, query, options = {}) {
-  const { section } = options;
-  // Defensive Clamps (Punkt 12): auch wenn zod schon begrenzt, hier hart machen.
-  const contextLines = clampInt(options.contextLines, 0, 20, 3);
-  const maxResults = clampInt(options.maxResults, 1, 100, 10);
-
-  const searchPath = section ? join(vaultPath, section) : vaultPath;
-
-  if (!isInsideVault(vaultPath, searchPath)) return [];
-
-  if (!existsSync(searchPath)) {
-    return [];
-  }
-
-  const tokens = tokenize(query);
-  if (tokens.length === 0) return [];
-
-  // Kandidaten-Obergrenze für das Lesen: rg/node streamen in Pfad-Reihenfolge,
-  // nach ~maxResults*3 distinct Dateien hören wir auf zu sammeln (Punkt 2).
-  const candidateCap = maxResults * 3;
-
-  if (tokens.length === 1) {
-    let raw;
-    try {
-      raw = searchWithRipgrep(vaultPath, searchPath, query, contextLines, candidateCap, true);
-    } catch {
-      raw = searchWithNode(vaultPath, searchPath, tokens[0], contextLines, candidateCap);
-    }
-
-    // Titel-/Pfad-Vorlauf (Punkt 3): kanonische Seiten mergen die nicht unter
-    // den ersten Datei-Treffern lagen.
-    raw = mergeTitleCandidates(vaultPath, searchPath, raw, tokens, contextLines);
-
-    return enrichResults(vaultPath, raw, tokens, query).slice(0, maxResults);
-  }
-
-  // multi-token: search with folded OR pattern, then rank by distinct token hits
-  const orPattern = tokens.map(tokenToFoldedPattern).join('|');
-  let raw;
-  try {
-    raw = searchWithRipgrep(vaultPath, searchPath, orPattern, 0, candidateCap, false);
-  } catch {
-    raw = searchWithNodeRegex(vaultPath, searchPath, new RegExp(orPattern, 'i'), 0, candidateCap);
-  }
-
-  raw = mergeTitleCandidates(vaultPath, searchPath, raw, tokens, 0);
-
-  const ranked = rankByTokenCoverage(vaultPath, raw, tokens, query);
-
-  for (const result of ranked) {
-    if (result.matches.length > MAX_MATCHES_PER_FILE) {
-      result.matches = result.matches.slice(0, MAX_MATCHES_PER_FILE);
-    }
-  }
-
-  // context_lines für multi-token nachreichen (Punkt 5): der Suchlauf lief mit
-  // Kontext 0; nach Ranking/Trim die gewünschten Kontextzeilen um die
-  // überlebenden Treffer hängen.
-  const trimmed = ranked.slice(0, candidateCap);
-  if (contextLines > 0) {
-    attachContext(vaultPath, trimmed, contextLines);
-  }
-
-  return enrichResults(vaultPath, trimmed, tokens, query).slice(0, maxResults);
-}
-
-// Fügt für multi-token-Ergebnisse die gewünschten Kontextzeilen um jede
-// Trefferzeile hinzu (Punkt 5). Liest jede Datei einmal.
-function attachContext(vaultPath, results, contextLines) {
-  for (const result of results) {
-    let lines;
-    try {
-      lines = readFileSync(join(vaultPath, result.file + '.md'), 'utf-8').split('\n');
-    } catch {
-      continue;
-    }
-    const seen = new Set(result.matches.map(m => m.line));
-    const expanded = [...result.matches];
-    for (const m of result.matches) {
-      const idx = m.line - 1;
-      const start = Math.max(0, idx - contextLines);
-      const end = Math.min(lines.length - 1, idx + contextLines);
-      for (let j = start; j <= end; j++) {
-        if (!seen.has(j + 1)) {
-          seen.add(j + 1);
-          expanded.push({ line: j + 1, text: lines[j] });
-        }
-      }
-    }
-    expanded.sort((a, b) => a.line - b.line);
-    result.matches = expanded;
-  }
-}
-
-// Titel-/Pfad-Vorlauf (Punkt 3): findet über den gecachten Titel-Index Dateien
-// deren Basename oder Frontmatter-Titel auf IRGENDEINEN Token passt, und merged
-// diese (deduped by file) in das Ergebnis-Set BEVOR auf maxResults geschnitten
-// wird. So landet die kanonische Seite garantiert im Ranking.
-function mergeTitleCandidates(vaultPath, searchPath, results, tokens, contextLines) {
-  const index = getCachedTitleIndex(vaultPath);
-  if (!index.length) return results;
-
-  const tokenRes = tokens.map(t => foldedTokenRegex(t));
-  const seen = new Set(results.map(r => r.file));
-  const sectionRel = relative(vaultPath, searchPath).split(sep).join('/');
-
-  for (const entry of index) {
-    if (seen.has(entry.path)) continue;
-    // section-scope respektieren
-    if (sectionRel && sectionRel !== '.' && !(entry.path === sectionRel || entry.path.startsWith(sectionRel + '/'))) {
-      continue;
-    }
-    const hay = foldText(`${entry.title} ${entry.name} ${entry.path}`);
-    if (!tokenRes.some(re => re.test(hay))) continue;
-
-    seen.add(entry.path);
-    // Body-Treffer für diese Kandidaten ziehen damit echte Snippets entstehen.
-    const matches = matchesForFile(vaultPath, entry.path, tokens, contextLines);
-    results.push({ file: entry.path, title: entry.title, matches });
-  }
-
-  return results;
-}
-
-// Liest eine einzelne Datei und liefert Treffer-Zeilen (mit Kontext) für die
-// gegebenen Tokens. Genutzt vom Titel-Vorlauf.
-function matchesForFile(vaultPath, relPath, tokens, contextLines) {
-  let lines;
+function cachedLines(vaultPath, relPath, store) {
+  if (store.has(relPath)) return store.get(relPath);
+  let lines = [];
   try {
     lines = readFileSync(join(vaultPath, relPath + '.md'), 'utf-8').split('\n');
   } catch {
-    return [];
+    lines = [];
   }
-  const tokenRes = tokens.map(t => foldedTokenRegex(t));
-  const matchingLines = [];
-  const seen = new Set();
-  for (let i = 0; i < lines.length; i++) {
-    if (tokenRes.some(re => re.test(lines[i]))) {
-      const start = Math.max(0, i - contextLines);
-      const end = Math.min(lines.length - 1, i + contextLines);
-      for (let j = start; j <= end; j++) {
-        if (!seen.has(j + 1)) {
-          seen.add(j + 1);
-          matchingLines.push({ line: j + 1, text: lines[j] });
-        }
-      }
-    }
-  }
-  matchingLines.sort((a, b) => a.line - b.line);
-  return matchingLines;
+  store.set(relPath, lines);
+  return lines;
 }
 
-// Post-processing für beide Suchpfade (ripgrep + node fallback):
-//  - filtert Treffer aus dem YAML-Frontmatter-Block raus
-//  - droppt leere/whitespace-only Treffer-Zeilen (Punkt 4)
-//  - hängt pro Treffer die nächste vorausgehende Überschrift als `heading` an
-//  - markiert Dateien deren Titel/Pfad/Name auf einen Token passt mit `titleMatch`
-//  - vergibt einen numerischen `score` (graded titleMatch, Punkt 10) und sortiert danach
-//  - strippt trailing \r aus dem Treffer-Text
-//  - frontmatter-only-Snippet (Punkt 11): titleMatch-Dateien ohne Body-Treffer
-//    bekommen einen synthetisierten Snippet statt gedroppt zu werden
-// Das bestehende Schema { file, title, matches: [{ line, text, heading }], titleMatch }
-// bleibt erhalten, `score` kommt additiv dazu.
-// Manche Quellen zeigen veraltete Stile (z.B. samples.md baut Gadgets noch per
-// `new otris.gadget.gui.X()` statt der aktuellen funktionalen gadgetAPI). Solche
-// Treffer kriegen einen Score-Malus, damit die aktuelle API-Referenz oben steht.
-// Kein Ausschluss, nur Absenkung: fehlt eine Alternative, rankt die Quelle weiter.
-// Malus ~ "alle Tokens im Titel"-Boost, neutralisiert also den Body-Vorteil einer
-// Sample-Datei gegenueber einer Datei mit echtem Titel-Treffer.
-const STALE_SOURCE_PENALTY = 30;
-const STALE_SOURCE_PATTERNS = [
-  /(^|\/)samples?(\/|$)/i,   // Sample-Verzeichnisse/-Dateien
-  /(^|\/)archiv(\/|$)/i,     // archivierte/veraltete Staende
-];
-
-function staleSourcePenalty(filePath) {
-  return STALE_SOURCE_PATTERNS.some(re => re.test(filePath)) ? STALE_SOURCE_PENALTY : 0;
+// IDF-Masse der Query-Tokens die in einer Zeile vorkommen.
+function lineWeight(line, terms, idf) {
+  const folded = foldText(line);
+  let sum = 0;
+  for (const t of terms) {
+    if (folded.includes(t)) sum += idf(t);
+  }
+  return sum;
 }
 
-function enrichResults(vaultPath, results, tokens, query) {
-  const enriched = [];
-  const titleByPath = new Map(getCachedTitleIndex(vaultPath).map(e => [e.path, e.title]));
+// Baut EIN Snippet: die aussagekräftigste Zeile des besten Abschnitts plus
+// bis zu `span` Zeilen Kontext, ohne Rauschzeilen.
+function buildSnippet(lines, seg, terms, idf, span) {
+  const from = Math.max(0, seg.startLine - 1);
+  const to = Math.min(lines.length, seg.endLine);
 
-  for (const result of results) {
-    // Titel aus dem Index nachziehen wenn der Suchpfad keinen geliefert hat
-    // (rg/node liefern leeren Titel, nur readDoc/Index kennt ihn).
-    if (!result.title && titleByPath.has(result.file)) {
-      result.title = titleByPath.get(result.file);
-    }
-
-    let frontmatterEnd = 0;
-    let headings = [];
-    let lines = [];
-    try {
-      const raw = readFileSync(join(vaultPath, result.file + '.md'), 'utf-8');
-      ({ frontmatterEnd, headings, lines } = buildLineIndex(raw));
-    } catch {
-      // Datei nicht lesbar: ohne Index weiter, nichts wird gefiltert/angereichert
-    }
-
-    const matches = [];
-    for (const m of result.matches) {
-      // Treffer innerhalb des Frontmatter-Blocks raushalten
-      if (frontmatterEnd && m.line <= frontmatterEnd) continue;
-      const text = typeof m.text === 'string' ? m.text.replace(/\r$/, '') : m.text;
-      // leere/whitespace-only Kontext-/Trefferzeilen droppen (Punkt 4)
-      if (typeof text === 'string' && text.trim() === '') continue;
-      matches.push({
-        line: m.line,
-        text,
-        heading: headingForLine(headings, m.line),
-      });
-    }
-
-    // geteilte Obergrenze für Treffer pro Datei (Punkt 4): gilt für BEIDE
-    // Branches, damit auch single-token nicht eine Datei mit Treffern flutet.
-    if (matches.length > MAX_MATCHES_PER_FILE) {
-      matches.length = MAX_MATCHES_PER_FILE;
-    }
-
-    const { titleMatch, titleScore } = scoreTitle(result, tokens, query);
-
-    if (matches.length === 0) {
-      // frontmatter-only-Snippet (Punkt 11): titleMatch ohne echten Body-Treffer
-      // nicht droppen, sondern aus erster Body-Zeile/Heading synthetisieren.
-      if (titleMatch && lines.length) {
-        const synth = synthesizeSnippet(lines, frontmatterEnd, headings);
-        if (synth) {
-          matches.push(synth);
-        }
-      }
-      if (matches.length === 0) continue;
-    }
-
-    // term-frequency über alle Treffer-Texte (klein gewichtet, Punkt 9)
-    const bodyScore = scoreBody(matches, tokens);
-    const score = titleScore + bodyScore - staleSourcePenalty(result.file);
-
-    enriched.push({ ...result, matches, titleMatch, score });
-  }
-
-  // höherer score zuerst, sonst stabile Eingangsreihenfolge
-  enriched.sort((a, b) => b.score - a.score);
-  return enriched;
-}
-
-// graded titleMatch (Punkt 10): liefert boolean titleMatch + numerischen Beitrag.
-//  - normalisierter Titel == Query -> großer Boost
-//  - alle Tokens im Titel -> mittlerer Boost
-//  - Basename/Pfad-Token-Treffer -> kleiner Boost
-function scoreTitle(result, tokens, query) {
-  const titleFold = foldText(result.title || '');
-  const baseFold = foldText(basename(result.file));
-  const pathFold = foldText(result.file);
-  const queryFold = foldText(query || '');
-
-  const tokenRes = tokens.map(t => foldedTokenRegex(t));
-
-  let titleScore = 0;
-  let titleMatch = false;
-
-  if (titleFold && titleFold === queryFold) {
-    titleScore += 100;
-    titleMatch = true;
-  }
-
-  if (titleFold && tokenRes.every(re => re.test(titleFold))) {
-    titleScore += 30;
-    titleMatch = true;
-  }
-
-  if (tokenRes.some(re => re.test(baseFold))) {
-    titleScore += 10;
-    titleMatch = true;
-  }
-
-  if (tokenRes.some(re => re.test(pathFold))) {
-    titleScore += 5;
-    titleMatch = true;
-  }
-
-  if (titleFold && tokenRes.some(re => re.test(titleFold))) {
-    titleScore += 5;
-    titleMatch = true;
-  }
-
-  return { titleMatch, titleScore };
-}
-
-// Body-Score (Punkt 9): distinct-token coverage + Phrasen-/Proximity-Bonus
-// (alle Tokens auf einer Zeile) + kleiner, gedeckelter term-frequency-Anteil.
-function scoreBody(matches, tokens) {
-  const tokenRes = tokens.map(t => foldedTokenRegex(t));
-  const lineTexts = matches.map(m => foldText(typeof m.text === 'string' ? m.text : ''));
-  const allText = lineTexts.join('\n');
-
-  // distinct-token coverage
-  let coverage = 0;
-  for (const re of tokenRes) {
-    if (re.test(allText)) coverage++;
-  }
-  let score = coverage * 4;
-
-  // Proximity: alle Tokens auf einer einzigen Zeile
-  if (tokens.length > 1) {
-    const allOnOneLine = lineTexts.some(line => tokenRes.every(re => re.test(line)));
-    if (allOnOneLine) score += 6;
-  }
-
-  // gedeckelte term-frequency
-  let tf = 0;
-  for (const re of tokenRes) {
-    const global = new RegExp(re.source, 'gi');
-    const count = (allText.match(global) || []).length;
-    tf += Math.min(count, 3);
-  }
-  score += Math.min(tf, 9);
-
-  return score;
-}
-
-// synthetisiert einen Snippet aus der ersten nicht-leeren Body-Zeile, sonst
-// aus der ersten Überschrift nach dem Frontmatter (Punkt 11).
-function synthesizeSnippet(lines, frontmatterEnd, headings) {
-  for (let i = frontmatterEnd; i < lines.length; i++) {
+  let bestIdx = -1;
+  let bestWeight = 0;
+  for (let i = from; i < to; i++) {
     const text = lines[i].replace(/\r$/, '');
-    if (text.trim() !== '') {
-      return { line: i + 1, text, heading: headingForLine(headings, i + 1) };
+    if (isNoiseLine(text)) continue;
+    const w = lineWeight(text, terms, idf);
+    if (w > bestWeight) {
+      bestWeight = w;
+      bestIdx = i;
     }
   }
-  if (headings.length) {
-    const h = headings.find(hh => hh.line > frontmatterEnd) || headings[0];
-    return { line: h.line, text: '#'.repeat(h.level) + ' ' + h.text, heading: h.text };
+
+  // Keine Zeile trägt einen Query-Token (z.B. Property-Abschnitte, die den
+  // Namen nur in der Überschrift führen): dann die längste inhaltliche Zeile
+  // nehmen, das ist praktisch immer der Beschreibungstext und nicht eine
+  // "- **Typ:** enum"-Metazeile.
+  if (bestIdx === -1) {
+    let longest = 0;
+    for (let i = from; i < to; i++) {
+      const text = lines[i].replace(/\r$/, '').trim();
+      if (isNoiseLine(text)) continue;
+      if (text.length > longest) {
+        longest = text.length;
+        bestIdx = i;
+      }
+    }
   }
-  return null;
+  if (bestIdx === -1) return '';
+
+  const picked = [];
+  for (let i = Math.max(from, bestIdx - span); i < Math.min(to, bestIdx + span + 1); i++) {
+    const text = lines[i].replace(/\r$/, '').trim();
+    if (i !== bestIdx && isNoiseLine(text)) continue;
+    picked.push(text.length > MAX_SNIPPET_LINE_CHARS ? text.slice(0, MAX_SNIPPET_LINE_CHARS) + '…' : text);
+  }
+
+  let snippet = picked.join('\n');
+  if (snippet.length > MAX_SNIPPET_CHARS) snippet = snippet.slice(0, MAX_SNIPPET_CHARS) + '…';
+  return snippet;
 }
 
-// Pre-Slice-Ranking: nutzt denselben Score wie enrichResults (titleScore +
-// bodyScore), damit titleMatch-Seiten den candidateCap-Slice überleben und
-// nicht hinter coverage-stärkeren Beispielseiten weggeschnitten werden.
-// Titel werden vorab aus dem Index nachgezogen (rg/node liefern leeren Titel),
-// sonst greift der Titel-Boost hier noch nicht.
-function rankByTokenCoverage(vaultPath, results, tokens, query) {
-  const titleByPath = new Map(getCachedTitleIndex(vaultPath).map(e => [e.path, e.title]));
-
-  for (const result of results) {
-    if (!result.title && titleByPath.has(result.file)) {
-      result.title = titleByPath.get(result.file);
+// detailed-Format: echte Treffer-Zeilen mit Kontext, wie vor der Umstellung.
+function buildMatches(lines, segs, terms, idf, contextLines) {
+  const seen = new Set();
+  const out = [];
+  for (const seg of segs) {
+    const from = Math.max(0, seg.startLine - 1);
+    const to = Math.min(lines.length, seg.endLine);
+    for (let i = from; i < to && out.length < MAX_MATCHES_PER_FILE; i++) {
+      const text = lines[i].replace(/\r$/, '');
+      if (isNoiseLine(text)) continue;
+      if (lineWeight(text, terms, idf) <= 0) continue;
+      const start = Math.max(from, i - contextLines);
+      const end = Math.min(to - 1, i + contextLines);
+      for (let j = start; j <= end && out.length < MAX_MATCHES_PER_FILE; j++) {
+        if (seen.has(j)) continue;
+        const ctx = lines[j].replace(/\r$/, '');
+        if (ctx.trim() === '') continue;
+        seen.add(j);
+        out.push({ line: j + 1, text: ctx, heading: seg.heading });
+      }
     }
-    const { titleScore } = scoreTitle(result, tokens, query);
-    result._score = titleScore + scoreBody(result.matches, tokens);
+    if (out.length >= MAX_MATCHES_PER_FILE) break;
   }
-
-  results.sort((a, b) => b._score - a._score);
-
-  for (const result of results) {
-    delete result._score;
-  }
-
-  return results;
-}
-
-// fixed: bei true wird -F/--fixed-strings gesetzt (literal match, Punkt 6).
-function searchWithRipgrep(vaultPath, searchPath, query, contextLines, maxResults, fixed) {
-  // dieselbe Skip-Semantik wie der node-fallback: crawl/, node_modules/ und
-  // _-/.-präfixierte Ordner sind kein Vault-Content.
-  // --json (Punkt 1): strukturierter Stream löst CRLF-, greedy-regex- und
-  // embedded-path-Probleme in einem Schritt.
-  const args = [
-    '-i', '--json', '-C', String(contextLines),
-    '--glob', '*.md',
-    '--glob', '!**/crawl/**',
-    '--glob', '!**/node_modules/**',
-    '--glob', '!**/_*/**',
-    '--glob', '!**/.*/**',
-  ];
-  if (fixed) {
-    // single-token literal: -F damit es wie der node-Pfad matcht. Damit Umlaut-
-    // Folding nicht schlechter ist als node, beide Varianten als separate
-    // fixed-strings -e Patterns mitgeben.
-    const variants = new Set([query, ...foldVariants(query)]);
-    for (const v of variants) {
-      args.push('-F', '-e', v);
-    }
-  } else {
-    args.push('-e', query);
-  }
-  args.push(searchPath);
-
-  let output;
-  try {
-    output = execFileSync('rg', args, { encoding: 'utf-8', timeout: 10000, maxBuffer: 64 * 1024 * 1024 }).trim();
-  } catch (err) {
-    // rg exits with code 1 when no matches found
-    if (err.status === 1 && err.stdout !== undefined) {
-      return [];
-    }
-    throw err;
-  }
-
-  if (!output) {
-    return [];
-  }
-
-  return parseRipgrepJson(vaultPath, output, maxResults);
-}
-
-// erzeugt die gefoldeten Schreibvarianten eines literalen Query-Strings, damit
-// der rg-Pfad bei -F (keine Regex) trotzdem Umlaute findet (Punkt 7).
-function foldVariants(query) {
-  const out = new Set();
-  out.add(foldText(query));
-  // umgekehrt: ae->ä etc. (nur die häufigste Rückrichtung)
-  out.add(query.toLowerCase()
-    .replace(/ae/g, 'ä')
-    .replace(/oe/g, 'ö')
-    .replace(/ue/g, 'ü')
-    .replace(/ss/g, 'ß'));
-  out.delete('');
+  out.sort((a, b) => a.line - b.line);
   return out;
 }
 
-// Parst den rg --json-Stream (Punkt 1). type:"match"-Events liefern
-// data.path.text, data.line_number, data.lines.text verbatim. Kontextzeilen
-// kommen als type:"context". Stoppt nach maxResults distinct Dateien (Punkt 2).
-export function parseRipgrepJson(vaultPath, output, maxResults) {
-  const fileGroups = new Map();
-  let distinctFiles = 0;
+// true wenn die Überschrift komplett aus Query-Tokens besteht. Das ist das
+// stärkste "hier ist die Definition"-Signal: `## hasInvoicePlugin` bei der
+// Query "Mappentyp Eigenschaft hasInvoicePlugin".
+function headingIsQuerySubset(heading, termSet) {
+  const parts = tokenize(heading).map(foldText);
+  if (!parts.length) return false;
+  return parts.every(p => termSet.has(p));
+}
 
-  for (const line of output.split(/\r?\n/)) {
-    if (!line.trim()) continue;
-    let evt;
-    try {
-      evt = JSON.parse(line);
-    } catch {
-      continue;
+// Aggregiert die Abschnitts-Treffer zu Datei-Treffern.
+//
+// Der entscheidende Punkt gegen den alten IDF-Fehler: primärer Diskriminator
+// ist nicht die rohe BM25-Summe, sondern wieviel IDF-MASSE der Query eine Datei
+// abdeckt. Eine Datei die den seltenen Token trifft schlägt damit eine Datei
+// die nur zwei häufige Tokens trifft, egal wie oft.
+function aggregateByFile(hits, index, terms, queryFold) {
+  const idfTotal = terms.reduce((s, t) => s + index.idf(t), 0) || 1;
+  const termSet = new Set(terms);
+  const byFile = new Map();
+
+  for (const hit of hits) {
+    const seg = index.segments.get(hit.id);
+    if (!seg) continue;
+
+    let group = byFile.get(seg.file);
+    if (!group) {
+      group = { file: seg.file, title: seg.title, terms: new Set(), segs: [] };
+      byFile.set(seg.file, group);
     }
-    if (evt.type !== 'match' && evt.type !== 'context') continue;
+    for (const t of hit.terms) group.terms.add(t);
 
-    const data = evt.data;
-    if (!data || !data.path || typeof data.path.text !== 'string') continue;
-    const absPath = data.path.text;
-    const relPath = relative(vaultPath, absPath).replace(/\.md$/, '').split(sep).join('/');
-
-    if (!fileGroups.has(relPath)) {
-      // Kandidaten-Obergrenze: nach maxResults distinct Dateien nicht mehr
-      // sammeln (rg streamt in Pfad-Reihenfolge).
-      if (distinctFiles >= maxResults) continue;
-      distinctFiles++;
-      fileGroups.set(relPath, { file: relPath, title: '', matches: [] });
+    // Abschnitts-Score: BM25, gewichtet mit der IDF-Masse die dieser Abschnitt
+    // selbst abdeckt, plus Boost wenn die Überschrift der gesuchte Bezeichner ist.
+    const segCoverage = hit.terms.reduce((s, t) => s + index.idf(t), 0) / idfTotal;
+    let score = hit.score * segCoverage;
+    if (seg.heading && headingIsQuerySubset(seg.heading, termSet)) {
+      const headingIdf = tokenize(seg.heading).map(foldText).reduce((s, t) => s + index.idf(t), 0);
+      score *= 1 + 3 * Math.min(1, headingIdf / idfTotal);
     }
-
-    const lineNumber = data.line_number;
-    const text = data.lines && typeof data.lines.text === 'string'
-      ? data.lines.text.replace(/\r?\n$/, '')
-      : '';
-    if (typeof lineNumber === 'number') {
-      fileGroups.get(relPath).matches.push({ line: lineNumber, text });
-    }
+    group.segs.push({ ...seg, score, matchedTerms: hit.terms });
   }
 
-  return Array.from(fileGroups.values());
-}
-
-function searchWithNode(vaultPath, searchPath, token, contextLines, maxResults) {
-  return searchWithNodeRegex(vaultPath, searchPath, foldedTokenRegex(token), contextLines, maxResults);
-}
-
-function searchWithNodeRegex(vaultPath, searchPath, regex, contextLines, maxResults) {
   const results = [];
-
-  const mdFiles = [];
-  collectMdFilePaths(searchPath, mdFiles);
-
-  for (const filePath of mdFiles) {
-    // Kandidaten-Obergrenze BEVOR weitere Dateien gelesen werden (Punkt 2):
-    // nicht erst den ganzen Vault lesen und dann slicen.
-    if (results.length >= maxResults) break;
-
-    const raw = readFileSync(filePath, 'utf-8');
-    const lines = raw.split('\n');
-    const matchingLines = [];
-    const seen = new Set();
-
-    for (let i = 0; i < lines.length; i++) {
-      if (regex.test(lines[i])) {
-        const start = Math.max(0, i - contextLines);
-        const end = Math.min(lines.length - 1, i + contextLines);
-        for (let j = start; j <= end; j++) {
-          if (!seen.has(j + 1)) {
-            seen.add(j + 1);
-            matchingLines.push({ line: j + 1, text: lines[j] });
-          }
-        }
-      }
-    }
-
-    if (matchingLines.length > 0) {
-      const relPath = relative(vaultPath, filePath).replace(/\.md$/, '').split(sep).join('/');
-      matchingLines.sort((a, b) => a.line - b.line);
-      results.push({
-        file: relPath,
-        title: '',
-        matches: matchingLines,
-      });
-    }
+  for (const group of byFile.values()) {
+    group.segs.sort((a, b) => b.score - a.score);
+    const coverage = [...group.terms].reduce((s, t) => s + index.idf(t), 0) / idfTotal;
+    // quadratisch: eine Datei die den seltenen Token gar nicht enthält fällt
+    // deutlich zurück, auch wenn sie die häufigen Tokens oft trifft.
+    let score = group.segs[0].score * coverage * coverage;
+    if (group.title && foldText(group.title) === queryFold) score *= 2;
+    score *= staleFactor(group.file);
+    results.push({ group, score, coverage });
   }
 
+  results.sort((a, b) => b.score - a.score);
   return results;
 }
 
-function collectMdFilePaths(dir, results) {
-  const entries = readdirSync(dir, { withFileTypes: true });
-  for (const entry of entries) {
-    const fullPath = join(dir, entry.name);
-    if (entry.isDirectory() && !isSkippedDir(entry.name)) {
-      collectMdFilePaths(fullPath, results);
-    } else if (entry.isFile() && entry.name.endsWith('.md')) {
-      results.push(fullPath);
-    }
+// Volltextsuche über den BM25-Abschnitts-Index.
+// options: { section, maxResults, contextLines, detailed, maxTokens }
+export function searchDocs(vaultPath, query, options = {}) {
+  const { section, detailed = false } = options;
+  const contextLines = clampInt(options.contextLines, 0, 20, 3);
+  const maxResults = clampInt(options.maxResults, 1, 100, 5);
+
+  if (section) {
+    const searchPath = join(vaultPath, section);
+    if (!isInsideVault(vaultPath, searchPath) || !existsSync(searchPath)) return [];
   }
+  if (!existsSync(vaultPath)) return [];
+
+  const terms = queryTerms(query);
+  if (terms.length === 0) return [];
+
+  let index;
+  try {
+    index = getCachedSearchIndex(vaultPath);
+  } catch {
+    return [];
+  }
+  if (!index || !index.segmentCount) return [];
+
+  const sectionPrefix = section ? section.split(sep).join('/') + '/' : '';
+  const filter = section
+    ? (result) => {
+      const seg = index.segments.get(result.id);
+      return !!seg && (seg.file === section || seg.file.startsWith(sectionPrefix));
+    }
+    : undefined;
+
+  let hits = index.mini.search(query, { filter });
+  if (hits.length === 0) {
+    // Tippfehler-/Teilwort-Rettung, nur wenn exakt gar nichts kam
+    hits = index.mini.search(query, { filter, fuzzy: 0.2, prefix: true });
+  }
+  if (hits.length === 0) return [];
+
+  const ranked = aggregateByFile(hits, index, terms, foldText(query.trim()));
+  const top = ranked.slice(0, maxResults);
+
+  const lineStore = new Map();
+  const snippetSpan = detailed ? 1 : Math.min(contextLines, 1);
+  const out = [];
+
+  for (const entry of top) {
+    const { group } = entry;
+    const lines = cachedLines(vaultPath, group.file, lineStore);
+    const headings = [];
+    for (const seg of group.segs) {
+      if (seg.heading && !headings.includes(seg.heading)) headings.push(seg.heading);
+      if (headings.length >= MAX_HEADINGS_PER_RESULT) break;
+    }
+
+    const result = {
+      file: group.file,
+      title: group.title,
+      headings,
+      snippet: buildSnippet(lines, group.segs[0], terms, index.idf, snippetSpan),
+      score: Math.round(entry.score * 10) / 10,
+    };
+
+    if (detailed) {
+      const titleFold = foldText(group.title || '');
+      const baseFold = foldText(basename(group.file));
+      result.titleMatch = terms.every(t => titleFold.includes(t))
+        || terms.every(t => baseFold.includes(t));
+      result.matches = buildMatches(lines, group.segs.slice(0, 3), terms, index.idf, contextLines);
+    }
+
+    out.push(result);
+  }
+
+  return applyTokenBudget(out, options.maxTokens);
 }
 
-function escapeRegex(str) {
-  return str.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+// Optionales hartes Budget: schneidet Treffer weg (und zur Not Snippets) bis die
+// serialisierte Antwort unter max_tokens bleibt. ~4 Zeichen pro Token.
+function applyTokenBudget(results, maxTokens) {
+  const budget = Number(maxTokens);
+  if (!Number.isFinite(budget) || budget <= 0) return results;
+  const maxChars = Math.max(200, Math.trunc(budget) * 4);
+
+  let out = results;
+  while (out.length > 1 && JSON.stringify(out).length > maxChars) {
+    out = out.slice(0, out.length - 1);
+  }
+  if (JSON.stringify(out).length > maxChars && out.length === 1) {
+    const only = { ...out[0] };
+    const overflow = JSON.stringify(out).length - maxChars;
+    only.snippet = only.snippet.slice(0, Math.max(0, only.snippet.length - overflow - 1));
+    out = [only];
+  }
+  return out;
 }
 
 export function getManifest(vaultPath) {

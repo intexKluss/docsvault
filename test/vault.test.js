@@ -2,7 +2,7 @@ import { describe, it, after } from 'node:test';
 import assert from 'node:assert/strict';
 import { join } from 'node:path';
 import {
-  getSections, listFiles, readDoc, searchDocs, getManifest, parseRipgrepJson,
+  getSections, listFiles, readDoc, searchDocs, getManifest,
 } from '../src/tools/vault.js';
 import { handleSearch } from '../src/tools/search.js';
 import { handleList } from '../src/tools/list.js';
@@ -28,16 +28,30 @@ const { root, cleanup } = createTempVaultsRoot({
       'Scripting/PortalscriptAPI/classes/context.md': '---\ntitle: context\n---\n# context\n\nDie Klasse context stellt getDocument bereit.\n\n## getDocument\n\ncontext.getDocument() liefert das aktuelle Dokument.',
       // frontmatter-only titleMatch: title enthält den Begriff, Body sonst nichts
       'api/FrontOnly.md': '---\ntitle: SonderBegriffXyz\n---\n# Heading One\n\nIrgendein Fließtext ohne den Begriff im Body.',
-      // viele example-pages die context erwähnen, damit context.md sonst untergeht
-      'examples/ex01.md': '# Example 1\n\nNutzt context irgendwo.',
-      'examples/ex02.md': '# Example 2\n\nNutzt context irgendwo.',
-      'examples/ex03.md': '# Example 3\n\nNutzt context irgendwo.',
-      'examples/ex04.md': '# Example 4\n\nNutzt context irgendwo.',
-      'examples/ex05.md': '# Example 5\n\nNutzt context irgendwo.',
+      // viele example-pages die context erwähnen, damit context.md sonst untergeht.
+      // Sie nennen auch Mappentyp/Eigenschaft, damit diese Tokens im Fixture-
+      // Korpus wirklich häufig sind (das ist die Voraussetzung des IDF-Falls).
+      'examples/ex01.md': '# Example 1\n\nNutzt context irgendwo. Am Mappentyp wird die Eigenschaft gesetzt.',
+      'examples/ex02.md': '# Example 2\n\nNutzt context irgendwo. Am Mappentyp wird die Eigenschaft gesetzt.',
+      'examples/ex03.md': '# Example 3\n\nNutzt context irgendwo. Am Mappentyp wird die Eigenschaft gesetzt.',
+      'examples/ex04.md': '# Example 4\n\nNutzt context irgendwo. Am Mappentyp wird die Eigenschaft gesetzt.',
+      'examples/ex05.md': '# Example 5\n\nNutzt context irgendwo. Am Mappentyp wird die Eigenschaft gesetzt.',
       // doc für per-file-cap: viele Treffer derselben Datei
       'api/Many.md': '# Many\n\ntoken\ntoken\ntoken\ntoken\ntoken\ntoken\ntoken\ntoken\ntoken\ntoken\ntoken\ntoken\ntoken\ntoken\ntoken',
       // doc für heading-targeting in readDoc
       'guides/Sections.md': '---\ntitle: Sections\n---\n# Sections\n\nIntro text.\n\n## Alpha\n\nAlpha body line.\n\n### Sub\n\nSub body.\n\n## Beta\n\nBeta body line.',
+      // IDF-Fall (hasInvoicePlugin): die kanonische Property-Seite nennt den
+      // seltenen Bezeichner nur als Überschrift, "Mappentyp"/"Eigenschaft"
+      // stehen irgendwo anders auf derselben Seite.
+      'Properties/DlcFile.md': '---\ntitle: "Properties: DlcFile"\n---\n# Properties: DlcFile\n\nEigenschaften am Mappentyp.\n\n## enableAlpha\n\n- **Typ:** enum\n\nSchaltet Alpha ein.\n\n## hasInvoicePlugin\n\n- **Objekte:** DlcFile\n- **Typ:** enum\n\nDas Invoice Plugin kann hiermit aktiviert werden.\n\n## zetaMode\n\n- **Typ:** string\n\nSteuert Zeta.',
+      // Distraktoren: viele häufige Tokens, aber nie der seltene Bezeichner.
+      'Handbuch/Mappentyp Konfiguration.md': '# Mappentyp Konfiguration\n\n## Eigenschaft setzen\n\nJeder Mappentyp hat Eigenschaften. Die Eigenschaft wird am Mappentyp gepflegt. Eigenschaft und Mappentyp gehören zusammen.\n\n## Weitere Eigenschaft\n\nNoch eine Eigenschaft am Mappentyp.',
+      'Handbuch/Eigenschaften und Felder.md': '# Eigenschaften und Felder\n\n## Eigenschaft am Mappentyp\n\nEine Eigenschaft am Mappentyp steuert das Verhalten. Mappentyp, Eigenschaft, Eigenschaft, Mappentyp.',
+      'HowTos/Mappentyp Eigenschaft pflegen.md': '# Mappentyp Eigenschaft pflegen\n\n## Eigenschaft anlegen\n\nSo legst du eine Eigenschaft an einem Mappentyp an. Mappentyp Eigenschaft Mappentyp Eigenschaft.',
+      // Seite mit vielen Abschnitten für die TOC-Logik in readDoc
+      'guides/Many Sections.md': '---\ntitle: Many Sections\n---\n# Many Sections\n\nIntro der Seite mit reichlich Text damit das Intro nicht leer ist.\n\n## Ein\n\nInhalt eins mit genug Text um das Limit zu sprengen.\n\n## Zwei\n\nInhalt zwei mit genug Text um das Limit zu sprengen.\n\n## Drei\n\nInhalt drei mit genug Text um das Limit zu sprengen.\n\n## Vier\n\nInhalt vier mit genug Text um das Limit zu sprengen.\n\n## Fuenf\n\nInhalt fuenf mit genug Text um das Limit zu sprengen.\n\n## Sechs\n\nInhalt sechs mit genug Text um das Limit zu sprengen.',
+      // lange Seite mit nur wenigen Abschnitten: truncate + Rest-TOC
+      'guides/Long Flat.md': '---\ntitle: Long Flat\n---\n# Long Flat\n\n' + 'Fliesstext der einfach immer weiter geht und geht. '.repeat(20) + '\n\n## Hinten\n\nDer hintere Abschnitt.',
     },
   },
 });
@@ -120,10 +134,9 @@ describe('Vault', () => {
     });
 
     it('truncates content when maxLength exceeded', () => {
-      const doc = readDoc(VAULT_PATH, 'guides/Sections', 10);
-      if (doc && doc.content.length > 10) {
-        assert.equal(doc.truncated, true);
-      }
+      const doc = readDoc(VAULT_PATH, 'guides/Long Flat', 300);
+      assert.ok(doc.content.length < 1000);
+      assert.equal(doc.truncated, true);
     });
 
     // Punkt 17: heading-targeting gibt nur den passenden Abschnitt zurück
@@ -147,11 +160,13 @@ describe('Vault', () => {
       assert.equal(doc.title, 'DocFile');
     });
 
-    // Punkt 12: maxLength wird geclampt (0 -> min 1, kein crash)
+    // Punkt 12: maxLength wird geclampt (0/negativ -> nutzbares Minimum, kein crash)
     it('clamps maxLength defensively', () => {
       const doc = readDoc(VAULT_PATH, 'guides/Sections', 0);
       assert.ok(doc);
-      assert.equal(doc.truncated, true);
+      assert.ok(doc.content.length > 0);
+      const huge = readDoc(VAULT_PATH, 'guides/Long Flat', 999999);
+      assert.ok(huge.content.length <= 25000);
     });
   });
 
@@ -178,7 +193,7 @@ describe('Vault', () => {
 
     // Punkt 1: Frontmatter-Zeilen (---/title/source) dürfen keine Treffer sein
     it('does not return matches inside the frontmatter block', () => {
-      const results = searchDocs(VAULT_PATH, 'DocFile');
+      const results = searchDocs(VAULT_PATH, 'DocFile', { detailed: true });
       const doc = results.find(r => r.file === 'api/DocFile');
       assert.ok(doc, 'DocFile sollte gefunden werden (Titel im Heading)');
       for (const m of doc.matches) {
@@ -190,7 +205,7 @@ describe('Vault', () => {
 
     // Punkt 2: jeder Treffer trägt die nächste vorausgehende Überschrift
     it('attaches the nearest preceding heading to each match', () => {
-      const results = searchDocs(VAULT_PATH, 'upload');
+      const results = searchDocs(VAULT_PATH, 'upload', { detailed: true });
       assert.ok(results.length > 0);
       for (const r of results) {
         for (const m of r.matches) {
@@ -207,14 +222,14 @@ describe('Vault', () => {
 
     // Punkt 3: Titel-/Pfad-Treffer kommen zuerst und sind markiert
     it('ranks title/path matches first with titleMatch flag', () => {
-      const results = searchDocs(VAULT_PATH, 'Interface');
+      const results = searchDocs(VAULT_PATH, 'Interface', { detailed: true });
       assert.ok(results.length > 0);
       assert.equal(results[0].file, 'api/Interface');
       assert.equal(results[0].titleMatch, true);
     });
 
-    it('sets titleMatch flag on every result', () => {
-      const results = searchDocs(VAULT_PATH, 'function');
+    it('sets titleMatch flag on every detailed result', () => {
+      const results = searchDocs(VAULT_PATH, 'function', { detailed: true });
       for (const r of results) {
         assert.ok('titleMatch' in r);
         assert.equal(typeof r.titleMatch, 'boolean');
@@ -232,7 +247,7 @@ describe('Vault', () => {
 
     // Punkt 5: trailing \r wird aus dem Treffer-Text gestrippt
     it('strips trailing carriage returns from match text', () => {
-      const results = searchDocs(VAULT_PATH, 'carriage');
+      const results = searchDocs(VAULT_PATH, 'carriage', { detailed: true });
       assert.ok(results.length > 0);
       for (const r of results) {
         for (const m of r.matches) {
@@ -247,9 +262,9 @@ describe('Vault', () => {
       assert.ok(!results.some(r => r.file.startsWith('crawl/')));
     });
 
-    // bestehendes Schema bleibt erhalten (file, title, matches[{line,text,heading}])
-    it('keeps the existing result schema intact', () => {
-      const results = searchDocs(VAULT_PATH, 'function');
+    // detailed behält das alte Schema (file, title, matches[{line,text,heading}])
+    it('keeps the legacy result schema intact in detailed mode', () => {
+      const results = searchDocs(VAULT_PATH, 'function', { detailed: true });
       assert.ok(results.length > 0);
       for (const r of results) {
         assert.ok('file' in r);
@@ -263,9 +278,37 @@ describe('Vault', () => {
       }
     });
 
+    // concise (Default): ein Snippet + Heading-Liste, keine matches-Flut
+    it('returns the compact shape by default', () => {
+      const results = searchDocs(VAULT_PATH, 'function');
+      assert.ok(results.length > 0);
+      for (const r of results) {
+        assert.ok('file' in r);
+        assert.ok('title' in r);
+        assert.ok(Array.isArray(r.headings), 'headings fehlt');
+        assert.equal(typeof r.snippet, 'string');
+        assert.ok(!('matches' in r), 'concise darf keine matches enthalten');
+      }
+    });
+
+    it('defaults to five results', () => {
+      const results = searchDocs(VAULT_PATH, 'function');
+      assert.ok(results.length <= 5);
+    });
+
+    it('never uses bare code fences or blank lines as snippet', () => {
+      const results = searchDocs(VAULT_PATH, 'function');
+      for (const r of results) {
+        for (const line of r.snippet.split('\n')) {
+          assert.notEqual(line.trim(), '');
+          assert.ok(!/^`{3,}$/.test(line.trim()), `code fence als snippet: ${r.file}`);
+        }
+      }
+    });
+
     // Punkt 3: rank-before-slice - kanonische Seite überlebt trotz vieler examples
     it('surfaces the canonical title page even with many example hits', () => {
-      const results = searchDocs(VAULT_PATH, 'context', { maxResults: 3 });
+      const results = searchDocs(VAULT_PATH, 'context', { maxResults: 3, detailed: true });
       const ctx = results.find(r => r.file === 'Scripting/PortalscriptAPI/classes/context');
       assert.ok(ctx, 'die kanonische context-Klasse muss in den top results sein');
       assert.equal(ctx.titleMatch, true);
@@ -273,7 +316,7 @@ describe('Vault', () => {
 
     // Punkt 4: per-file cap - keine Datei flutet die Antwort
     it('caps matches per file and drops blank lines', () => {
-      const results = searchDocs(VAULT_PATH, 'token');
+      const results = searchDocs(VAULT_PATH, 'token', { detailed: true });
       const many = results.find(r => r.file === 'api/Many');
       assert.ok(many);
       assert.ok(many.matches.length <= 10, `per-file cap verletzt: ${many.matches.length}`);
@@ -284,7 +327,7 @@ describe('Vault', () => {
 
     // Punkt 5: context_lines wird auch für multi-token honoriert
     it('honors context_lines for multi-token queries', () => {
-      const results = searchDocs(VAULT_PATH, 'Methoden upload', { contextLines: 2 });
+      const results = searchDocs(VAULT_PATH, 'Methoden upload', { contextLines: 2, detailed: true });
       const doc = results.find(r => r.file === 'api/DocFile');
       assert.ok(doc);
       // bei context 2 muss es mehr als nur die reinen treffer-zeilen geben
@@ -302,15 +345,12 @@ describe('Vault', () => {
       assert.ok(results.some(r => r.file === 'api/Uebersicht'));
     });
 
-    // Punkt 11: frontmatter-only titleMatch bekommt synthetischen snippet
-    it('synthesizes a snippet for frontmatter-only title matches', () => {
+    // Titel-Treffer ohne Body-Treffer wird nicht gedroppt
+    it('still returns a snippet when only the title matches', () => {
       const results = searchDocs(VAULT_PATH, 'SonderBegriffXyz');
       const front = results.find(r => r.file === 'api/FrontOnly');
-      assert.ok(front, 'titleMatch-datei darf nicht gedroppt werden');
-      assert.ok(front.matches.length > 0, 'kein leerer snippet');
-      for (const m of front.matches) {
-        assert.notEqual(m.text.trim(), '');
-      }
+      assert.ok(front, 'titel-treffer darf nicht gedroppt werden');
+      assert.notEqual(front.snippet.trim(), '', 'kein leerer snippet');
     });
 
     // Punkt 8: dotted API name wird tokenisiert
@@ -325,47 +365,104 @@ describe('Vault', () => {
       const results = searchDocs(VAULT_PATH, 'context', { maxResults: 9999 });
       assert.ok(results.length <= 100);
     });
+
+    it('honors max_tokens as a hard budget', () => {
+      const budget = 60;
+      const results = searchDocs(VAULT_PATH, 'function', { maxResults: 5, maxTokens: budget });
+      assert.ok(results.length >= 1, 'budget darf nicht alles wegschneiden');
+      assert.ok(
+        JSON.stringify(results).length <= budget * 4,
+        `budget verletzt: ${JSON.stringify(results).length} > ${budget * 4}`
+      );
+    });
   });
 
-  // Punkt 1: CRLF rg --json parsing
-  describe('parseRipgrepJson', () => {
-    it('parses rg --json match events with CRLF lines verbatim', () => {
-      const abs = join(VAULT_PATH, 'api', 'Crlf.md');
-      const stream = [
-        JSON.stringify({ type: 'begin', data: { path: { text: abs } } }),
-        JSON.stringify({
-          type: 'match',
-          data: {
-            path: { text: abs },
-            lines: { text: 'Diese Seite nutzt carriage returns überall.\r\n' },
-            line_number: 7,
-          },
-        }),
-        JSON.stringify({ type: 'end', data: { path: { text: abs } } }),
-      ].join('\n');
-
-      const parsed = parseRipgrepJson(VAULT_PATH, stream, 10);
-      assert.equal(parsed.length, 1);
-      assert.equal(parsed[0].file, 'api/Crlf');
-      assert.equal(parsed[0].matches.length, 1);
-      assert.equal(parsed[0].matches[0].line, 7);
-      // kein trailing CR oder LF mehr
-      assert.ok(!parsed[0].matches[0].text.endsWith('\r'));
-      assert.ok(!parsed[0].matches[0].text.endsWith('\n'));
-      assert.match(parsed[0].matches[0].text, /carriage returns überall/);
+  // BM25/IDF statt Handscoring: der seltene Token muss die Query dominieren.
+  describe('searchDocs BM25 ranking', () => {
+    it('finds the canonical page for a rare single token', () => {
+      const results = searchDocs(VAULT_PATH, 'hasInvoicePlugin');
+      assert.equal(results[0].file, 'Properties/DlcFile');
     });
 
-    it('stops collecting after maxResults distinct files', () => {
-      const lines = [];
-      for (let i = 0; i < 10; i++) {
-        const abs = join(VAULT_PATH, 'examples', `ex0${i}.md`);
-        lines.push(JSON.stringify({
-          type: 'match',
-          data: { path: { text: abs }, lines: { text: 'x\n' }, line_number: 1 },
-        }));
+    // Der Regressionsfall: "Mappentyp" und "Eigenschaft" sind häufig, unter dem
+    // alten Handscoring haben sie irrelevante Seiten nach oben geboostet.
+    it('lets the rare token win over frequent tokens (hasInvoicePlugin case)', () => {
+      const results = searchDocs(VAULT_PATH, 'Mappentyp Eigenschaft hasInvoicePlugin');
+      assert.equal(
+        results[0].file,
+        'Properties/DlcFile',
+        `falsches Top-Ergebnis: ${results.map(r => r.file).join(', ')}`
+      );
+    });
+
+    // Der Treffer muss das heading mitliefern, damit ein Folge-read gezielt sein kann.
+    it('reports the matched heading so a follow-up read can target it', () => {
+      const results = searchDocs(VAULT_PATH, 'Mappentyp Eigenschaft hasInvoicePlugin');
+      assert.equal(results[0].headings[0], 'hasInvoicePlugin');
+      const doc = readDoc(VAULT_PATH, results[0].file, 8000, { heading: results[0].headings[0] });
+      assert.equal(doc.mode, 'heading');
+      assert.match(doc.content, /Invoice Plugin/);
+    });
+
+    it('scores results in descending order', () => {
+      const results = searchDocs(VAULT_PATH, 'Mappentyp Eigenschaft');
+      for (let i = 1; i < results.length; i++) {
+        assert.ok(results[i - 1].score >= results[i].score);
       }
-      const parsed = parseRipgrepJson(VAULT_PATH, lines.join('\n'), 3);
-      assert.equal(parsed.length, 3);
+    });
+  });
+
+  // read: kleines Default-Budget, TOC statt Rohseite
+  describe('readDoc truncation and table of contents', () => {
+    it('returns the full body when it fits the budget', () => {
+      const doc = readDoc(VAULT_PATH, 'guides/Sections');
+      assert.equal(doc.mode, 'full');
+      assert.equal(doc.truncated, false);
+      assert.match(doc.content, /Beta body line/);
+    });
+
+    it('returns only the requested section with heading', () => {
+      const doc = readDoc(VAULT_PATH, 'guides/Sections', 8000, { heading: 'Beta' });
+      assert.equal(doc.mode, 'heading');
+      assert.match(doc.content, /Beta body line/);
+      assert.ok(!/Alpha body line/.test(doc.content));
+    });
+
+    it('folds umlauts when matching a heading', () => {
+      const doc = readDoc(VAULT_PATH, 'api/Uebersicht', 8000, { heading: 'Uebersicht' });
+      assert.ok(doc);
+    });
+
+    // teuerster Altfehler: unbekanntes heading lieferte still die ganze Seite
+    it('offers the table of contents instead of the raw page for an unknown heading', () => {
+      const doc = readDoc(VAULT_PATH, 'guides/Many Sections', 8000, { heading: 'GibtEsNicht' });
+      assert.equal(doc.mode, 'heading-not-found');
+      assert.ok(!/Inhalt eins/.test(doc.content), 'darf nicht den Seiteninhalt dumpen');
+      assert.match(doc.content, /Ein \| Zwei \| Drei/);
+      assert.match(doc.content, /heading=/);
+    });
+
+    it('returns intro plus toc for a long page with many sections', () => {
+      const doc = readDoc(VAULT_PATH, 'guides/Many Sections', 200);
+      assert.equal(doc.mode, 'toc');
+      assert.equal(doc.truncated, true);
+      assert.match(doc.content, /Abschnitte \(6\)/);
+      assert.match(doc.content, /Ein \| Zwei \| Drei \| Vier \| Fuenf \| Sechs/);
+      assert.match(doc.content, /heading=/);
+      assert.ok(!/Inhalt sechs/.test(doc.content), 'TOC-Modus darf keine Abschnittsinhalte enthalten');
+    });
+
+    it('lists the remaining headings when a flat page is cut off', () => {
+      const doc = readDoc(VAULT_PATH, 'guides/Long Flat', 300);
+      assert.equal(doc.mode, 'truncated');
+      assert.equal(doc.truncated, true);
+      assert.match(doc.content, /Hinten/);
+      assert.match(doc.content, /heading=/);
+    });
+
+    it('honors max_tokens as a read budget', () => {
+      const doc = readDoc(VAULT_PATH, 'guides/Long Flat', 8000, { maxTokens: 100 });
+      assert.ok(doc.content.length <= 100 * 4 + 600, `budget verletzt: ${doc.content.length}`);
     });
   });
 

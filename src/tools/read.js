@@ -1,14 +1,14 @@
-import { readDoc } from './vault.js';
+import { readDoc, DEFAULT_READ_LENGTH, MAX_READ_LENGTH } from './vault.js';
 
 export function handleRead(vaultPath, params) {
-  const { path, heading } = params;
-  // context bewusst begrenzen: zu grosse reads überladen schwache modelle (mini
-  // verliert dann details wie das return-gerüst) und fressen unnötig tokens. das
-  // grundgerüst liefert eh der prompt, hier reicht der inhaltliche teil.
-  const max_length = Math.min(params.max_length || 20000, 25000);
-  const doc = readDoc(vaultPath, path, max_length, { heading });
+  const { path, heading, max_tokens } = params;
+  // Context bewusst begrenzen: zu grosse reads überladen schwache Modelle und
+  // fressen unnötig Tokens. Wer mehr will, setzt max_length explizit, bis zur
+  // harten Obergrenze.
+  const maxLength = Math.min(params.max_length || DEFAULT_READ_LENGTH, MAX_READ_LENGTH);
+  const doc = readDoc(vaultPath, path, maxLength, { heading, maxTokens: max_tokens });
   if (!doc) return { error: `Document not found: ${path}` };
-  // Self-Healing lieferte mehrdeutige Kandidaten (Punkt 17): "did you mean"
+  // Self-Healing lieferte mehrdeutige Kandidaten: "did you mean"
   if (doc.error) {
     return doc.candidates && doc.candidates.length
       ? { error: `${doc.error}\n${doc.candidates.join('\n')}` }
