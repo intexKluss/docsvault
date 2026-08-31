@@ -8,12 +8,22 @@ Web Chat UI und MCP Server für deine Markdown-Dokumentation. Als AI Backend lä
 - **MCP Endpoints**: SSE (`/sse`) und Streamable HTTP (`/mcp`) für externe MCP Clients
 - **REST API**: `/api/vaults` (Liste), `/api/<prefix>/{search,read,list,overview,status}` pro Vault
 - **Bridge Switching**: Claude oder Codex per `BRIDGE` ENV Variable (Code Default `claude`, das mitgelieferte Docker Image setzt `BRIDGE=codex`)
-- **Volltextsuche**: nutzt [ripgrep](https://github.com/BurntSushi/ripgrep) (`rg`) für schnelle Suche, mit reinem Node Fallback falls `rg` fehlt
+- **Volltextsuche**: BM25 Index auf Abschnittsebene, beim Start im Speicher aufgebaut
 - **Sicherheit**: Rate Limiting, DOMPurify, Tool Whitelisting, Prompt Injection Schutz. Die Origin Validierung schützt allerdings nur den WebSocket. Optionale Bearer Token Auth für REST/MCP per `API_TOKEN` (siehe unten)
 
 ## Volltextsuche
 
-`<prefix>_search` durchsucht den Vault mit **ripgrep** (`rg`), sofern es im `PATH` liegt. Das ist deutlich schneller als der Node Fallback, der greift nur wenn `rg` fehlt. Deshalb installiert das Docker Image `ripgrep` gleich mit (siehe `Dockerfile`). Lokal (Dev) ohne installiertes `rg` läuft automatisch der Fallback. Das Suchergebnis ist identisch, nur langsamer.
+`<prefix>_search` läuft gegen einen **BM25 Index** ([MiniSearch](https://github.com/lucaong/minisearch)), der pro Vault beim Start im Speicher gebaut wird. Indexiert wird auf **Abschnittsebene**: ein Eintrag pro `##`/`###` Überschrift, nicht pro Datei. Jeder Treffer liefert deshalb sein `heading` mit, und ein Folge-`read` mit diesem `heading` holt gezielt nur diesen Abschnitt statt der halben Seite.
+
+Gerankt wird primär nach der abgedeckten **IDF Masse** der Query, nicht nach der rohen BM25 Summe. Eine Seite die den seltenen Begriff trifft schlägt damit eine Seite die nur die häufigen Wörter der Query oft enthält. Umlaute werden symmetrisch gefaltet (`ue`/`ü`, `ae`/`ä`, `ss`/`ß`).
+
+Kosten: ca. 2 bis 8 Sekunden Indexaufbau und ~100 MB Heap pro 1800 Seiten. Externe Suchbinaries braucht der Server nicht mehr.
+
+### Antwortgröße im Griff behalten
+
+- `search` liefert per Default 5 Treffer mit je einem Snippet (`response_format: "detailed"` bringt das alte Format mit allen Trefferzeilen zurück)
+- `read` liefert per Default 8000 Zeichen; bei langen Seiten ohne `heading` kommen Intro plus Inhaltsverzeichnis statt der Rohseite
+- `search` und `read` akzeptieren `max_tokens` als hartes Budget für Clients mit kleinem Kontext
 
 ## Quick Start
 

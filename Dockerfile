@@ -1,8 +1,6 @@
 FROM node:20-slim
 
-# ripgrep (rg) fuer schnelle Volltextsuche; ohne faellt der Server auf eine
-# langsamere Node-Implementierung zurueck (siehe README -> Volltextsuche)
-RUN apt-get update && apt-get install -y --no-install-recommends ca-certificates ripgrep && rm -rf /var/lib/apt/lists/*
+RUN apt-get update && apt-get install -y --no-install-recommends ca-certificates && rm -rf /var/lib/apt/lists/*
 
 # tini als init fuer korrektes zombie-reaping (node als PID 1 raeumt
 # verwaiste codex-grandchildren nicht ab)

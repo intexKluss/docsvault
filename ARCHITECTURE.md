@@ -16,6 +16,8 @@ src/
   vault-registry.js      Vault-Discovery, _meta.json, toolPrefix, describeVaults()
   system-prompt.js       System-Prompt mit Safety- + Behavior-Rules
   tools/                 Internalisierte Tool-Handler (vault, search, read, list, overview, status)
+  tools/search-index.js  BM25-Index auf Abschnittsebene (MiniSearch), Tokenizer + Umlaut-Folding
+  tools/vault-cache.js   Pro-Vault-Cache (Manifest, Sections, Titel-Index, Suchindex), mtime-invalidiert
 public/
   index.html             Landing + Chat UI
   app.js                 WebSocket Client, UI-Logik, Typewriter, Tool-Anzeige
@@ -123,6 +125,18 @@ Die Tools liegen in `src/tools/` und kommen über drei Wege raus:
 | `<prefix>_status` | Status prüfen |
 
 > Pro Vault werden diese 5 Tools mit dem `toolPrefix` aus `_meta.json` registriert.
+
+Die Tool-Beschreibungen sind bewusst ein bis zwei Sätze lang: sie liegen dauerhaft im Kontext, einmal pro Vault. Die Recherche-Methodik und der `searchHint` aus `_meta.json` stehen stattdessen in den `instructions` der `initialize`-Response (`buildInstructions()` in `mcp-handler.js`), die es nur einmal pro Server gibt.
+
+### Suche
+
+`searchDocs()` läuft gegen den BM25-Index aus `tools/search-index.js`. Indexiert wird auf Abschnittsebene (`##` bis `######`), ein Eintrag pro Überschrift mit den Feldern `title`, `heading`, `path`, `body`.
+
+Gerankt wird in zwei Stufen:
+1. **Abschnitt**: BM25-Score, gewichtet mit der IDF-Masse die dieser Abschnitt selbst abdeckt, plus Boost wenn die Überschrift komplett aus Query-Tokens besteht (`## hasInvoicePlugin`).
+2. **Datei**: bester Abschnitt mal der quadrierten IDF-Abdeckung der ganzen Datei. Damit schlägt eine Datei die den seltenen Token trifft eine Datei die nur häufige Tokens oft trifft.
+
+Der Index wird beim Start gebaut (`warmSearchIndex()`) und über die mtime von `_manifest.json` invalidiert. Kosten: ~2 bis 8 s und ~100 MB Heap pro 1800 Seiten.
 
 Claude Bridge: explizit über `allowedTools` + `disallowedTools` (alle Built-in Tools gesperrt).
 Codex Bridge: nutzt MCP über die Codex CLI Config.
