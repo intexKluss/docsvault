@@ -1,6 +1,6 @@
 import { searchDocs, getSections } from './vault.js';
 import { existsSync } from 'fs';
-import { join } from 'path';
+import { join, normalize } from 'path';
 
 export const DEFAULT_MAX_RESULTS = 5;
 
@@ -17,9 +17,10 @@ export function handleSearch(vaultPath, params) {
   // unbekannte Section von "keine Treffer" unterscheiden: die mcp/api-Schicht
   // kann das `error`-Signal in einen echten Fehler verwandeln.
   if (section) {
-    const parts = section.split(/[\\/]+/).filter(Boolean);
+    const normalizedSection = normalize(section).split(/[\\/]+/).join('/');
+    const parts = normalizedSection.split('/').filter(Boolean);
     const sectionPath = join(vaultPath, ...parts);
-    if (!parts.length || !getSections(vaultPath).includes(parts[0]) || !existsSync(sectionPath)) {
+    if (normalizedSection !== section || !parts.length || !getSections(vaultPath).includes(parts[0]) || !existsSync(sectionPath)) {
       return { error: `Section "${section}" not found. Use the overview tool to see valid sections.` };
     }
   }

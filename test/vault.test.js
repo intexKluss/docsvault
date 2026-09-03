@@ -509,6 +509,11 @@ describe('Vault', () => {
       assert.equal(res[0].file, 'Scripting/TERAS API/Gadget API/HTML');
     });
 
+    it('rejects a non-canonical nested section path', () => {
+      const res = handleSearch(VAULT_PATH, { query: 'appendHtml', section: 'Scripting/../Scripting/TERAS API' });
+      assert.ok(res && res.error, 'non-canonical section must return an error');
+    });
+
     it('returns an error for an unknown section in list', () => {
       const res = handleList(VAULT_PATH, { section: 'nope-not-a-section' });
       assert.ok(res && res.error);
