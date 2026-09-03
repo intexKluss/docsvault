@@ -3,7 +3,7 @@ import { query } from '@anthropic-ai/claude-agent-sdk';
 import { dirname, join, resolve } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { buildSystemPrompt } from './system-prompt.js';
-import { TOOL_SUFFIXES } from './vault-registry.js';
+import { getToolSuffixes } from './vault-registry.js';
 
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = dirname(__filename);
@@ -49,8 +49,8 @@ export class ClaudeBridge {
       registry = [scoped];
     }
     const systemPrompt = buildSystemPrompt(registry);
-    const allowedTools = registry.flatMap(v =>
-      TOOL_SUFFIXES.map(s => `mcp__docsvault__${v.toolPrefix}_${s}`)
+  const allowedTools = registry.flatMap(v =>
+      getToolSuffixes(v).map(s => `mcp__docsvault__${v.toolPrefix}_${s}`)
     );
 
     // security-relevante felder NACH spread, nicht überschreibbar

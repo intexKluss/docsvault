@@ -21,11 +21,13 @@ const { root, cleanup } = createTempVaultsRoot({
       'api/Crlf.md': '---\r\ntitle: CrlfPage\r\nsource: https://example.com\r\n---\r\n# CrlfPage\r\n\r\nDiese Seite nutzt carriage returns überall.\r\n',
       // crawler-code, darf NICHT als section/treffer auftauchen
       'crawl/crawler.md': '# crawler internals\n\nfunction crawl() läuft hier.',
+      'otris-teras-build/output/HTML.md': '# interne TERAS Build-Datei\n\nappendHtml internals.',
       // umlaut-doc für folding-test: Titel und Body mit echtem ü
       'api/Uebersicht.md': '---\ntitle: Übersicht\n---\n# Übersicht\n\nDiese Seite ist eine Übersicht ueber alles.',
       // kanonische API-Klasse, soll bei "context getDocument" trotz vieler
       // example-pages nach vorne kommen (rank-before-slice)
       'Scripting/PortalscriptAPI/classes/context.md': '---\ntitle: context\n---\n# context\n\nDie Klasse context stellt getDocument bereit.\n\n## getDocument\n\ncontext.getDocument() liefert das aktuelle Dokument.',
+      'Scripting/TERAS API/Gadget API/HTML.md': '# HTML\n\nappendHtml(newHtml: string): void',
       // frontmatter-only titleMatch: title enthält den Begriff, Body sonst nichts
       'api/FrontOnly.md': '---\ntitle: SonderBegriffXyz\n---\n# Heading One\n\nIrgendein Fließtext ohne den Begriff im Body.',
       // viele example-pages die context erwähnen, damit context.md sonst untergeht.
@@ -83,6 +85,7 @@ describe('Vault', () => {
       const sections = getSections(VAULT_PATH);
       assert.ok(!sections.includes('crawl'));
       assert.ok(!sections.includes('node_modules'));
+      assert.ok(!sections.includes('otris-teras-build'));
     });
   });
 
@@ -498,6 +501,12 @@ describe('Vault', () => {
     it('returns an array for a known section in search', () => {
       const res = handleSearch(VAULT_PATH, { query: 'function', section: 'api' });
       assert.ok(Array.isArray(res));
+    });
+
+    it('accepts a nested technical section in search', () => {
+      const res = handleSearch(VAULT_PATH, { query: 'appendHtml', section: 'Scripting/TERAS API' });
+      assert.ok(Array.isArray(res));
+      assert.equal(res[0].file, 'Scripting/TERAS API/Gadget API/HTML');
     });
 
     it('returns an error for an unknown section in list', () => {

@@ -3,7 +3,7 @@ import { join, resolve } from 'node:path';
 
 // Ordner die kein Vault-Content sind und übersprungen werden (zusätzlich
 // zu '.'- und '_'-Präfix). crawl = Crawler-Code, node_modules = Deps.
-const SKIP_DIRS = new Set(['crawl', 'node_modules']);
+const SKIP_DIRS = new Set(['crawl', 'node_modules', 'otris-teras', 'otris-teras-build']);
 
 // true wenn der Ordner kein Vault-Content ist (Meta/Internal/Crawler/Deps).
 export function isSkippedDir(name) {
@@ -125,11 +125,18 @@ export function loadVaultRegistry(vaultsRoot) {
 
 export const TOOL_SUFFIXES = ['search', 'read', 'list', 'overview', 'status'];
 
+export function getToolSuffixes(vault) {
+  if (vault.toolPrefix === 'otris') {
+    return ['search', 'technical_search', 'read', 'list', 'overview', 'status'];
+  }
+  return TOOL_SUFFIXES;
+}
+
 export function describeVaults(registry) {
   if (!registry.length) return '';
 
   const lines = registry.map(v => {
-    const tools = TOOL_SUFFIXES.map(s => `${v.toolPrefix}_${s}`).join(', ');
+    const tools = getToolSuffixes(v).map(s => `${v.toolPrefix}_${s}`).join(', ');
     return `- **${v.name}**: ${v.description}\n  Tools: ${tools}`;
   });
 

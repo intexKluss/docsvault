@@ -17,7 +17,7 @@ describe('MCP Handler', () => {
     assert.ok(typeof server.tool === 'function');
   });
 
-  it('registers 5 tools per vault', () => {
+  it('registers the separate technical search only for otris', () => {
     // MCP server exposes registered tools via _registeredTools or listTools
     const server = createMcpServer(REGISTRY);
     const tools = server._registeredTools || {};
@@ -28,7 +28,9 @@ describe('MCP Handler', () => {
         assert.ok(names.includes(`${prefix}_${suffix}`), `missing ${prefix}_${suffix}`);
       }
     }
-    assert.equal(names.length, 10);
+    assert.ok(names.includes('otris_technical_search'));
+    assert.ok(!names.includes('intex_regeln_technical_search'));
+    assert.equal(names.length, 11);
   });
 
   it('includes vault description in tool description', () => {

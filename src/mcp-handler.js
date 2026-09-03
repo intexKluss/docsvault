@@ -106,6 +106,28 @@ function registerVaultTools(server, vault) {
     }
   );
 
+  if (toolPrefix === 'otris') {
+    server.tool(
+      'otris_technical_search',
+      'Exact otris TypeScript API search.',
+      {
+        query: z.string().describe('API term.'),
+        max_results: z.number().int().min(1).max(100).optional(),
+        context_lines: z.number().int().min(0).max(20).optional(),
+        response_format: z.enum(['concise', 'detailed']).optional(),
+        max_tokens: z.number().int().min(50).max(50000).optional(),
+      },
+      READONLY_TOOL,
+      async (params) => {
+        const results = handleSearch(vaultPath, { ...params, section: 'Scripting/TERAS API' });
+        if (isErrorResult(results)) {
+          return { content: [{ type: 'text', text: results.error }], isError: true };
+        }
+        return { content: [{ type: 'text', text: JSON.stringify(results) }] };
+      }
+    );
+  }
+
   server.tool(
     `${toolPrefix}_read`,
     `Read one page of: ${description}\nUse a "file" value from ${toolPrefix}_search verbatim. Set "heading" to read a single section; without it, long pages return intro plus a table of contents to pick from.`,
