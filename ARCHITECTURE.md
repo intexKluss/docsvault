@@ -125,13 +125,13 @@ Die Tools liegen in `src/tools/` und kommen über drei Wege raus:
 | `<prefix>_overview` | Übersicht laden |
 | `<prefix>_status` | Status prüfen |
 
-Pro Vault werden fünf Tools mit dem `toolPrefix` aus `_meta.json` registriert. Setzt `_meta.json` eine existierende, kanonische `technicalSection` innerhalb des Vaults, kommt `<prefix>_technical_search` hinzu. Ohne Feld wird nur das vorhandene Standardverzeichnis `Scripting/TERAS API` erkannt. Die Toolmenge wird damit vollständig aus den Vault-Daten abgeleitet.
+Pro Vault werden fünf Tools mit dem `toolPrefix` aus `_meta.json` registriert. Fehlt das Feld, wird der Prefix aus dem Ordnernamen abgeleitet. Setzt `_meta.json` eine existierende, kanonische `technicalSection` innerhalb des Vaults, kommt `<prefix>_technical_search` hinzu. Ohne Feld wird nur das vorhandene Standardverzeichnis `Scripting/TERAS API` erkannt. Die Toolmenge wird damit vollständig aus den Vault-Daten abgeleitet.
 
 Die Tool-Beschreibungen sind bewusst ein bis zwei Sätze lang: sie liegen dauerhaft im Kontext, einmal pro Vault. Die Recherche-Methodik und der `searchHint` aus `_meta.json` stehen stattdessen einmal pro Server in den `instructions` der `initialize`-Response.
 
 ### Suche
 
-`searchDocs()` läuft gegen den BM25-Index aus `tools/search-index.js`. Indexiert wird auf Abschnittsebene (`##` bis `######`), ein Eintrag pro Überschrift mit den Feldern `title`, `heading`, `path`, `body`.
+`searchDocs()` läuft gegen den BM25-Index aus `tools/search-index.js`. Indexiert wird auf Abschnittsebene: ein Eintrag für den Introbereich und je Überschrift von `##` bis `######` mit den Feldern `title`, `heading`, `path`, `body`.
 
 Gerankt wird in zwei Stufen:
 1. **Abschnitt**: BM25-Score, gewichtet mit der IDF-Masse die dieser Abschnitt selbst abdeckt, plus Boost wenn die Überschrift komplett aus Query-Tokens besteht (`## hasInvoicePlugin`).

@@ -3,7 +3,7 @@ import { readdirSync, readFileSync } from 'fs';
 import { join, relative, basename, sep } from 'path';
 import { isSkippedDir } from '../vault-registry.js';
 
-var FIELD_BOOSTS = { title: 2, heading: 3, path: 1, body: 1 };
+export var FIELD_BOOSTS = { title: 2, heading: 3, path: 1, body: 1 };
 var TOKEN_SPLIT = /[^\p{L}\p{N}_$]+/u;
 
 export function foldText(text) {
@@ -147,7 +147,7 @@ function collectMdFilePaths(directory, results) {
   }
 }
 
-function splitIntoSections(raw) {
+export function splitIntoSections(raw) {
   var lines = raw.split('\n');
   var start = 0;
   if (lines.length && lines[0].replace(/\r$/, '').replace(/^﻿/, '') === '---') {

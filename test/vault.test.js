@@ -4,7 +4,8 @@ import { join } from 'node:path';
 import {
   getSections, listFiles, readDoc, searchDocs, getManifest,
 } from '../src/tools/vault.js';
-import { handleSearch } from '../src/tools/search.js';
+import { handleSearch, DEFAULT_MAX_RESULTS } from '../src/tools/search.js';
+import { FIELD_BOOSTS, splitIntoSections } from '../src/tools/search-index.js';
 import { handleList } from '../src/tools/list.js';
 import { handleRead } from '../src/tools/read.js';
 import { createTempVaultsRoot } from './helpers/temp-vault.js';
@@ -55,6 +56,26 @@ const VAULT_PATH = join(root, 'otris');
 after(cleanup);
 
 describe('Vault', () => {
+  describe('search export contracts', () => {
+    it('exports the default search limit', () => {
+      assert.equal(typeof DEFAULT_MAX_RESULTS, 'number');
+    });
+
+    it('exports the MiniSearch field boosts', () => {
+      assert.deepEqual(FIELD_BOOSTS, { title: 2, heading: 3, path: 1, body: 1 });
+    });
+
+    it('exports section splitting including the intro', () => {
+      assert.equal(typeof splitIntoSections, 'function');
+      var sections = splitIntoSections('# Page\n\nIntro\n\n## Details\n\nBody');
+      assert.equal(sections.length, 2);
+      assert.equal(sections[0].heading, '');
+      assert.equal(sections[0].body, '# Page\n\nIntro');
+      assert.equal(sections[1].heading, 'Details');
+      assert.equal(sections[1].body, 'Body');
+    });
+  });
+
   describe('getSections', () => {
     it('returns array of section names', () => {
       const sections = getSections(VAULT_PATH);
@@ -287,7 +308,7 @@ describe('Vault', () => {
 
     it('defaults to five results', () => {
       var results = searchDocs(VAULT_PATH, 'function');
-      assert.ok(results.length <= 5);
+      assert.ok(results.length <= DEFAULT_MAX_RESULTS);
     });
 
     it('never uses bare code fences or blank lines as snippet', () => {

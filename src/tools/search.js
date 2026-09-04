@@ -2,7 +2,7 @@ import { searchDocs, getSections } from './vault.js';
 import { existsSync, statSync } from 'fs';
 import { join, normalize } from 'path';
 
-var DEFAULT_MAX_RESULTS = 5;
+export var DEFAULT_MAX_RESULTS = 5;
 
 export function handleSearch(vaultPath, params) {
   var query = params.query;

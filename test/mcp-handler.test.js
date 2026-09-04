@@ -1,6 +1,6 @@
 import { describe, it, after } from 'node:test';
 import assert from 'node:assert/strict';
-import { createMcpServer } from '../src/mcp-handler.js';
+import { createMcpServer, buildInstructions } from '../src/mcp-handler.js';
 import { createTempVaultsRoot } from './helpers/temp-vault.js';
 
 var REGISTRY = [
@@ -180,9 +180,12 @@ describe('MCP Handler', () => {
   });
 
   describe('instructions', () => {
+    it('exports buildInstructions', () => {
+      assert.equal(typeof buildInstructions, 'function');
+    });
+
     it('carries the research method once per server', () => {
-      var server = createMcpServer(REGISTRY);
-      var text = server.server.instructions || server.server._instructions;
+      var text = buildInstructions(REGISTRY);
       assert.match(text, /Never guess or construct a path/i);
       assert.match(text, /search again/i);
       assert.match(text, /Check every relevant type/i);
@@ -190,17 +193,15 @@ describe('MCP Handler', () => {
     });
 
     it('embeds the vault-specific searchHint when present', () => {
-      var server = createMcpServer([
+      var text = buildInstructions([
         { name: 'otris', description: 'otris Docs', toolPrefix: 'otris', searchHint: 'Check All Properties first.', path: '/tmp/otris' },
       ]);
-      var text = server.server.instructions || server.server._instructions;
       assert.ok(text.includes('Check All Properties first.'));
       assert.ok(text.includes('otris_*'));
     });
 
     it('omits vault guidance when no searchHint', () => {
-      var server = createMcpServer(REGISTRY);
-      var text = server.server.instructions || server.server._instructions;
+      var text = buildInstructions(REGISTRY);
       assert.ok(!text.includes('Check All Properties first.'));
     });
 

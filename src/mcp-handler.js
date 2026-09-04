@@ -46,7 +46,7 @@ export function createMcpServer(vaultRegistry) {
   return server;
 }
 
-function buildInstructions(vaultRegistry) {
+export function buildInstructions(vaultRegistry) {
   var instructions = 'Read-only documentation vaults. Each vault has its own tool prefix.\n\n';
   instructions += 'Flow: <prefix>_overview for section names, <prefix>_search for the term, <prefix>_read for the page.\n\n';
   instructions += 'Search results are section-level. Each hit is { file, title, headings, snippet, score }.\n';

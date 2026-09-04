@@ -1,6 +1,6 @@
 import { listFiles, getSections } from './vault.js';
 
-var DEFAULT_LIST_LIMIT = 50;
+export var DEFAULT_LIST_LIMIT = 50;
 var MAX_LIST_LIMIT = 500;
 
 export function handleList(vaultPath, params) {

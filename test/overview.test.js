@@ -2,7 +2,7 @@ import { describe, it, after } from 'node:test';
 import assert from 'node:assert/strict';
 import { join } from 'node:path';
 import { handleOverview } from '../src/tools/overview.js';
-import { handleList, handleListPaged } from '../src/tools/list.js';
+import { handleList, handleListPaged, DEFAULT_LIST_LIMIT } from '../src/tools/list.js';
 import { createTempVaultsRoot } from './helpers/temp-vault.js';
 
 var bigFiles = {};
@@ -61,9 +61,13 @@ describe('handleOverview', () => {
 });
 
 describe('handleListPaged', () => {
+  it('exports the default list limit', () => {
+    assert.equal(typeof DEFAULT_LIST_LIMIT, 'number');
+  });
+
   it('caps the listing and reports how many are left', () => {
     var result = handleListPaged(VAULT_PATH, { section: 'big' });
-    assert.equal(result.files.length, 50);
+    assert.equal(result.files.length, DEFAULT_LIST_LIMIT);
     assert.equal(result.total, 72);
     assert.equal(result.truncated, true);
     assert.match(result.note, /\+22 weitere/);

@@ -13,7 +13,7 @@ Web Chat UI und MCP Server für deine Markdown-Dokumentation. Als AI Backend lä
 
 ## Volltextsuche
 
-`<prefix>_search` läuft gegen einen **BM25 Index** ([MiniSearch](https://github.com/lucaong/minisearch)), der pro Vault beim Start im Speicher gebaut wird. Indexiert wird auf **Abschnittsebene**: ein Eintrag pro Überschrift von `##` bis `######`, nicht pro Datei. Jeder Treffer liefert deshalb seine passenden `headings`, und ein Folge-`read` mit einem dieser Werte holt gezielt nur diesen Abschnitt statt der halben Seite.
+`<prefix>_search` läuft gegen einen **BM25 Index** ([MiniSearch](https://github.com/lucaong/minisearch)), der pro Vault beim Start im Speicher gebaut wird. Indexiert wird auf **Abschnittsebene**: ein Eintrag für den Introbereich und je Überschrift von `##` bis `######`, nicht pro Datei. Jeder Treffer liefert deshalb seine passenden `headings`, und ein Folge-`read` mit einem dieser Werte holt gezielt nur diesen Abschnitt statt der halben Seite.
 
 Gerankt wird primär nach der abgedeckten **IDF Masse** der Query, nicht nach der rohen BM25 Summe. Eine Seite die den seltenen Begriff trifft schlägt damit eine Seite die nur die häufigen Wörter der Query oft enthält. Umlaute werden symmetrisch gefaltet (`ue`/`ü`, `ae`/`ä`, `ss`/`ß`).
 
@@ -26,14 +26,14 @@ Der Startup ist deterministisch: Die Vault Registry ist nach `toolPrefix` sortie
 - MCP `list` liefert standardmäßig 50 und höchstens 500 Seiten.
 - `search` und `read` akzeptieren `max_tokens` von 50 bis 50000. Das wird als hartes Zeichenbudget von `max_tokens * 4` umgesetzt, nicht mit einem Modell-Tokenizer.
 
-Die REST API bleibt absichtlich kompatibel zum bisherigen Verhalten: `search` liefert standardmäßig 10 Treffer im `detailed`-Format, `list` bleibt ungekürzt und ein explizites `read.max_length` darf bis 200000 gehen. Der `read`-Default ist auch per REST 8000 Zeichen. `response_format`, `max_tokens` und `heading` funktionieren als Query-Parameter. Bei REST begrenzt `read.max_tokens` den Dokumentinhalt; das JSON mit Titel, Quelle und Metadaten kann entsprechend etwas größer sein.
+Bei der REST API bleiben die bisherigen Verträge für `search` und `list` erhalten: `search` liefert standardmäßig 10 Treffer im `detailed`-Format und `list` bleibt ungekürzt. Der REST-`read`-Default sinkt von effektiv 25000 auf 8000 Zeichen. Dafür wird die Unterstützung für ein explizites `read.max_length` von bisher effektiv 25000 auf 200000 Zeichen erweitert. `response_format`, `max_tokens` und `heading` funktionieren als Query-Parameter. Bei REST begrenzt `read.max_tokens` den Dokumentinhalt; das JSON mit Titel, Quelle und Metadaten kann entsprechend etwas größer sein.
 
 ```bash
 curl "http://localhost:3000/api/docs/search?query=Installation&max_tokens=300"
 curl "http://localhost:3000/api/docs/read?path=api/DocFile&heading=getAttribute"
 ```
 
-Beim Update ändert sich damit nur der MCP-Default von `search` von 10 auf 5 Treffer. Der `read`-Default sinkt bei MCP und REST von 50000 auf 8000 Zeichen. Wer mehr braucht, setzt `max_results` beziehungsweise `max_length` explizit.
+Beim Update sinkt der MCP-Default von `search` von 10 auf 5 Treffer. Der `read`-Default sinkt bei MCP von 20000 und bei REST von effektiv 25000 auf 8000 Zeichen. Die maximale REST-Leselänge steigt gleichzeitig von effektiv 25000 auf 200000 Zeichen. Wer mehr braucht, setzt `max_results` beziehungsweise `max_length` explizit.
 
 ## Quick Start
 
