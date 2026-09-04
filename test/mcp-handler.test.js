@@ -16,7 +16,7 @@ var LONG_TOC_HEADING = 'Eine außergewöhnlich lange Überschrift die im finalen
 const { root: MCP_VAULT_ROOT, cleanup: cleanupMcpVault } = createTempVaultsRoot({
   'otris': {
     files: {
-      'long/Read.md': '---\ntitle: Ein außergewöhnlich langer MCP-Titel für das harte Antwortbudget\nsource: https://example.com/eine/außergewöhnlich/lange/source/unter/engem/budget\n---\n# Read\n\n## ' + LONG_TOC_HEADING + '\n\n' + 'Inhalt '.repeat(100) + '\n\n## Zwei\n\nInhalt.\n\n## Drei\n\nInhalt.\n\n## Vier\n\nInhalt.\n\n## Fuenf\n\nInhalt.',
+      'long/Read.md': '---\ntitle: Ein außergewöhnlich langer MCP-Titel für das harte Antwortbudget\nsource: https://example.com/eine/außergewöhnlich/lange/source/unter/engem/budget\n---\n# Read\n\n## ' + LONG_TOC_HEADING + '\n\n' + 'Inhalt '.repeat(100) + '\n\n## Zwei\n\nInhalt.\n\n## Drei\n\nInhalt.\n\n## Vier\n\nInhalt.\n\n## Fünf\n\nInhalt.',
     },
   },
 });
