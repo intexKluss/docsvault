@@ -3,7 +3,7 @@ import { query } from '@anthropic-ai/claude-agent-sdk';
 import { dirname, join, resolve } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { buildSystemPrompt } from './system-prompt.js';
-import { TOOL_SUFFIXES } from './vault-registry.js';
+import { getToolSuffixes } from './vault-registry.js';
 
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = dirname(__filename);
@@ -28,13 +28,15 @@ const DISALLOWED_TOOLS = [
 ];
 
 export class ClaudeBridge {
-  constructor(vaultRegistry) {
+  constructor(vaultRegistry, queryCallback) {
     this.vaultRegistry = (vaultRegistry || []).filter(
       v => v && typeof v.toolPrefix === 'string' && v.toolPrefix.length > 0
     );
+    this.queryCallback = queryCallback || query;
   }
 
   async createSession(toolPrefix) {
+    var queryCallback = this.queryCallback;
     const id = randomUUID();
     let destroyed = false;
     let sessionId = null;
@@ -49,9 +51,7 @@ export class ClaudeBridge {
       registry = [scoped];
     }
     const systemPrompt = buildSystemPrompt(registry);
-    const allowedTools = registry.flatMap(v =>
-      TOOL_SUFFIXES.map(s => `mcp__docsvault__${v.toolPrefix}_${s}`)
-    );
+    var allowedTools = getAllowedTools(registry);
 
     // security-relevante felder NACH spread, nicht überschreibbar
     function buildOptions(overrides = {}) {
@@ -88,7 +88,7 @@ export class ClaudeBridge {
         try {
           const options = buildOptions({ maxTurns: 1, abortController: abort });
 
-          for await (const message of query({ prompt: 'Antworte nur mit: Bereit.', options })) {
+          for await (var message of queryCallback({ prompt: 'Antworte nur mit: Bereit.', options })) {
             if (message.type === 'system' && message.subtype === 'init' && message.session_id) {
               sessionId = message.session_id;
             }
@@ -132,7 +132,7 @@ export class ClaudeBridge {
             resume: sessionId || undefined,
           });
 
-          for await (const message of query({ prompt: content, options })) {
+          for await (var message of queryCallback({ prompt: content, options })) {
             if (abort.signal.aborted) break;
 
             if (message.type === 'system' && message.subtype === 'init' && message.session_id) {
@@ -217,4 +217,16 @@ export class ClaudeBridge {
       }
     };
   }
+}
+
+export function getAllowedTools(registry) {
+  var allowedTools = [];
+  for (var vaultIndex = 0; vaultIndex < registry.length; vaultIndex++) {
+    var vault = registry[vaultIndex];
+    var toolSuffixes = getToolSuffixes(vault);
+    for (var suffixIndex = 0; suffixIndex < toolSuffixes.length; suffixIndex++) {
+      allowedTools.push(`mcp__docsvault__${vault.toolPrefix}_${toolSuffixes[suffixIndex]}`);
+    }
+  }
+  return allowedTools;
 }

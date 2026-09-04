@@ -1,6 +1,8 @@
 import { describe, it, before, after } from 'node:test';
 import assert from 'node:assert/strict';
+import { join } from 'node:path';
 import { createServer } from '../src/server.js';
+import { clearVaultCache } from '../src/tools/vault-cache.js';
 import { createTempVaultsRoot } from './helpers/temp-vault.js';
 
 // minimaler fake-bridge für die ws-tests. warmUp ist sofort fertig, send liefert
@@ -54,7 +56,14 @@ const { root: TEST_VAULTS_ROOT, cleanup: cleanupTestVaults } = createTempVaultsR
     files: {
       'portalscript-api/DocFile.md': '# DocFile\n\nEine Klasse für Dateien.',
       'portalscript-api/FileType.md': '# FileType\n\nDateityp-Klasse.',
+      'portalscript-api/Duplicate.md': '# Duplicate\n\n## First\n\n### Details\n\nFirst section body.\n\n## Second\n\n### Details\n\nNestedLocatorNeedle belongs to the second section.',
+      'portalscript-api/Guide.md': '# Guide\n\nGeneric intro.\n\n## UniqueHeading\n\nGeneric body.',
+      'portalscript-api/HeadingOnly.md': '# Heading Page\n\nGeneric intro.\n\n## UniqueHeading\n\nGeneric body.',
+      'portalscript-api/MultiHeading.md': '# Heading Page\n\nGeneric intro.\n\n## Unique Heading Name\n\nGeneric body.',
+      'portalscript-api/TopHeading.md': '# UniqueTopHeading\n\nGeneric body.',
+      'SpecialFolder/Page.md': '# Page\n\nBodyNeedle appears without the parent folder name.',
       'howtos/upload.md': '# Upload\n\nDoc-Upload Anleitung.',
+      'portalscript-api/Long.md': '# Long\n\n' + 'Langer REST-Inhalt. '.repeat(2000),
     },
   },
 });
@@ -97,6 +106,31 @@ describe('Server', () => {
     });
   });
 
+  it('builds the search index before createServer returns', async () => {
+    await new Promise(resolve => setImmediate(resolve));
+    clearVaultCache(join(TEST_VAULTS_ROOT, 'otris'));
+
+    var logs = [];
+    var originalLog = console.log;
+    console.log = function (message) {
+      logs.push(message);
+    };
+
+    var result;
+    try {
+      result = await createServer({ port: 0, bridge: fakeBridge() });
+    } finally {
+      console.log = originalLog;
+    }
+
+    result.server.close();
+    var sawIndex = false;
+    for (var i = 0; i < logs.length; i++) {
+      if (logs[i].startsWith('[server] otris: ')) sawIndex = true;
+    }
+    assert.ok(sawIndex);
+  });
+
   describe('REST API', () => {
     it('GET /api/health returns ok', async () => {
       const res = await fetch(`${baseUrl}/api/health`);
@@ -130,6 +164,145 @@ describe('Server', () => {
       assert.equal(res.status, 200);
       const data = await res.json();
       assert.ok(Array.isArray(data));
+      assert.ok(Array.isArray(data[0].matches));
+      assert.ok(data[0].matches.length >= 1, 'title-only detailed hit needs a synthetic match');
+    });
+
+    it('keeps parent-folder path matches in the legacy detailed shape', async () => {
+      var response = await fetch(`${baseUrl}/api/otris/search?query=SpecialFolder`);
+      assert.equal(response.status, 200);
+      var results = await response.json();
+      var page;
+      for (var resultIndex = 0; resultIndex < results.length; resultIndex++) {
+        if (results[resultIndex].file === 'SpecialFolder/Page') page = results[resultIndex];
+      }
+
+      assert.ok(page);
+      assert.equal(page.titleMatch, true);
+      assert.ok(page.matches.length >= 1);
+      assert.match(page.matches[0].text, /SpecialFolder/);
+    });
+
+    it('marks a mixed path and body query as a legacy titleMatch', async () => {
+      var response = await fetch(`${baseUrl}/api/otris/search?query=SpecialFolder%20BodyNeedle`);
+      assert.equal(response.status, 200);
+      var results = await response.json();
+      var page;
+      for (var resultIndex = 0; resultIndex < results.length; resultIndex++) {
+        if (results[resultIndex].file === 'SpecialFolder/Page') page = results[resultIndex];
+      }
+
+      assert.ok(page);
+      assert.equal(page.titleMatch, true);
+      var sawBodyNeedle = false;
+      for (var matchIndex = 0; matchIndex < page.matches.length; matchIndex++) {
+        if (/BodyNeedle/.test(page.matches[matchIndex].text)) sawBodyNeedle = true;
+      }
+      assert.equal(sawBodyNeedle, true);
+    });
+
+    it('does not mark partial path words as a legacy titleMatch', async () => {
+      var response = await fetch(`${baseUrl}/api/otris/search?query=Special`);
+      assert.equal(response.status, 200);
+      var results = await response.json();
+      var page;
+      for (var resultIndex = 0; resultIndex < results.length; resultIndex++) {
+        if (results[resultIndex].file === 'SpecialFolder/Page') page = results[resultIndex];
+      }
+
+      assert.ok(page);
+      assert.equal(page.titleMatch, false);
+    });
+
+    it('returns a synthetic detailed match for a heading-only hit', async () => {
+      var response = await fetch(`${baseUrl}/api/otris/search?query=UniqueHeading`);
+      assert.equal(response.status, 200);
+      var results = await response.json();
+      var page;
+      for (var resultIndex = 0; resultIndex < results.length; resultIndex++) {
+        if (results[resultIndex].file === 'portalscript-api/HeadingOnly') page = results[resultIndex];
+      }
+
+      assert.ok(page);
+      assert.equal(page.matches.length, 1);
+      assert.equal(page.matches[0].text, 'UniqueHeading');
+      assert.equal(page.matches[0].line, 5);
+      assert.equal(page.matches[0].heading, 'UniqueHeading');
+    });
+
+    it('returns the structural H1 as a synthetic detailed match', async () => {
+      var response = await fetch(`${baseUrl}/api/otris/search?query=UniqueTopHeading`);
+      assert.equal(response.status, 200);
+      var results = await response.json();
+      var page;
+      for (var resultIndex = 0; resultIndex < results.length; resultIndex++) {
+        if (results[resultIndex].file === 'portalscript-api/TopHeading') page = results[resultIndex];
+      }
+
+      assert.ok(page);
+      assert.equal(page.headings.length, 0);
+      assert.equal(page.matches.length, 1);
+      assert.equal(page.matches[0].text, 'UniqueTopHeading');
+      assert.equal(page.matches[0].line, 1);
+      assert.equal(page.matches[0].heading, 'UniqueTopHeading');
+    });
+
+    it('prefers a concrete H2 match over the title fallback', async () => {
+      var response = await fetch(`${baseUrl}/api/otris/search?query=Guide%20UniqueHeading`);
+      assert.equal(response.status, 200);
+      var results = await response.json();
+      var page;
+      for (var resultIndex = 0; resultIndex < results.length; resultIndex++) {
+        if (results[resultIndex].file === 'portalscript-api/Guide') page = results[resultIndex];
+      }
+
+      assert.ok(page);
+      assert.equal(page.titleMatch, true);
+      assert.equal(page.matches.length, 1);
+      assert.equal(page.matches[0].text, 'UniqueHeading');
+      assert.equal(page.matches[0].line, 5);
+      assert.equal(page.matches[0].heading, 'UniqueHeading');
+    });
+
+    it('returns a partially matched multi-token heading as the synthetic match', async () => {
+      var response = await fetch(`${baseUrl}/api/otris/search?query=Unique`);
+      assert.equal(response.status, 200);
+      var results = await response.json();
+      var page;
+      for (var resultIndex = 0; resultIndex < results.length; resultIndex++) {
+        if (results[resultIndex].file === 'portalscript-api/MultiHeading') page = results[resultIndex];
+      }
+
+      assert.ok(page);
+      assert.equal(page.matches.length, 1);
+      assert.equal(page.matches[0].text, 'Unique Heading Name');
+      assert.equal(page.matches[0].line, 5);
+      assert.equal(page.matches[0].heading, 'Unique Heading Name');
+    });
+
+    it('GET /api/otris/search returns concise snippets on request', async () => {
+      var res = await fetch(`${baseUrl}/api/otris/search?query=DocFile&response_format=concise`);
+      assert.equal(res.status, 200);
+      var data = await res.json();
+      assert.ok(typeof data[0].snippet === 'string');
+      assert.equal(data[0].matches, undefined);
+    });
+
+    it('chains a duplicate heading search result to the exact section', async () => {
+      var searchResponse = await fetch(`${baseUrl}/api/otris/search?query=NestedLocatorNeedle&response_format=concise`);
+      assert.equal(searchResponse.status, 200);
+      var results = await searchResponse.json();
+      assert.equal(results[0].file, 'portalscript-api/Duplicate');
+      assert.equal(results[0].headings[0], 'Details');
+      assert.equal(typeof results[0].locator, 'string');
+
+      var path = encodeURIComponent(results[0].file);
+      var locator = encodeURIComponent(results[0].locator);
+      var readResponse = await fetch(`${baseUrl}/api/otris/read?path=${path}&locator=${locator}`);
+      assert.equal(readResponse.status, 200);
+      var doc = await readResponse.json();
+      assert.match(doc.content, /NestedLocatorNeedle/);
+      assert.doesNotMatch(doc.content, /First section body/);
     });
 
     it('GET /api/otris/search clamps max_results', async () => {
@@ -142,14 +315,55 @@ describe('Server', () => {
       assert.equal(res.status, 200);
     });
 
+    it('GET /api/otris/search clamps fractional max_tokens to the minimum budget', async () => {
+      var res = await fetch(`${baseUrl}/api/otris/search?query=FileType&response_format=concise&max_tokens=0.1`);
+      assert.equal(res.status, 200);
+      var data = await res.json();
+      assert.equal(data.length, 1);
+      assert.ok(JSON.stringify(data).length <= 50 * 4);
+    });
+
     it('GET /api/otris/read requires path param', async () => {
       const res = await fetch(`${baseUrl}/api/otris/read`);
       assert.equal(res.status, 400);
     });
 
+    it('GET /api/otris/read rejects repeated heading parameters', async () => {
+      var response = await fetch(`${baseUrl}/api/otris/read?path=portalscript-api/Guide&heading=Guide&heading=UniqueHeading`);
+      assert.equal(response.status, 400);
+    });
+
+    it('GET /api/otris/read rejects repeated locator parameters', async () => {
+      var response = await fetch(`${baseUrl}/api/otris/read?path=portalscript-api/Guide&locator=L1&locator=L5`);
+      assert.equal(response.status, 400);
+    });
+
+    it('GET /api/otris/read accepts a single heading parameter', async () => {
+      var response = await fetch(`${baseUrl}/api/otris/read?path=portalscript-api/Guide&heading=UniqueHeading`);
+      assert.equal(response.status, 200);
+      var document = await response.json();
+      assert.equal(document.mode, 'heading');
+      assert.match(document.content, /Generic body/);
+    });
+
+    it('GET /api/otris/read accepts a single locator parameter', async () => {
+      var response = await fetch(`${baseUrl}/api/otris/read?path=portalscript-api/Guide&locator=L5`);
+      assert.equal(response.status, 200);
+      var document = await response.json();
+      assert.equal(document.mode, 'heading');
+      assert.match(document.content, /UniqueHeading/);
+    });
+
     it('GET /api/otris/read returns 404 for missing doc', async () => {
       const res = await fetch(`${baseUrl}/api/otris/read?path=nonexistent/doc`);
       assert.equal(res.status, 404);
+    });
+
+    it('GET /api/otris/read permits an explicit 200000 character REST read', async () => {
+      var res = await fetch(`${baseUrl}/api/otris/read?path=portalscript-api/Long&max_length=200000`);
+      assert.equal(res.status, 200);
+      var data = await res.json();
+      assert.ok(data.content.length > 25000);
     });
 
     it('GET /api/otris/list requires section param', async () => {

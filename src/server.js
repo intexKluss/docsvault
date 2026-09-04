@@ -8,7 +8,8 @@ import { WebSocketServer } from 'ws';
 import { SessionManager } from './session-manager.js';
 import { handleSseGet, handleSsePost, handleStreamablePost } from './mcp-handler.js';
 import { createApiRouter } from './api-routes.js';
-import { loadVaultRegistry, TOOL_SUFFIXES } from './vault-registry.js';
+import { loadVaultRegistry, getToolSuffixes } from './vault-registry.js';
+import { warmSearchIndex } from './tools/vault-cache.js';
 import { requireToken, wsAuthOk } from './auth.js';
 import { installLogCapture, recentLogs } from './log-buffer.js';
 import { readBurnRate } from './codex-usage.js';
@@ -69,7 +70,18 @@ export async function createServer(opts = {}) {
   } else {
     console.log(`[server] loaded ${vaultRegistry.length} vault(s): ${vaultRegistry.map(v => v.toolPrefix).join(', ')}`);
     if (vaultRegistry.length > 20) {
-      console.warn(`[server] WARNING: ${vaultRegistry.length} vaults = ${vaultRegistry.length * TOOL_SUFFIXES.length} tools, some agents may hit tool-count limits.`);
+      var toolCount = 0;
+      for (var vaultIndex = 0; vaultIndex < vaultRegistry.length; vaultIndex++) {
+        toolCount += getToolSuffixes(vaultRegistry[vaultIndex]).length;
+      }
+      console.warn(`[server] WARNING: ${vaultRegistry.length} vaults = ${toolCount} tools, some agents may hit tool-count limits.`);
+    }
+    for (var vaultIndex = 0; vaultIndex < vaultRegistry.length; vaultIndex++) {
+      var vault = vaultRegistry[vaultIndex];
+      var index = warmSearchIndex(vault.path);
+      if (index) {
+        console.log(`[server] ${vault.toolPrefix}: ${index.fileCount} pages, ${index.segmentCount} sections indexed in ${index.buildMs}ms`);
+      }
     }
   }
 

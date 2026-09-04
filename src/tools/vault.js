@@ -1,104 +1,55 @@
 import { readdirSync, readFileSync, existsSync, statSync } from 'fs';
 import { join, relative, basename, sep, resolve } from 'path';
-import { execFileSync } from 'child_process';
-import { isSkippedDir } from '../vault-registry.js';
-import { getCachedManifest, getCachedSections, getCachedTitleIndex } from './vault-cache.js';
+import { getCachedManifest, getCachedSections, getCachedTitleIndex, getCachedSearchIndex } from './vault-cache.js';
+import { foldText, tokenize, queryTerms, splitIntoSections } from './search-index.js';
 
-// geteilte Obergrenze für Treffer pro Datei (Punkt 4). Beide Suchpfade
-// (single-token + multi-token) nutzen dieselbe Zahl damit ein einzelnes
-// Dokument die Antwort nicht flutet.
-const MAX_MATCHES_PER_FILE = 10;
+export { foldText };
 
-function isInsideVault(vaultPath, targetPath) {
-  const resolvedVault = resolve(vaultPath);
-  const resolvedTarget = resolve(targetPath);
-  return resolvedTarget.startsWith(resolvedVault + sep) || resolvedTarget === resolvedVault;
-}
-
-function clampInt(value, min, max, fallback) {
-  const n = Number(value);
-  if (!Number.isFinite(n)) return fallback;
-  return Math.max(min, Math.min(max, Math.trunc(n)));
-}
+var MAX_MATCHES_PER_FILE = 10;
+var MAX_HEADINGS_PER_RESULT = 3;
+var MAX_SNIPPET_CHARS = 300;
+var MAX_SNIPPET_LINE_CHARS = 200;
+export var DEFAULT_READ_LENGTH = 8000;
+export var MAX_READ_LENGTH = 200000;
+var TOC_MIN_HEADINGS = 5;
+var MAX_TOC_ENTRIES = 200;
+var STALE_SOURCE_FACTOR = 0.5;
+var STALE_SOURCE_PATTERNS = [
+  /(^|\/)samples?(\/|$)/i,
+  /(^|\/)archiv(\/|$)/i,
+];
 
 export function getSections(vaultPath) {
   return getCachedSections(vaultPath);
 }
 
 export function listFiles(vaultPath, section, subfolder) {
-  const searchDir = subfolder
-    ? join(vaultPath, section, subfolder)
-    : join(vaultPath, section);
+  var searchDirectory = join(vaultPath, section);
+  if (subfolder) searchDirectory = join(vaultPath, section, subfolder);
+  if (!isInsideVault(vaultPath, searchDirectory)) return [];
+  if (!existsSync(searchDirectory) || !statSync(searchDirectory).isDirectory()) return [];
 
-  if (!isInsideVault(vaultPath, searchDir)) return [];
-
-  if (!existsSync(searchDir) || !statSync(searchDir).isDirectory()) {
-    return [];
-  }
-
-  const results = [];
-  collectMdFiles(searchDir, vaultPath, results);
-  results.sort((a, b) => a.name.localeCompare(b.name));
+  var results = [];
+  collectMdFiles(searchDirectory, vaultPath, results);
+  results.sort(function (first, second) {
+    return first.name.localeCompare(second.name);
+  });
   return results;
 }
 
-function collectMdFiles(dir, vaultRoot, results) {
-  const entries = readdirSync(dir, { withFileTypes: true });
-  for (const entry of entries) {
-    const fullPath = join(dir, entry.name);
-    if (entry.isDirectory()) {
-      collectMdFiles(fullPath, vaultRoot, results);
-    } else if (entry.isFile() && entry.name.endsWith('.md')) {
-      const relPath = relative(vaultRoot, fullPath).replace(/\.md$/, '').split(sep).join('/');
-      results.push({
-        name: basename(entry.name, '.md'),
-        path: relPath,
-      });
-    }
+export function readDoc(vaultPath, docPath, maxLength = DEFAULT_READ_LENGTH, options = {}) {
+  maxLength = clampInt(maxLength, 200, MAX_READ_LENGTH, DEFAULT_READ_LENGTH);
+  var heading = options.heading;
+  var locator = options.locator;
+  if (Number.isFinite(Number(options.maxTokens))) {
+    var budget = clampInt(options.maxTokens, 50, 50000, maxLength / 4) * 4;
+    maxLength = Math.min(maxLength, budget);
   }
-}
 
-// Liefert nur die gewünschte Abschnittsabschnitt (von der passenden Überschrift
-// bis zur nächsten Überschrift gleichen oder höheren Levels). '' wenn nichts passt.
-function extractHeadingSection(body, heading) {
-  const wanted = heading.trim().toLowerCase();
-  const lines = body.split('\n');
-  let startLevel = 0;
-  let startIdx = -1;
-
-  for (let i = 0; i < lines.length; i++) {
-    const m = lines[i].replace(/\r$/, '').match(/^(#{1,6})\s+(.+?)\s*$/);
-    if (!m) continue;
-    if (m[2].trim().toLowerCase() === wanted) {
-      startLevel = m[1].length;
-      startIdx = i;
-      break;
-    }
-  }
-  if (startIdx === -1) return '';
-
-  let endIdx = lines.length;
-  for (let i = startIdx + 1; i < lines.length; i++) {
-    const m = lines[i].replace(/\r$/, '').match(/^(#{1,6})\s+/);
-    if (m && m[1].length <= startLevel) {
-      endIdx = i;
-      break;
-    }
-  }
-  return lines.slice(startIdx, endIdx).join('\n').trimEnd();
-}
-
-export function readDoc(vaultPath, docPath, maxLength = 50000, options = {}) {
-  maxLength = clampInt(maxLength, 1, 200000, 50000);
-  const { heading } = options;
-
-  let resolvedPath = docPath;
-  let filePath = join(vaultPath, docPath + '.md');
-
-  // Self-Healing (Punkt 17): wenn der exakte Pfad nicht existiert, über den
-  // Titel-/Pfad-Index nach Basename/Titel suchen.
+  var resolvedPath = docPath;
+  var filePath = join(vaultPath, docPath + '.md');
   if (!isInsideVault(vaultPath, filePath) || !existsSync(filePath)) {
-    const healed = healDocPath(vaultPath, docPath);
+    var healed = healDocPath(vaultPath, docPath);
     if (healed && healed.path) {
       resolvedPath = healed.path;
       filePath = join(vaultPath, resolvedPath + '.md');
@@ -108,714 +59,702 @@ export function readDoc(vaultPath, docPath, maxLength = 50000, options = {}) {
       return null;
     }
   }
+  if (!isInsideVault(vaultPath, filePath) || !existsSync(filePath)) return null;
 
-  if (!isInsideVault(vaultPath, filePath) || !existsSync(filePath)) {
-    return null;
-  }
-
-  const raw = readFileSync(filePath, 'utf-8');
-  const { frontmatter, body } = parseFrontmatter(raw);
-
-  let content = body;
-  let truncated = false;
-
-  // optionales heading-Targeting: nur den passenden Abschnitt zurückgeben
-  if (heading) {
-    const section = extractHeadingSection(body, heading);
-    if (section) {
-      content = section;
-    }
-  }
-
-  if (content.length > maxLength) {
-    content = content.slice(0, maxLength) + '\n\n[truncated]';
-    truncated = true;
-  }
-
-  return {
+  var raw = readFileSync(filePath, 'utf-8');
+  var parsed = parseFrontmatter(raw);
+  var frontmatter = parsed.frontmatter;
+  var body = parsed.body;
+  var meta = {
     title: frontmatter.title || '',
     source: frontmatter.source || '',
-    content,
-    truncated,
+    path: resolvedPath,
   };
-}
 
-// Versucht einen nicht gefundenen Pfad über den Titel-Index zu heilen.
-// Rückgabe:
-//  - { path } bei eindeutigem/besten Treffer
-//  - { error, candidates } wenn nur mehrdeutige Nähe-Treffer existieren
-//  - null wenn gar nichts passt
-function healDocPath(vaultPath, docPath) {
-  const index = getCachedTitleIndex(vaultPath);
-  if (!index.length) return null;
-
-  const wantedBase = foldText(basename(docPath).toLowerCase());
-  const wantedFull = foldText(docPath.toLowerCase().split(sep).join('/'));
-
-  // 1) exakter Basename- oder Titel-Match (gefaltet)
-  const exact = index.filter(e =>
-    foldText(e.name.toLowerCase()) === wantedBase ||
-    foldText(e.title.toLowerCase()) === wantedBase
-  );
-  if (exact.length === 1) return { path: exact[0].path };
-  if (exact.length > 1) {
-    return {
-      error: `Document not found: ${docPath}. Did you mean one of these?`,
-      candidates: exact.slice(0, 8).map(e => e.path),
-    };
+  var bodySections = splitIntoSections(body);
+  var subHeadings = [];
+  for (var sectionIndex = 0; sectionIndex < bodySections.length; sectionIndex++) {
+    if (bodySections[sectionIndex].level < 2) continue;
+    subHeadings.push({
+      text: bodySections[sectionIndex].heading,
+      level: bodySections[sectionIndex].level,
+      line: bodySections[sectionIndex].startLine - 1,
+    });
   }
 
-  // 2) Nähe-Treffer: Basename/Titel/Pfad enthält den gesuchten Basename.
-  // Anders als der exakte Treffer wird ein Nähe-Treffer NIE still als einzelnes
-  // Dokument aufgelöst. Ein bloßer Substring (z.B. "doc" in "DocFile") ist
-  // inhärent mehrdeutig und würde sonst stillschweigend das falsche Dokument
-  // liefern statt eines 404. Nähe-Treffer kommen daher immer als "did you mean"-
-  // Kandidaten zurück; der Aufrufer entscheidet (handleRead -> error -> 404).
-  const near = index.filter(e =>
-    foldText(e.name.toLowerCase()).includes(wantedBase) ||
-    foldText(e.title.toLowerCase()).includes(wantedBase) ||
-    foldText(e.path.toLowerCase()).includes(wantedFull)
-  );
-  if (near.length > 0) {
-    return {
-      error: `Document not found: ${docPath}. Did you mean one of these?`,
-      candidates: near.slice(0, 8).map(e => e.path),
-    };
-  }
+  if (locator) {
+    var locatorMatch = String(locator).match(/^L([1-9]\d*)$/);
+    var locatorSection = '';
+    if (locatorMatch) {
+      var wantedStartLine = Number(locatorMatch[1]);
+      var rawSections = splitIntoSections(raw);
+      for (var sectionIndex = 0; sectionIndex < rawSections.length; sectionIndex++) {
+        if (rawSections[sectionIndex].startLine !== wantedStartLine) continue;
 
-  return null;
-}
-
-// Baut einen Zeilen-Index für eine roh eingelesene Datei:
-//  - frontmatterEnd: 1-basierte Zeilennummer des schließenden '---' (0 = kein Frontmatter)
-//  - headings: { line, text, level } aller Markdown-Überschriften (#, ##, ...)
-function buildLineIndex(raw) {
-  const lines = raw.split('\n');
-  let frontmatterEnd = 0;
-
-  // Frontmatter nur wenn die allererste Zeile genau '---' ist (CRLF-tolerant)
-  if (lines.length && lines[0].replace(/\r$/, '').replace(/^﻿/, '') === '---') {
-    for (let i = 1; i < lines.length; i++) {
-      if (lines[i].replace(/\r$/, '') === '---') {
-        frontmatterEnd = i + 1; // 1-basiert
+        var rawLines = raw.split('\n');
+        for (var lineIndex = wantedStartLine - 1; lineIndex < rawSections[sectionIndex].endLine; lineIndex++) {
+          if (locatorSection) locatorSection += '\n';
+          locatorSection += rawLines[lineIndex];
+        }
+        locatorSection = locatorSection.trimEnd();
         break;
       }
     }
-  }
 
-  const headings = [];
-  for (let i = 0; i < lines.length; i++) {
-    const m = lines[i].match(/^(#{1,6})\s+(.+?)\s*$/);
-    if (m) headings.push({ line: i + 1, text: m[2].replace(/\r$/, ''), level: m[1].length });
-  }
-
-  return { frontmatterEnd, headings, lines };
-}
-
-// Nächste vorausgehende Überschrift für eine Trefferzeile (oder '').
-function headingForLine(headings, line) {
-  let current = '';
-  for (const h of headings) {
-    if (h.line <= line) current = h.text;
-    else break;
-  }
-  return current;
-}
-
-function parseFrontmatter(raw) {
-  const match = raw.match(/^﻿?---\r?\n([\s\S]*?)\r?\n---\r?\n?([\s\S]*)$/);
-  if (!match) {
-    return { frontmatter: {}, body: raw };
-  }
-
-  const yamlBlock = match[1];
-  const body = match[2];
-  const frontmatter = {};
-
-  for (const line of yamlBlock.split('\n')) {
-    const kv = line.match(/^(\w+)\s*:\s*"?(.+?)"?\s*$/);
-    if (kv) {
-      frontmatter[kv[1]] = kv[2].replace(/\r$/, '');
+    if (locatorSection) {
+      var cutSection = cutAtLineBoundary(locatorSection, maxLength);
+      return {
+        ...meta,
+        content: cutSection,
+        truncated: cutSection.length < locatorSection.length,
+        mode: 'heading',
+      };
     }
+
+    var content = `Abschnitt mit Locator "${locator}" existiert auf dieser Seite nicht.`;
+    var toc = renderToc(subHeadings, `Seite: ${resolvedPath}`, maxLength - content.length);
+    if (content.length + toc.length <= maxLength) {
+      return {
+        ...meta,
+        content: content + toc,
+        truncated: true,
+        mode: 'heading-not-found',
+      };
+    }
+    return {
+      ...meta,
+      content: renderToc(subHeadings, `Seite: ${resolvedPath}`, maxLength),
+      truncated: true,
+      mode: 'heading-not-found',
+    };
   }
 
-  return { frontmatter, body };
-}
+  if (heading) {
+    var section = extractHeadingSection(body, heading, bodySections);
+    if (section) {
+      var cutSection = cutAtLineBoundary(section, maxLength);
+      return {
+        ...meta,
+        content: cutSection,
+        truncated: cutSection.length < section.length,
+        mode: 'heading',
+      };
+    }
 
-// Umlaut-/ss-Folding (Punkt 7): normalisiert deutschen Text so dass ae/ä,
-// oe/ö, ue/ü, ss/ß als gleich gelten. Wird symmetrisch auf Query-Tokens UND
-// Suchtext/Titel/Pfad angewandt damit "uebersicht" auch "Übersicht" findet.
-function foldText(str) {
-  return String(str)
-    .toLowerCase()
-    .replace(/ä/g, 'ae')
-    .replace(/ö/g, 'oe')
-    .replace(/ü/g, 'ue')
-    .replace(/ß/g, 'ss');
-}
-
-// Baut aus einem Token ein Regex-Fragment das beide Schreibweisen matcht:
-// 'ue' -> (?:ue|ü), 'ü' -> (?:ü|ue), 'ss' -> (?:ss|ß) usw. Der Token wird zuerst
-// regex-escaped, dann werden die gefoldeten Stellen zu Alternationen aufgeweitet.
-function tokenToFoldedPattern(token) {
-  // erst auf die gefaltete Form bringen, dann Stück für Stück escapen und
-  // an ae/oe/ue/ss Alternationen einsetzen.
-  const folded = foldText(token);
-  let out = '';
-  for (let i = 0; i < folded.length; i++) {
-    const two = folded.slice(i, i + 2);
-    if (two === 'ae') { out += '(?:ae|ä)'; i++; continue; }
-    if (two === 'oe') { out += '(?:oe|ö)'; i++; continue; }
-    if (two === 'ue') { out += '(?:ue|ü)'; i++; continue; }
-    if (two === 'ss') { out += '(?:ss|ß)'; i++; continue; }
-    out += escapeRegex(folded[i]);
+    var content = `Abschnitt "${heading}" existiert auf dieser Seite nicht.`;
+    var toc = renderToc(subHeadings, `Seite: ${resolvedPath}`, maxLength - content.length);
+    if (content.length + toc.length <= maxLength) {
+      return {
+        ...meta,
+        content: content + toc,
+        truncated: true,
+        mode: 'heading-not-found',
+      };
+    }
+    return {
+      ...meta,
+      content: renderToc(subHeadings, `Seite: ${resolvedPath}`, maxLength),
+      truncated: true,
+      mode: 'heading-not-found',
+    };
   }
-  return out;
+
+  if (body.length <= maxLength) {
+    return { ...meta, content: body, truncated: false, mode: 'full' };
+  }
+
+  if (subHeadings.length >= TOC_MIN_HEADINGS) {
+    var bodyLines = body.split('\n');
+    var introEnd = '';
+    for (var lineIndex = 0; lineIndex < subHeadings[0].line; lineIndex++) {
+      if (lineIndex > 0) introEnd += '\n';
+      introEnd += bodyLines[lineIndex];
+    }
+    introEnd = introEnd.trimEnd();
+
+    var intro = cutAtLineBoundary(introEnd, Math.floor(maxLength / 3));
+    var prefix = intro;
+    if (!prefix) prefix = `# ${meta.title || resolvedPath}`;
+    if (prefix.length > maxLength) prefix = '';
+    var toc = renderToc(
+      subHeadings,
+      `Seite gekürzt (${body.length} Zeichen, ${subHeadings.length} Abschnitte). Nur Intro oben.`,
+      maxLength - prefix.length
+    );
+    return {
+      ...meta,
+      content: prefix + toc,
+      truncated: true,
+      mode: 'toc',
+    };
+  }
+
+  var cut = cutAtLineBoundary(body, Math.floor(maxLength / 2));
+  var cutLine = cut.split('\n').length - 1;
+  var remaining = [];
+  for (var headingIndex = 0; headingIndex < subHeadings.length; headingIndex++) {
+    if (subHeadings[headingIndex].line > cutLine) remaining.push(subHeadings[headingIndex]);
+  }
+  return {
+    ...meta,
+    content: cut + renderToc(remaining, `Ab hier gekürzt (${body.length} Zeichen gesamt).`, maxLength - cut.length),
+    truncated: true,
+    mode: 'truncated',
+  };
 }
 
-function foldedTokenRegex(token, flags = 'i') {
-  return new RegExp(tokenToFoldedPattern(token), flags);
-}
-
-// Tokenizer (Punkt 8): split auf Whitespace UND Identifier-trennende
-// Interpunktion (. ( ) [ ] :: ->), min length >= 2. Die Original-Phrase bleibt
-// für den Exact-Match-Boost separat erhalten.
-function tokenize(query) {
-  return query
-    .trim()
-    .split(/[\s.()[\]]+|::|->/)
-    .map(t => t.trim())
-    .filter(t => t.length >= 2);
-}
-
-// splits query into tokens, searches each, ranks by number of distinct token hits
 export function searchDocs(vaultPath, query, options = {}) {
-  const { section } = options;
-  // Defensive Clamps (Punkt 12): auch wenn zod schon begrenzt, hier hart machen.
-  const contextLines = clampInt(options.contextLines, 0, 20, 3);
-  const maxResults = clampInt(options.maxResults, 1, 100, 10);
+  var section = options.section;
+  var detailed = options.detailed === true;
+  var contextLines = clampInt(options.contextLines, 0, 20, 3);
+  var maxResults = clampInt(options.maxResults, 1, 100, 5);
 
-  const searchPath = section ? join(vaultPath, section) : vaultPath;
+  if (section) {
+    var searchPath = join(vaultPath, section);
+    if (!isInsideVault(vaultPath, searchPath) || !existsSync(searchPath)) return [];
+  }
+  if (!existsSync(vaultPath)) return [];
 
-  if (!isInsideVault(vaultPath, searchPath)) return [];
+  var terms = queryTerms(query);
+  if (terms.length === 0) return [];
 
-  if (!existsSync(searchPath)) {
-    return [];
+  var index = getCachedSearchIndex(vaultPath);
+  if (!index || !index.segmentCount) return [];
+
+  var sectionPrefix = '';
+  var filter;
+  if (section) {
+    sectionPrefix = normalizeSlashes(section) + '/';
+    filter = function (result) {
+      var segment = index.segments.get(result.id);
+      return !!segment && segment.file.startsWith(sectionPrefix);
+    };
   }
 
-  const tokens = tokenize(query);
-  if (tokens.length === 0) return [];
+  var hits = index.mini.search(query, { filter });
+  var fuzzyQuery = '';
+  for (var termIndex = 0; termIndex < terms.length; termIndex++) {
+    if (index.hasTerm(terms[termIndex])) continue;
+    if (fuzzyQuery) fuzzyQuery += ' ';
+    fuzzyQuery += terms[termIndex];
+  }
+  if (!fuzzyQuery && hits.length === 0) fuzzyQuery = query;
 
-  // Kandidaten-Obergrenze für das Lesen: rg/node streamen in Pfad-Reihenfolge,
-  // nach ~maxResults*3 distinct Dateien hören wir auf zu sammeln (Punkt 2).
-  const candidateCap = maxResults * 3;
-
-  if (tokens.length === 1) {
-    let raw;
-    try {
-      raw = searchWithRipgrep(vaultPath, searchPath, query, contextLines, candidateCap, true);
-    } catch {
-      raw = searchWithNode(vaultPath, searchPath, tokens[0], contextLines, candidateCap);
+  if (fuzzyQuery) {
+    var hitsById = new Map();
+    for (var hitIndex = 0; hitIndex < hits.length; hitIndex++) {
+      hitsById.set(hits[hitIndex].id, hits[hitIndex]);
     }
 
-    // Titel-/Pfad-Vorlauf (Punkt 3): kanonische Seiten mergen die nicht unter
-    // den ersten Datei-Treffern lagen.
-    raw = mergeTitleCandidates(vaultPath, searchPath, raw, tokens, contextLines);
-
-    return enrichResults(vaultPath, raw, tokens, query).slice(0, maxResults);
-  }
-
-  // multi-token: search with folded OR pattern, then rank by distinct token hits
-  const orPattern = tokens.map(tokenToFoldedPattern).join('|');
-  let raw;
-  try {
-    raw = searchWithRipgrep(vaultPath, searchPath, orPattern, 0, candidateCap, false);
-  } catch {
-    raw = searchWithNodeRegex(vaultPath, searchPath, new RegExp(orPattern, 'i'), 0, candidateCap);
-  }
-
-  raw = mergeTitleCandidates(vaultPath, searchPath, raw, tokens, 0);
-
-  const ranked = rankByTokenCoverage(vaultPath, raw, tokens, query);
-
-  for (const result of ranked) {
-    if (result.matches.length > MAX_MATCHES_PER_FILE) {
-      result.matches = result.matches.slice(0, MAX_MATCHES_PER_FILE);
-    }
-  }
-
-  // context_lines für multi-token nachreichen (Punkt 5): der Suchlauf lief mit
-  // Kontext 0; nach Ranking/Trim die gewünschten Kontextzeilen um die
-  // überlebenden Treffer hängen.
-  const trimmed = ranked.slice(0, candidateCap);
-  if (contextLines > 0) {
-    attachContext(vaultPath, trimmed, contextLines);
-  }
-
-  return enrichResults(vaultPath, trimmed, tokens, query).slice(0, maxResults);
-}
-
-// Fügt für multi-token-Ergebnisse die gewünschten Kontextzeilen um jede
-// Trefferzeile hinzu (Punkt 5). Liest jede Datei einmal.
-function attachContext(vaultPath, results, contextLines) {
-  for (const result of results) {
-    let lines;
-    try {
-      lines = readFileSync(join(vaultPath, result.file + '.md'), 'utf-8').split('\n');
-    } catch {
-      continue;
-    }
-    const seen = new Set(result.matches.map(m => m.line));
-    const expanded = [...result.matches];
-    for (const m of result.matches) {
-      const idx = m.line - 1;
-      const start = Math.max(0, idx - contextLines);
-      const end = Math.min(lines.length - 1, idx + contextLines);
-      for (let j = start; j <= end; j++) {
-        if (!seen.has(j + 1)) {
-          seen.add(j + 1);
-          expanded.push({ line: j + 1, text: lines[j] });
-        }
+    var fuzzyHits = index.mini.search(fuzzyQuery, { filter, fuzzy: 0.2, prefix: true });
+    for (var fuzzyHitIndex = 0; fuzzyHitIndex < fuzzyHits.length; fuzzyHitIndex++) {
+      var fuzzyHit = fuzzyHits[fuzzyHitIndex];
+      var existingHit = hitsById.get(fuzzyHit.id);
+      if (!existingHit) {
+        hits.push(fuzzyHit);
+        hitsById.set(fuzzyHit.id, fuzzyHit);
+        continue;
       }
-    }
-    expanded.sort((a, b) => a.line - b.line);
-    result.matches = expanded;
-  }
-}
 
-// Titel-/Pfad-Vorlauf (Punkt 3): findet über den gecachten Titel-Index Dateien
-// deren Basename oder Frontmatter-Titel auf IRGENDEINEN Token passt, und merged
-// diese (deduped by file) in das Ergebnis-Set BEVOR auf maxResults geschnitten
-// wird. So landet die kanonische Seite garantiert im Ranking.
-function mergeTitleCandidates(vaultPath, searchPath, results, tokens, contextLines) {
-  const index = getCachedTitleIndex(vaultPath);
-  if (!index.length) return results;
-
-  const tokenRes = tokens.map(t => foldedTokenRegex(t));
-  const seen = new Set(results.map(r => r.file));
-  const sectionRel = relative(vaultPath, searchPath).split(sep).join('/');
-
-  for (const entry of index) {
-    if (seen.has(entry.path)) continue;
-    // section-scope respektieren
-    if (sectionRel && sectionRel !== '.' && !(entry.path === sectionRel || entry.path.startsWith(sectionRel + '/'))) {
-      continue;
-    }
-    const hay = foldText(`${entry.title} ${entry.name} ${entry.path}`);
-    if (!tokenRes.some(re => re.test(hay))) continue;
-
-    seen.add(entry.path);
-    // Body-Treffer für diese Kandidaten ziehen damit echte Snippets entstehen.
-    const matches = matchesForFile(vaultPath, entry.path, tokens, contextLines);
-    results.push({ file: entry.path, title: entry.title, matches });
-  }
-
-  return results;
-}
-
-// Liest eine einzelne Datei und liefert Treffer-Zeilen (mit Kontext) für die
-// gegebenen Tokens. Genutzt vom Titel-Vorlauf.
-function matchesForFile(vaultPath, relPath, tokens, contextLines) {
-  let lines;
-  try {
-    lines = readFileSync(join(vaultPath, relPath + '.md'), 'utf-8').split('\n');
-  } catch {
-    return [];
-  }
-  const tokenRes = tokens.map(t => foldedTokenRegex(t));
-  const matchingLines = [];
-  const seen = new Set();
-  for (let i = 0; i < lines.length; i++) {
-    if (tokenRes.some(re => re.test(lines[i]))) {
-      const start = Math.max(0, i - contextLines);
-      const end = Math.min(lines.length - 1, i + contextLines);
-      for (let j = start; j <= end; j++) {
-        if (!seen.has(j + 1)) {
-          seen.add(j + 1);
-          matchingLines.push({ line: j + 1, text: lines[j] });
-        }
+      existingHit.score += fuzzyHit.score;
+      for (var fuzzyTermIndex = 0; fuzzyTermIndex < fuzzyHit.terms.length; fuzzyTermIndex++) {
+        if (existingHit.terms.includes(fuzzyHit.terms[fuzzyTermIndex])) continue;
+        existingHit.terms.push(fuzzyHit.terms[fuzzyTermIndex]);
+      }
+      for (var queryTermIndex = 0; queryTermIndex < fuzzyHit.queryTerms.length; queryTermIndex++) {
+        if (existingHit.queryTerms.includes(fuzzyHit.queryTerms[queryTermIndex])) continue;
+        existingHit.queryTerms.push(fuzzyHit.queryTerms[queryTermIndex]);
       }
     }
   }
-  matchingLines.sort((a, b) => a.line - b.line);
-  return matchingLines;
-}
+  if (hits.length === 0) return [];
 
-// Post-processing für beide Suchpfade (ripgrep + node fallback):
-//  - filtert Treffer aus dem YAML-Frontmatter-Block raus
-//  - droppt leere/whitespace-only Treffer-Zeilen (Punkt 4)
-//  - hängt pro Treffer die nächste vorausgehende Überschrift als `heading` an
-//  - markiert Dateien deren Titel/Pfad/Name auf einen Token passt mit `titleMatch`
-//  - vergibt einen numerischen `score` (graded titleMatch, Punkt 10) und sortiert danach
-//  - strippt trailing \r aus dem Treffer-Text
-//  - frontmatter-only-Snippet (Punkt 11): titleMatch-Dateien ohne Body-Treffer
-//    bekommen einen synthetisierten Snippet statt gedroppt zu werden
-// Das bestehende Schema { file, title, matches: [{ line, text, heading }], titleMatch }
-// bleibt erhalten, `score` kommt additiv dazu.
-// Manche Quellen zeigen veraltete Stile (z.B. samples.md baut Gadgets noch per
-// `new otris.gadget.gui.X()` statt der aktuellen funktionalen gadgetAPI). Solche
-// Treffer kriegen einen Score-Malus, damit die aktuelle API-Referenz oben steht.
-// Kein Ausschluss, nur Absenkung: fehlt eine Alternative, rankt die Quelle weiter.
-// Malus ~ "alle Tokens im Titel"-Boost, neutralisiert also den Body-Vorteil einer
-// Sample-Datei gegenueber einer Datei mit echtem Titel-Treffer.
-const STALE_SOURCE_PENALTY = 30;
-const STALE_SOURCE_PATTERNS = [
-  /(^|\/)samples?(\/|$)/i,   // Sample-Verzeichnisse/-Dateien
-  /(^|\/)archiv(\/|$)/i,     // archivierte/veraltete Staende
-];
+  var queryFold = foldText(query.trim());
+  var termSet = new Set(terms);
+  var ranked = aggregateByFile(hits, index, terms, queryFold, termSet);
+  var top = ranked.slice(0, maxResults);
+  var lineStore = new Map();
+  var snippetSpan = Math.min(contextLines, 1);
+  if (detailed) snippetSpan = 1;
+  var results = [];
 
-function staleSourcePenalty(filePath) {
-  return STALE_SOURCE_PATTERNS.some(re => re.test(filePath)) ? STALE_SOURCE_PENALTY : 0;
-}
-
-function enrichResults(vaultPath, results, tokens, query) {
-  const enriched = [];
-  const titleByPath = new Map(getCachedTitleIndex(vaultPath).map(e => [e.path, e.title]));
-
-  for (const result of results) {
-    // Titel aus dem Index nachziehen wenn der Suchpfad keinen geliefert hat
-    // (rg/node liefern leeren Titel, nur readDoc/Index kennt ihn).
-    if (!result.title && titleByPath.has(result.file)) {
-      result.title = titleByPath.get(result.file);
-    }
-
-    let frontmatterEnd = 0;
-    let headings = [];
-    let lines = [];
-    try {
-      const raw = readFileSync(join(vaultPath, result.file + '.md'), 'utf-8');
-      ({ frontmatterEnd, headings, lines } = buildLineIndex(raw));
-    } catch {
-      // Datei nicht lesbar: ohne Index weiter, nichts wird gefiltert/angereichert
-    }
-
-    const matches = [];
-    for (const m of result.matches) {
-      // Treffer innerhalb des Frontmatter-Blocks raushalten
-      if (frontmatterEnd && m.line <= frontmatterEnd) continue;
-      const text = typeof m.text === 'string' ? m.text.replace(/\r$/, '') : m.text;
-      // leere/whitespace-only Kontext-/Trefferzeilen droppen (Punkt 4)
-      if (typeof text === 'string' && text.trim() === '') continue;
-      matches.push({
-        line: m.line,
-        text,
-        heading: headingForLine(headings, m.line),
-      });
-    }
-
-    // geteilte Obergrenze für Treffer pro Datei (Punkt 4): gilt für BEIDE
-    // Branches, damit auch single-token nicht eine Datei mit Treffern flutet.
-    if (matches.length > MAX_MATCHES_PER_FILE) {
-      matches.length = MAX_MATCHES_PER_FILE;
-    }
-
-    const { titleMatch, titleScore } = scoreTitle(result, tokens, query);
-
-    if (matches.length === 0) {
-      // frontmatter-only-Snippet (Punkt 11): titleMatch ohne echten Body-Treffer
-      // nicht droppen, sondern aus erster Body-Zeile/Heading synthetisieren.
-      if (titleMatch && lines.length) {
-        const synth = synthesizeSnippet(lines, frontmatterEnd, headings);
-        if (synth) {
-          matches.push(synth);
-        }
+  for (var resultIndex = 0; resultIndex < top.length; resultIndex++) {
+    var entry = top[resultIndex];
+    var group = entry.group;
+    var lines = cachedLines(vaultPath, group.file, lineStore);
+    var resultHeadings = [];
+    for (var segmentIndex = 0; segmentIndex < group.segs.length; segmentIndex++) {
+      var segment = group.segs[segmentIndex];
+      if (segment.level >= 2 && segment.heading && !resultHeadings.includes(segment.heading)) {
+        resultHeadings.push(segment.heading);
       }
-      if (matches.length === 0) continue;
+      if (resultHeadings.length >= MAX_HEADINGS_PER_RESULT) break;
     }
 
-    // term-frequency über alle Treffer-Texte (klein gewichtet, Punkt 9)
-    const bodyScore = scoreBody(matches, tokens);
-    const score = titleScore + bodyScore - staleSourcePenalty(result.file);
+    var result = {
+      file: group.file,
+      title: group.title,
+      headings: resultHeadings,
+      locator: group.segs[0].locator,
+      snippet: buildSnippet(lines, group.segs[0], terms, index.idf, snippetSpan),
+      score: Math.round(entry.score * 10) / 10,
+    };
 
-    enriched.push({ ...result, matches, titleMatch, score });
-  }
-
-  // höherer score zuerst, sonst stabile Eingangsreihenfolge
-  enriched.sort((a, b) => b.score - a.score);
-  return enriched;
-}
-
-// graded titleMatch (Punkt 10): liefert boolean titleMatch + numerischen Beitrag.
-//  - normalisierter Titel == Query -> großer Boost
-//  - alle Tokens im Titel -> mittlerer Boost
-//  - Basename/Pfad-Token-Treffer -> kleiner Boost
-function scoreTitle(result, tokens, query) {
-  const titleFold = foldText(result.title || '');
-  const baseFold = foldText(basename(result.file));
-  const pathFold = foldText(result.file);
-  const queryFold = foldText(query || '');
-
-  const tokenRes = tokens.map(t => foldedTokenRegex(t));
-
-  let titleScore = 0;
-  let titleMatch = false;
-
-  if (titleFold && titleFold === queryFold) {
-    titleScore += 100;
-    titleMatch = true;
-  }
-
-  if (titleFold && tokenRes.every(re => re.test(titleFold))) {
-    titleScore += 30;
-    titleMatch = true;
-  }
-
-  if (tokenRes.some(re => re.test(baseFold))) {
-    titleScore += 10;
-    titleMatch = true;
-  }
-
-  if (tokenRes.some(re => re.test(pathFold))) {
-    titleScore += 5;
-    titleMatch = true;
-  }
-
-  if (titleFold && tokenRes.some(re => re.test(titleFold))) {
-    titleScore += 5;
-    titleMatch = true;
-  }
-
-  return { titleMatch, titleScore };
-}
-
-// Body-Score (Punkt 9): distinct-token coverage + Phrasen-/Proximity-Bonus
-// (alle Tokens auf einer Zeile) + kleiner, gedeckelter term-frequency-Anteil.
-function scoreBody(matches, tokens) {
-  const tokenRes = tokens.map(t => foldedTokenRegex(t));
-  const lineTexts = matches.map(m => foldText(typeof m.text === 'string' ? m.text : ''));
-  const allText = lineTexts.join('\n');
-
-  // distinct-token coverage
-  let coverage = 0;
-  for (const re of tokenRes) {
-    if (re.test(allText)) coverage++;
-  }
-  let score = coverage * 4;
-
-  // Proximity: alle Tokens auf einer einzigen Zeile
-  if (tokens.length > 1) {
-    const allOnOneLine = lineTexts.some(line => tokenRes.every(re => re.test(line)));
-    if (allOnOneLine) score += 6;
-  }
-
-  // gedeckelte term-frequency
-  let tf = 0;
-  for (const re of tokenRes) {
-    const global = new RegExp(re.source, 'gi');
-    const count = (allText.match(global) || []).length;
-    tf += Math.min(count, 3);
-  }
-  score += Math.min(tf, 9);
-
-  return score;
-}
-
-// synthetisiert einen Snippet aus der ersten nicht-leeren Body-Zeile, sonst
-// aus der ersten Überschrift nach dem Frontmatter (Punkt 11).
-function synthesizeSnippet(lines, frontmatterEnd, headings) {
-  for (let i = frontmatterEnd; i < lines.length; i++) {
-    const text = lines[i].replace(/\r$/, '');
-    if (text.trim() !== '') {
-      return { line: i + 1, text, heading: headingForLine(headings, i + 1) };
+    if (detailed) {
+      var titleFold = foldText(group.title || '');
+      var titleTerms = new Set(queryTerms(group.title || ''));
+      var baseTerms = new Set(queryTerms(basename(group.file)));
+      var pathTerms = new Set(queryTerms(group.file));
+      var exactTitleMatch = titleFold === queryFold;
+      var allTermsInTitle = true;
+      var titleTermMatch = false;
+      var baseTermMatch = false;
+      var pathTermMatch = false;
+      for (var termIndex = 0; termIndex < terms.length; termIndex++) {
+        if (!titleTerms.has(terms[termIndex])) allTermsInTitle = false;
+        if (titleTerms.has(terms[termIndex])) titleTermMatch = true;
+        if (baseTerms.has(terms[termIndex])) baseTermMatch = true;
+        if (pathTerms.has(terms[termIndex])) pathTermMatch = true;
+      }
+      result.titleMatch = exactTitleMatch
+        || allTermsInTitle
+        || titleTermMatch
+        || baseTermMatch
+        || pathTermMatch;
+      result.matches = buildMatches(lines, group.segs.slice(0, 3), terms, index.idf, contextLines);
+      if (result.matches.length === 0) {
+        var topSegment = group.segs[0];
+        var syntheticText = '';
+        var headingTermMatch = false;
+        var headingTerms = new Set(queryTerms(topSegment.heading));
+        for (var matchedTermIndex = 0; matchedTermIndex < topSegment.matchedTerms.length; matchedTermIndex++) {
+          if (!headingTerms.has(foldText(topSegment.matchedTerms[matchedTermIndex]))) continue;
+          headingTermMatch = true;
+          break;
+        }
+        if (headingTermMatch) {
+          syntheticText = topSegment.heading;
+        } else if (result.titleMatch) {
+          syntheticText = group.title;
+          if (!exactTitleMatch && !allTermsInTitle && !titleTermMatch) syntheticText = group.file;
+        }
+        if (!syntheticText) syntheticText = result.snippet;
+        if (!syntheticText) syntheticText = group.file;
+        result.matches.push({
+          line: topSegment.startLine,
+          text: syntheticText,
+          heading: topSegment.heading,
+        });
+      }
     }
+    results.push(result);
   }
-  if (headings.length) {
-    const h = headings.find(hh => hh.line > frontmatterEnd) || headings[0];
-    return { line: h.line, text: '#'.repeat(h.level) + ' ' + h.text, heading: h.text };
-  }
-  return null;
+
+  return applyTokenBudget(results, options.maxTokens);
 }
 
-// Pre-Slice-Ranking: nutzt denselben Score wie enrichResults (titleScore +
-// bodyScore), damit titleMatch-Seiten den candidateCap-Slice überleben und
-// nicht hinter coverage-stärkeren Beispielseiten weggeschnitten werden.
-// Titel werden vorab aus dem Index nachgezogen (rg/node liefern leeren Titel),
-// sonst greift der Titel-Boost hier noch nicht.
-function rankByTokenCoverage(vaultPath, results, tokens, query) {
-  const titleByPath = new Map(getCachedTitleIndex(vaultPath).map(e => [e.path, e.title]));
-
-  for (const result of results) {
-    if (!result.title && titleByPath.has(result.file)) {
-      result.title = titleByPath.get(result.file);
-    }
-    const { titleScore } = scoreTitle(result, tokens, query);
-    result._score = titleScore + scoreBody(result.matches, tokens);
-  }
-
-  results.sort((a, b) => b._score - a._score);
-
-  for (const result of results) {
-    delete result._score;
-  }
-
-  return results;
+export function getManifest(vaultPath) {
+  return getCachedManifest(vaultPath);
 }
 
-// fixed: bei true wird -F/--fixed-strings gesetzt (literal match, Punkt 6).
-function searchWithRipgrep(vaultPath, searchPath, query, contextLines, maxResults, fixed) {
-  // dieselbe Skip-Semantik wie der node-fallback: crawl/, node_modules/ und
-  // _-/.-präfixierte Ordner sind kein Vault-Content.
-  // --json (Punkt 1): strukturierter Stream löst CRLF-, greedy-regex- und
-  // embedded-path-Probleme in einem Schritt.
-  const args = [
-    '-i', '--json', '-C', String(contextLines),
-    '--glob', '*.md',
-    '--glob', '!**/crawl/**',
-    '--glob', '!**/node_modules/**',
-    '--glob', '!**/_*/**',
-    '--glob', '!**/.*/**',
-  ];
-  if (fixed) {
-    // single-token literal: -F damit es wie der node-Pfad matcht. Damit Umlaut-
-    // Folding nicht schlechter ist als node, beide Varianten als separate
-    // fixed-strings -e Patterns mitgeben.
-    const variants = new Set([query, ...foldVariants(query)]);
-    for (const v of variants) {
-      args.push('-F', '-e', v);
-    }
-  } else {
-    args.push('-e', query);
-  }
-  args.push(searchPath);
-
-  let output;
-  try {
-    output = execFileSync('rg', args, { encoding: 'utf-8', timeout: 10000, maxBuffer: 64 * 1024 * 1024 }).trim();
-  } catch (err) {
-    // rg exits with code 1 when no matches found
-    if (err.status === 1 && err.stdout !== undefined) {
-      return [];
-    }
-    throw err;
-  }
-
-  if (!output) {
-    return [];
-  }
-
-  return parseRipgrepJson(vaultPath, output, maxResults);
-}
-
-// erzeugt die gefoldeten Schreibvarianten eines literalen Query-Strings, damit
-// der rg-Pfad bei -F (keine Regex) trotzdem Umlaute findet (Punkt 7).
-function foldVariants(query) {
-  const out = new Set();
-  out.add(foldText(query));
-  // umgekehrt: ae->ä etc. (nur die häufigste Rückrichtung)
-  out.add(query.toLowerCase()
-    .replace(/ae/g, 'ä')
-    .replace(/oe/g, 'ö')
-    .replace(/ue/g, 'ü')
-    .replace(/ss/g, 'ß'));
-  out.delete('');
-  return out;
-}
-
-// Parst den rg --json-Stream (Punkt 1). type:"match"-Events liefern
-// data.path.text, data.line_number, data.lines.text verbatim. Kontextzeilen
-// kommen als type:"context". Stoppt nach maxResults distinct Dateien (Punkt 2).
 export function parseRipgrepJson(vaultPath, output, maxResults) {
-  const fileGroups = new Map();
-  let distinctFiles = 0;
+  var fileGroups = new Map();
+  var distinctFiles = 0;
+  var lines = output.split(/\r?\n/);
 
-  for (const line of output.split(/\r?\n/)) {
-    if (!line.trim()) continue;
-    let evt;
+  for (var lineIndex = 0; lineIndex < lines.length; lineIndex++) {
+    if (!lines[lineIndex].trim()) continue;
+
     try {
-      evt = JSON.parse(line);
+      var event = JSON.parse(lines[lineIndex]);
     } catch {
       continue;
     }
-    if (evt.type !== 'match' && evt.type !== 'context') continue;
+    if (event.type !== 'match' && event.type !== 'context') continue;
 
-    const data = evt.data;
+    var data = event.data;
     if (!data || !data.path || typeof data.path.text !== 'string') continue;
-    const absPath = data.path.text;
-    const relPath = relative(vaultPath, absPath).replace(/\.md$/, '').split(sep).join('/');
-
-    if (!fileGroups.has(relPath)) {
-      // Kandidaten-Obergrenze: nach maxResults distinct Dateien nicht mehr
-      // sammeln (rg streamt in Pfad-Reihenfolge).
+    var relativePath = normalizeSlashes(relative(vaultPath, data.path.text).replace(/\.md$/, ''));
+    if (!fileGroups.has(relativePath)) {
       if (distinctFiles >= maxResults) continue;
       distinctFiles++;
-      fileGroups.set(relPath, { file: relPath, title: '', matches: [] });
+      fileGroups.set(relativePath, { file: relativePath, title: '', matches: [] });
     }
 
-    const lineNumber = data.line_number;
-    const text = data.lines && typeof data.lines.text === 'string'
-      ? data.lines.text.replace(/\r?\n$/, '')
-      : '';
-    if (typeof lineNumber === 'number') {
-      fileGroups.get(relPath).matches.push({ line: lineNumber, text });
+    var text = '';
+    if (data.lines && typeof data.lines.text === 'string') {
+      text = data.lines.text.replace(/\r?\n$/, '');
     }
+    if (typeof data.line_number !== 'number') continue;
+
+    var group = fileGroups.get(relativePath);
+    group.matches.push({ line: data.line_number, text });
   }
 
   return Array.from(fileGroups.values());
 }
 
-function searchWithNode(vaultPath, searchPath, token, contextLines, maxResults) {
-  return searchWithNodeRegex(vaultPath, searchPath, foldedTokenRegex(token), contextLines, maxResults);
+function isInsideVault(vaultPath, targetPath) {
+  var resolvedVault = resolve(vaultPath);
+  var resolvedTarget = resolve(targetPath);
+  return resolvedTarget.startsWith(resolvedVault + sep) || resolvedTarget === resolvedVault;
 }
 
-function searchWithNodeRegex(vaultPath, searchPath, regex, contextLines, maxResults) {
-  const results = [];
+function clampInt(value, min, max, fallback) {
+  var number = Number(value);
+  if (!Number.isFinite(number)) return fallback;
+  return Math.max(min, Math.min(max, Math.trunc(number)));
+}
 
-  const mdFiles = [];
-  collectMdFilePaths(searchPath, mdFiles);
-
-  for (const filePath of mdFiles) {
-    // Kandidaten-Obergrenze BEVOR weitere Dateien gelesen werden (Punkt 2):
-    // nicht erst den ganzen Vault lesen und dann slicen.
-    if (results.length >= maxResults) break;
-
-    const raw = readFileSync(filePath, 'utf-8');
-    const lines = raw.split('\n');
-    const matchingLines = [];
-    const seen = new Set();
-
-    for (let i = 0; i < lines.length; i++) {
-      if (regex.test(lines[i])) {
-        const start = Math.max(0, i - contextLines);
-        const end = Math.min(lines.length - 1, i + contextLines);
-        for (let j = start; j <= end; j++) {
-          if (!seen.has(j + 1)) {
-            seen.add(j + 1);
-            matchingLines.push({ line: j + 1, text: lines[j] });
-          }
-        }
-      }
+function collectMdFiles(directory, vaultRoot, results) {
+  var entries = readdirSync(directory, { withFileTypes: true });
+  for (var entryIndex = 0; entryIndex < entries.length; entryIndex++) {
+    var entry = entries[entryIndex];
+    var fullPath = join(directory, entry.name);
+    if (entry.isDirectory()) {
+      collectMdFiles(fullPath, vaultRoot, results);
+      continue;
     }
+    if (!entry.isFile() || !entry.name.endsWith('.md')) continue;
 
-    if (matchingLines.length > 0) {
-      const relPath = relative(vaultPath, filePath).replace(/\.md$/, '').split(sep).join('/');
-      matchingLines.sort((a, b) => a.line - b.line);
-      results.push({
-        file: relPath,
-        title: '',
-        matches: matchingLines,
-      });
+    results.push({
+      name: basename(entry.name, '.md'),
+      path: normalizeSlashes(relative(vaultRoot, fullPath).replace(/\.md$/, '')),
+    });
+  }
+}
+
+function normalizeSlashes(filePath) {
+  var parts = filePath.split(sep);
+  var normalized = '';
+  for (var partIndex = 0; partIndex < parts.length; partIndex++) {
+    if (partIndex > 0) normalized += '/';
+    normalized += parts[partIndex];
+  }
+  return normalized;
+}
+
+function healDocPath(vaultPath, docPath) {
+  var index = getCachedTitleIndex(vaultPath);
+  if (!index.length) return null;
+
+  var wantedBase = foldText(basename(docPath).toLowerCase());
+  var wantedFull = foldText(normalizeSlashes(docPath.toLowerCase()));
+  var exact = [];
+  for (var entryIndex = 0; entryIndex < index.length; entryIndex++) {
+    var entry = index[entryIndex];
+    if (foldText(entry.name.toLowerCase()) === wantedBase || foldText(entry.title.toLowerCase()) === wantedBase) {
+      exact.push(entry);
     }
   }
+  if (exact.length === 1) return { path: exact[0].path };
+  if (exact.length > 1) {
+    var candidates = [];
+    for (var entryIndex = 0; entryIndex < exact.length && entryIndex < 8; entryIndex++) {
+      candidates.push(exact[entryIndex].path);
+    }
+    return {
+      error: `Document not found: ${docPath}. Did you mean one of these?`,
+      candidates,
+    };
+  }
 
+  var near = [];
+  for (var entryIndex = 0; entryIndex < index.length; entryIndex++) {
+    var entry = index[entryIndex];
+    if (
+      foldText(entry.name.toLowerCase()).includes(wantedBase)
+      || foldText(entry.title.toLowerCase()).includes(wantedBase)
+      || foldText(entry.path.toLowerCase()).includes(wantedFull)
+    ) {
+      near.push(entry);
+    }
+  }
+  if (near.length === 0) return null;
+
+  var candidates = [];
+  for (var entryIndex = 0; entryIndex < near.length && entryIndex < 8; entryIndex++) {
+    candidates.push(near[entryIndex].path);
+  }
+  return {
+    error: `Document not found: ${docPath}. Did you mean one of these?`,
+    candidates,
+  };
+}
+
+function parseFrontmatter(raw) {
+  var match = raw.match(/^﻿?---\r?\n([\s\S]*?)\r?\n---\r?\n?([\s\S]*)$/);
+  if (!match) return { frontmatter: {}, body: raw };
+
+  var frontmatter = {};
+  var lines = match[1].split('\n');
+  for (var lineIndex = 0; lineIndex < lines.length; lineIndex++) {
+    var entry = lines[lineIndex].match(/^(\w+)\s*:\s*"?(.+?)"?\s*$/);
+    if (entry) frontmatter[entry[1]] = entry[2].replace(/\r$/, '');
+  }
+  return { frontmatter, body: match[2] };
+}
+
+function extractHeadingSection(body, heading, sections) {
+  var wanted = foldText(heading.trim());
+  var lines = body.split('\n');
+  var startIndex = -1;
+  var startLevel = 0;
+  var matchedSectionIndex = -1;
+
+  for (var sectionIndex = 0; sectionIndex < sections.length; sectionIndex++) {
+    if (foldText(sections[sectionIndex].heading.trim()) !== wanted) continue;
+    startIndex = sections[sectionIndex].startLine - 1;
+    startLevel = sections[sectionIndex].level;
+    matchedSectionIndex = sectionIndex;
+    break;
+  }
+  if (startIndex === -1) return '';
+
+  var endIndex = lines.length;
+  for (var sectionIndex = matchedSectionIndex + 1; sectionIndex < sections.length; sectionIndex++) {
+    if (sections[sectionIndex].level > startLevel) continue;
+    endIndex = sections[sectionIndex].startLine - 1;
+    break;
+  }
+
+  var section = '';
+  for (var lineIndex = startIndex; lineIndex < endIndex; lineIndex++) {
+    if (section) section += '\n';
+    section += lines[lineIndex];
+  }
+  return section.trimEnd();
+}
+
+function cutAtLineBoundary(text, maxLength) {
+  if (text.length <= maxLength) return text;
+  var slice = text.slice(0, maxLength);
+  var lastNewline = slice.lastIndexOf('\n');
+  if (lastNewline > maxLength * 0.5) return slice.slice(0, lastNewline);
+  return slice;
+}
+
+function renderToc(headings, note, budget = Infinity) {
+  if (!headings.length) return '';
+
+  var output = `\n\n---\n${note}\nWeiter mit heading="<name>", zum Beispiel heading="${headings[0].text}".\n\nAbschnitte (${headings.length}):\n`;
+  if (output.length > budget) {
+    output = `\n\nWeiter mit heading="${headings[0].text}".\n\nAbschnitte (${headings.length}):\n`;
+  }
+  if (output.length > budget) output = `\n\nAbschnitte (${headings.length}):\n`;
+
+  var shown = 0;
+  for (var headingIndex = 0; headingIndex < headings.length; headingIndex++) {
+    if (shown >= MAX_TOC_ENTRIES) break;
+    var separator = '';
+    if (shown > 0) separator = ' | ';
+    if (output.length + separator.length + headings[headingIndex].text.length > budget) break;
+    output += separator + headings[headingIndex].text;
+    shown++;
+  }
+
+  var rest = headings.length - shown;
+  var restText = ` | ... +${rest} weitere, hol sie mit einem größeren max_length`;
+  if (rest > 0 && output.length + restText.length <= budget) output += restText;
+  return output;
+}
+
+function staleFactor(filePath) {
+  for (var patternIndex = 0; patternIndex < STALE_SOURCE_PATTERNS.length; patternIndex++) {
+    if (STALE_SOURCE_PATTERNS[patternIndex].test(filePath)) return STALE_SOURCE_FACTOR;
+  }
+  return 1;
+}
+
+function isNoiseLine(text) {
+  var line = String(text).trim();
+  if (!line) return true;
+  if (/^`{3,}/.test(line)) return true;
+  if (/^#{1,6}(\s|$)/.test(line)) return true;
+  if (/^[|\-+:=_*~\s]+$/.test(line)) return true;
+  if (/^[<>{}[\]()]+$/.test(line)) return true;
+  return false;
+}
+
+function cachedLines(vaultPath, relativePath, store) {
+  if (store.has(relativePath)) return store.get(relativePath);
+
+  var filePath = join(vaultPath, relativePath + '.md');
+  try {
+    var lines = readFileSync(filePath, 'utf-8').split('\n');
+  } catch (error) {
+    throw new Error(`Failed to read Markdown file "${filePath}": ${error.message}`);
+  }
+  store.set(relativePath, lines);
+  return lines;
+}
+
+function lineWeight(line, terms, idf) {
+  var folded = foldText(line);
+  var weight = 0;
+  for (var termIndex = 0; termIndex < terms.length; termIndex++) {
+    if (folded.includes(terms[termIndex])) weight += idf(terms[termIndex]);
+  }
+  return weight;
+}
+
+function buildSnippet(lines, segment, terms, idf, span) {
+  var start = Math.max(0, segment.startLine - 1);
+  var end = Math.min(lines.length, segment.endLine);
+  var bestIndex = -1;
+  var bestWeight = 0;
+
+  for (var lineIndex = start; lineIndex < end; lineIndex++) {
+    var text = lines[lineIndex].replace(/\r$/, '');
+    if (isNoiseLine(text)) continue;
+    var weight = lineWeight(text, terms, idf);
+    if (weight <= bestWeight) continue;
+    bestWeight = weight;
+    bestIndex = lineIndex;
+  }
+
+  if (bestIndex === -1) {
+    var longest = 0;
+    for (var lineIndex = start; lineIndex < end; lineIndex++) {
+      var text = lines[lineIndex].replace(/\r$/, '').trim();
+      if (isNoiseLine(text) || text.length <= longest) continue;
+      longest = text.length;
+      bestIndex = lineIndex;
+    }
+  }
+  if (bestIndex === -1) return '';
+
+  var snippet = '';
+  var snippetStart = Math.max(start, bestIndex - span);
+  var snippetEnd = Math.min(end, bestIndex + span + 1);
+  for (var lineIndex = snippetStart; lineIndex < snippetEnd; lineIndex++) {
+    var text = lines[lineIndex].replace(/\r$/, '').trim();
+    if (lineIndex !== bestIndex && isNoiseLine(text)) continue;
+    if (text.length > MAX_SNIPPET_LINE_CHARS) text = text.slice(0, MAX_SNIPPET_LINE_CHARS) + '…';
+    if (snippet) snippet += '\n';
+    snippet += text;
+  }
+
+  if (snippet.length > MAX_SNIPPET_CHARS) snippet = snippet.slice(0, MAX_SNIPPET_CHARS) + '…';
+  return snippet;
+}
+
+function buildMatches(lines, segments, terms, idf, contextLines) {
+  var seen = new Set();
+  var matches = [];
+  for (var segmentIndex = 0; segmentIndex < segments.length; segmentIndex++) {
+    var segment = segments[segmentIndex];
+    var from = Math.max(0, segment.startLine - 1);
+    var to = Math.min(lines.length, segment.endLine);
+    for (var lineIndex = from; lineIndex < to && matches.length < MAX_MATCHES_PER_FILE; lineIndex++) {
+      var text = lines[lineIndex].replace(/\r$/, '');
+      if (isNoiseLine(text) || lineWeight(text, terms, idf) <= 0) continue;
+
+      var start = Math.max(from, lineIndex - contextLines);
+      var end = Math.min(to - 1, lineIndex + contextLines);
+      for (var contextIndex = start; contextIndex <= end && matches.length < MAX_MATCHES_PER_FILE; contextIndex++) {
+        if (seen.has(contextIndex)) continue;
+        var context = lines[contextIndex].replace(/\r$/, '');
+        if (context.trim() === '') continue;
+        seen.add(contextIndex);
+        matches.push({ line: contextIndex + 1, text: context, heading: segment.heading });
+      }
+    }
+    if (matches.length >= MAX_MATCHES_PER_FILE) break;
+  }
+  matches.sort(function (first, second) {
+    return first.line - second.line;
+  });
+  return matches;
+}
+
+function headingIsQuerySubset(heading, termSet) {
+  var parts = tokenize(heading);
+  if (!parts.length) return false;
+  for (var partIndex = 0; partIndex < parts.length; partIndex++) {
+    if (!termSet.has(foldText(parts[partIndex]))) return false;
+  }
+  return true;
+}
+
+function aggregateByFile(hits, index, terms, queryFold, termSet) {
+  var idfTotal = 0;
+  for (var termIndex = 0; termIndex < terms.length; termIndex++) {
+    idfTotal += index.idf(terms[termIndex]);
+  }
+  if (!idfTotal) idfTotal = 1;
+
+  var files = new Map();
+  for (var hitIndex = 0; hitIndex < hits.length; hitIndex++) {
+    var hit = hits[hitIndex];
+    var segment = index.segments.get(hit.id);
+    if (!segment) continue;
+
+    var group = files.get(segment.file);
+    if (!group) {
+      group = { file: segment.file, title: segment.title, terms: new Set(), segs: [] };
+      files.set(segment.file, group);
+    }
+    for (var termIndex = 0; termIndex < hit.queryTerms.length; termIndex++) {
+      group.terms.add(hit.queryTerms[termIndex]);
+    }
+
+    var matchedIdf = 0;
+    for (var termIndex = 0; termIndex < hit.queryTerms.length; termIndex++) {
+      matchedIdf += index.idf(hit.queryTerms[termIndex]);
+    }
+    var segmentCoverage = matchedIdf / idfTotal;
+    var score = hit.score * segmentCoverage;
+    if (segment.level >= 2 && segment.heading && headingIsQuerySubset(segment.heading, termSet)) {
+      var headingTokens = tokenize(segment.heading);
+      var headingIdf = 0;
+      for (var termIndex = 0; termIndex < headingTokens.length; termIndex++) {
+        headingIdf += index.idf(foldText(headingTokens[termIndex]));
+      }
+      score *= 1 + 3 * Math.min(1, headingIdf / idfTotal);
+    }
+    group.segs.push({ ...segment, score, matchedTerms: hit.terms });
+  }
+
+  var results = [];
+  var groups = Array.from(files.values());
+  for (var groupIndex = 0; groupIndex < groups.length; groupIndex++) {
+    var group = groups[groupIndex];
+    group.segs.sort(function (first, second) {
+      return second.score - first.score;
+    });
+
+    var groupTerms = Array.from(group.terms);
+    var coveredIdf = 0;
+    for (var termIndex = 0; termIndex < groupTerms.length; termIndex++) {
+      coveredIdf += index.idf(groupTerms[termIndex]);
+    }
+    var coverage = coveredIdf / idfTotal;
+    var score = group.segs[0].score * coverage * coverage;
+    if (group.title && foldText(group.title) === queryFold) score *= 2;
+    score *= staleFactor(group.file);
+    results.push({ group, score, coverage });
+  }
+
+  results.sort(function (first, second) {
+    var scoreDifference = second.score - first.score;
+    if (scoreDifference !== 0) return scoreDifference;
+    if (first.group.file < second.group.file) return -1;
+    if (first.group.file > second.group.file) return 1;
+    return 0;
+  });
   return results;
 }
 
-function collectMdFilePaths(dir, results) {
-  const entries = readdirSync(dir, { withFileTypes: true });
-  for (const entry of entries) {
-    const fullPath = join(dir, entry.name);
-    if (entry.isDirectory() && !isSkippedDir(entry.name)) {
-      collectMdFilePaths(fullPath, results);
-    } else if (entry.isFile() && entry.name.endsWith('.md')) {
-      results.push(fullPath);
-    }
+function applyTokenBudget(results, maxTokens) {
+  var budget = Number(maxTokens);
+  if (!Number.isFinite(budget) || budget <= 0) return results;
+
+  var maxChars = Math.trunc(budget) * 4;
+  var output = results;
+  while (output.length > 1 && JSON.stringify(output).length > maxChars) {
+    output = output.slice(0, output.length - 1);
   }
-}
-
-function escapeRegex(str) {
-  return str.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
-}
-
-export function getManifest(vaultPath) {
-  return getCachedManifest(vaultPath);
+  if (JSON.stringify(output).length > maxChars) return [];
+  return output;
 }

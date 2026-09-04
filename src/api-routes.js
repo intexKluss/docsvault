@@ -1,6 +1,7 @@
 import { Router } from 'express';
 import { handleSearch } from './tools/search.js';
 import { handleRead } from './tools/read.js';
+import { DEFAULT_READ_LENGTH } from './tools/vault.js';
 import { handleList } from './tools/list.js';
 import { handleOverview } from './tools/overview.js';
 import { handleStatus } from './tools/status.js';
@@ -24,6 +25,7 @@ function isErrorResult(value) {
 
 const apiRateCounts = new Map();
 const API_RATE_LIMIT = parseInt(process.env.API_RATE_LIMIT_PER_MIN || '60', 10);
+var REST_DEFAULT_MAX_RESULTS = 10;
 
 setInterval(() => {
   const now = Date.now();
@@ -56,11 +58,15 @@ function registerVaultRoutes(router, vault) {
     if (!query || typeof query !== 'string' || !query.trim()) {
       return res.status(400).json({ error: 'query parameter required' });
     }
+    var responseFormat = 'detailed';
+    if (req.query.response_format === 'concise') responseFormat = 'concise';
     const results = handleSearch(vaultPath, {
       query: query.trim(),
       section: section || undefined,
-      max_results: clampInt(req.query.max_results, 1, 100, 10),
+      max_results: clampInt(req.query.max_results, 1, 100, REST_DEFAULT_MAX_RESULTS),
       context_lines: clampInt(req.query.context_lines, 0, 20, 3),
+      response_format: responseFormat,
+      max_tokens: clampInt(req.query.max_tokens, 50, 50000, undefined),
     });
     if (isErrorResult(results)) return res.status(400).json(results);
     res.json(results);
@@ -71,9 +77,20 @@ function registerVaultRoutes(router, vault) {
     if (!docPath || typeof docPath !== 'string' || !docPath.trim()) {
       return res.status(400).json({ error: 'path parameter required' });
     }
+    var heading = req.query.heading;
+    if (heading !== undefined && typeof heading !== 'string') {
+      return res.status(400).json({ error: 'heading parameter must be a string' });
+    }
+    var locator = req.query.locator;
+    if (locator !== undefined && typeof locator !== 'string') {
+      return res.status(400).json({ error: 'locator parameter must be a string' });
+    }
     const result = handleRead(vaultPath, {
       path: docPath.trim(),
-      max_length: clampInt(req.query.max_length, 1, 200000, 50000),
+      heading: heading || undefined,
+      locator: locator || undefined,
+      max_length: clampInt(req.query.max_length, 1, 200000, DEFAULT_READ_LENGTH),
+      max_tokens: clampInt(req.query.max_tokens, 50, 50000, undefined),
     });
     if (result.error) return res.status(404).json(result);
     res.json(result);

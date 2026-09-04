@@ -1,56 +1,115 @@
 import { getSections, listFiles, getManifest } from './vault.js';
 
-// max. Anzahl Subfolder die inline pro Section in der Gesamt-Übersicht
-// gelistet werden, bevor auf "+N weitere" gekürzt wird (Punkt 16).
-const MAX_INLINE_SUBFOLDERS = 8;
+var MAX_INLINE_SUBFOLDERS = 8;
+var MAX_INLINE_TITLES = 40;
 
 export function handleOverview(vaultPath, params, vaultName = 'Documentation') {
-  const { section } = params;
+  var section = params.section;
 
   if (section) {
-    const files = listFiles(vaultPath, section);
+    var files = listFiles(vaultPath, section);
     if (files.length === 0) return `Section "${section}" not found or empty.`;
-    const groups = {};
-    for (const f of files) {
-      const parts = f.path.split('/');
-      const group = parts.length > 2 ? parts[1] : '_root';
-      if (!groups[group]) groups[group] = [];
-      groups[group].push(f.name);
+
+    var groupCounts = new Map();
+    var directPageCount = 0;
+    for (var fileIndex = 0; fileIndex < files.length; fileIndex++) {
+      var pathParts = files[fileIndex].path.split('/');
+      if (pathParts.length <= 2) {
+        directPageCount++;
+        continue;
+      }
+      var group = pathParts[1];
+      groupCounts.set(group, (groupCounts.get(group) || 0) + 1);
     }
-    let out = `## ${section} (${files.length} pages)\n\n`;
-    for (const [group, names] of Object.entries(groups).sort()) {
-      if (group !== '_root') out += `### ${group}\n`;
-      for (const n of names.sort()) out += `- ${n}\n`;
-      out += '\n';
+    var groups = Array.from(groupCounts.entries());
+    groups.sort(function (first, second) {
+      return first[0].localeCompare(second[0]);
+    });
+
+    if (files.length <= MAX_INLINE_TITLES) {
+      var result = `## ${section} (${files.length} pages)\n\n`;
+      var filesByGroup = new Map();
+      for (var fileIndex = 0; fileIndex < files.length; fileIndex++) {
+        var pathParts = files[fileIndex].path.split('/');
+        var group = '_root';
+        if (pathParts.length > 2) group = pathParts[1];
+        if (!filesByGroup.has(group)) filesByGroup.set(group, []);
+        filesByGroup.get(group).push(files[fileIndex].name);
+      }
+      var entries = Array.from(filesByGroup.entries());
+      entries.sort();
+      for (var entryIndex = 0; entryIndex < entries.length; entryIndex++) {
+        var names = entries[entryIndex][1];
+        names.sort();
+        if (entries[entryIndex][0] !== '_root') result += `### ${entries[entryIndex][0]}\n`;
+        for (var nameIndex = 0; nameIndex < names.length; nameIndex++) {
+          result += `- ${names[nameIndex]}\n`;
+        }
+        result += '\n';
+      }
+      return result;
     }
-    return out;
+
+    var result = `## ${section} (${files.length} pages, ${groups.length} subfolders)\n\n`;
+    if (directPageCount > 0) result += `- (direkt in ${section}): ${directPageCount} pages\n`;
+    for (var groupIndex = 0; groupIndex < groups.length; groupIndex++) {
+      var group = groups[groupIndex][0];
+      var count = groups[groupIndex][1];
+      result += `- ${group}: ${count} pages\n`;
+    }
+
+    if (groups.length > 0) {
+      result += `\nSeitentitel: list(section="${section}", subfolder="${groups[0][0]}").`;
+    } else {
+      result += `\nSeitentitel: list(section="${section}").`;
+    }
+    result += '\nDirekt suchen ist meist schneller als durchblättern.';
+    return result;
   }
 
-  const manifest = getManifest(vaultPath);
-  const sections = getSections(vaultPath);
-  let out = `# ${vaultName}`;
+  var manifest = getManifest(vaultPath);
+  var sections = getSections(vaultPath);
+  var out = `# ${vaultName}`;
   if (manifest?.crawledAt) out += ` (updated: ${manifest.crawledAt.split('T')[0]})`;
   out += '\n\n';
-  for (const sec of sections.slice().sort()) {
-    const files = listFiles(vaultPath, sec);
-    const subfolders = new Set();
-    for (const f of files) {
-      const parts = f.path.split('/');
-      if (parts.length > 2) subfolders.add(parts[1]);
+  sections = sections.slice();
+  sections.sort();
+  for (var sectionIndex = 0; sectionIndex < sections.length; sectionIndex++) {
+    var sectionName = sections[sectionIndex];
+    var files = listFiles(vaultPath, sectionName);
+    var subfolders = new Set();
+    var rootPageCount = 0;
+    for (var fileIndex = 0; fileIndex < files.length; fileIndex++) {
+      var pathParts = files[fileIndex].path.split('/');
+      if (pathParts.length <= 2) {
+        rootPageCount++;
+        continue;
+      }
+      subfolders.add(pathParts[1]);
     }
-    let sfInfo = '';
-    if (subfolders.size > 0) {
-      const sorted = [...subfolders].sort();
-      // große Sections nicht voll auflisten, sonst sprengt es das Token-Budget
-      if (sorted.length > MAX_INLINE_SUBFOLDERS) {
-        const shown = sorted.slice(0, MAX_INLINE_SUBFOLDERS).join(', ');
-        const rest = sorted.length - MAX_INLINE_SUBFOLDERS;
-        sfInfo = ` (${shown}, +${rest} weitere, nutze overview(${sec}))`;
-      } else {
-        sfInfo = ` (${sorted.join(', ')})`;
+    var sorted = Array.from(subfolders);
+    sorted.sort();
+    var sfInfo = '';
+    var shown = '';
+    if (rootPageCount > 0) shown = `${rootPageCount} direkt`;
+    if (sorted.length > MAX_INLINE_SUBFOLDERS) {
+      for (var folderIndex = 0; folderIndex < MAX_INLINE_SUBFOLDERS; folderIndex++) {
+        if (shown) shown += ', ';
+        shown += sorted[folderIndex];
+      }
+      var rest = sorted.length - MAX_INLINE_SUBFOLDERS;
+      if (shown) shown += ', ';
+      shown += `+${rest} weitere, nutze overview(${sectionName})`;
+    } else {
+      for (var folderIndex = 0; folderIndex < sorted.length; folderIndex++) {
+        if (shown) shown += ', ';
+        shown += sorted[folderIndex];
       }
     }
-    out += `- ${sec}: ${files.length} pages${sfInfo}\n`;
+    if (shown) {
+      sfInfo = ` (${shown})`;
+    }
+    out += `- ${sectionName}: ${files.length} pages${sfInfo}\n`;
   }
   return out;
 }

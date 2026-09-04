@@ -3,8 +3,8 @@ import { SSEServerTransport } from '@modelcontextprotocol/sdk/server/sse.js';
 import { z } from 'zod';
 import { handleOverview } from './tools/overview.js';
 import { handleSearch } from './tools/search.js';
-import { handleRead } from './tools/read.js';
-import { handleList } from './tools/list.js';
+import { handleRead, MAX_MCP_READ_LENGTH } from './tools/read.js';
+import { handleListPaged } from './tools/list.js';
 import { handleStatus } from './tools/status.js';
 
 const sseSessions = new Map();
@@ -28,25 +28,64 @@ function isErrorResult(value) {
 // cancelt den call headless ("user cancelled MCP tool call").
 const READONLY_TOOL = { readOnlyHint: true, openWorldHint: false };
 
+export function createMcpServer(vaultRegistry) {
+  var server = new McpServer(
+    {
+      name: 'docsvault',
+      version: '0.2.0',
+    },
+    {
+      instructions: buildInstructions(vaultRegistry),
+    }
+  );
+
+  for (var vaultIndex = 0; vaultIndex < vaultRegistry.length; vaultIndex++) {
+    registerVaultTools(server, vaultRegistry[vaultIndex]);
+  }
+
+  return server;
+}
+
+export function buildInstructions(vaultRegistry) {
+  var instructions = 'Read-only documentation vaults. Each vault has its own tool prefix.\n\n';
+  instructions += 'Flow: <prefix>_overview for section names, <prefix>_search for the term, <prefix>_read for the page.\n\n';
+  instructions += 'Search results are section-level. Each hit is { file, title, headings, locator, snippet, score }.\n';
+  instructions += 'Pass "file" verbatim as _read\'s "path" and "locator" as its "locator" to get the exact section.\n';
+  instructions += 'The heading fallback stays supported. Reading without either value returns intro plus a table of contents.\n\n';
+  instructions += 'Rules:\n';
+  instructions += '- Never guess or construct a path. Only use "file"/"path" values a tool returned.\n';
+  instructions += '- Snippets are pointers, not the answer. Open the page before answering.\n';
+  instructions += '- Thin results: search again with other words (synonym, German and English, method and concept name).\n';
+  instructions += '- Concept/handbook, API reference and properties/config pages answer different parts of a question.\n';
+  instructions += '  Check every relevant type, not just the first hit.\n';
+  instructions += '- Tight context budget: set max_tokens on search and read.';
+
+  if (vaultRegistry.length) {
+    instructions += '\n\nVaults:';
+    for (var vaultIndex = 0; vaultIndex < vaultRegistry.length; vaultIndex++) {
+      var vault = vaultRegistry[vaultIndex];
+      instructions += `\n- ${vault.toolPrefix}_*: ${vault.description}`;
+      if (vault.searchHint) instructions += `\n  ${vault.searchHint}`;
+    }
+  }
+
+  return instructions;
+}
+
 function registerVaultTools(server, vault) {
   const { toolPrefix, description } = vault;
   const vaultPath = vault.path;
-  const searchHint = vault.searchHint || '';
-  // generische Such-Strategie, hilft auch schwächeren agents: nicht beim ersten
-  // Treffer aufhören, mehrgleisig suchen, die Seiten wirklich lesen
-  const strategy =
-    `Search strategy: do not stop at the first hit or at the snippets alone. The matches are pointers, not the answer; open the relevant pages with ${toolPrefix}_read before you answer. If results are thin, search again with other terms (synonyms, German and English, method name and concept name). Different page types (concept/handbook vs API reference vs properties/config) hold different parts of the answer, so check more than one.`;
-  // vault-spezifischer Hinweis aus _meta.json (optional)
-  const vaultGuidance = searchHint ? `\n\nGuidance for this vault: ${searchHint}` : '';
+  var hintRef = '';
+  if (vault.searchHint) hintRef = ` See this server's instructions for what lives where.`;
 
   // Jedes neue Tool hier muss auch in TOOL_SUFFIXES in vault-registry.js ergänzt werden,
   // sonst wird es nicht in describeVaults()/System-Prompt auftauchen.
 
   server.tool(
     `${toolPrefix}_overview`,
-    `Get an overview of: ${description}\n\nStart here. Typical flow: ${toolPrefix}_overview to learn the section names, then ${toolPrefix}_search to find the relevant page, then ${toolPrefix}_read to read it in full.\n\nWithout parameters, returns a compact summary of all sections with page counts. With a section parameter, returns a detailed listing of all pages grouped by subfolder.\n\nDifferent section types (concept/handbook vs API reference vs properties/config) cover different parts of an answer; identify and check all that are relevant, not just one.`,
+    `Sections and page counts of: ${description}\nStart here, then ${toolPrefix}_search, then ${toolPrefix}_read. With "section": its subfolders and their page counts.`,
     {
-      section: z.string().optional().describe(`Section name to get detailed listing for. Use exact names as shown by ${toolPrefix}_overview.`),
+      section: z.string().optional().describe('Section name, exactly as listed without this parameter.'),
     },
     READONLY_TOOL,
     async (params) => {
@@ -57,12 +96,14 @@ function registerVaultTools(server, vault) {
 
   server.tool(
     `${toolPrefix}_search`,
-    `Full-text search across: ${description}\n\nReturns a JSON array of result objects, each shaped like { "file": "<path>", "title": "<page title>", "matches": [{ "line": <n>, "text": "<line text>", "heading": "<nearest heading>" }], "titleMatch": <bool>, "score": <number> }.\n\nTo read a hit, pass its "file" value verbatim as the "path" argument to ${toolPrefix}_read; "file" IS the document path. Never guess or construct paths. Read the result with titleMatch:true (and the highest "score") first, as it marks the canonical page for the query. An empty array means no matches.\n\n${strategy}${vaultGuidance}`,
+    `Full-text search in: ${description}\nReturns hits as { file, title, headings, locator, snippet, score }, best first. Pass "file" and "locator" verbatim to ${toolPrefix}_read.${hintRef}`,
     {
-      query: z.string().describe('Search query (case-insensitive text search)'),
-      section: z.string().optional().describe(`Limit search to a specific section. Use exact names as shown by ${toolPrefix}_overview.`),
-      max_results: z.number().int().min(1).max(100).optional().describe('Maximum number of results (default: 10, max: 100)'),
-      context_lines: z.number().int().min(0).max(20).optional().describe('Number of context lines around each match (default: 3, max: 20)'),
+      query: z.string().describe('Search terms.'),
+      section: z.string().optional().describe('Limit to one section.'),
+      max_results: z.number().int().min(1).max(100).optional().describe('Default 5.'),
+      context_lines: z.number().int().min(0).max(20).optional().describe('Only for "detailed". Default 3.'),
+      response_format: z.enum(['concise', 'detailed']).optional().describe('"detailed" adds every matching line.'),
+      max_tokens: z.number().int().min(50).max(50000).optional().describe('Hard response budget.'),
     },
     READONLY_TOOL,
     async (params) => {
@@ -74,17 +115,41 @@ function registerVaultTools(server, vault) {
     }
   );
 
+  if (vault.technicalSection) {
+    server.tool(
+      `${toolPrefix}_technical_search`,
+      `Exact technical API search in ${vault.technicalSection}.`,
+      {
+        query: z.string().describe('API term.'),
+        max_results: z.number().int().min(1).max(100).optional(),
+        context_lines: z.number().int().min(0).max(20).optional(),
+        response_format: z.enum(['concise', 'detailed']).optional(),
+        max_tokens: z.number().int().min(50).max(50000).optional(),
+      },
+      READONLY_TOOL,
+      async (params) => {
+        var results = handleSearch(vaultPath, { ...params, section: vault.technicalSection });
+        if (isErrorResult(results)) {
+          return { content: [{ type: 'text', text: results.error }], isError: true };
+        }
+        return { content: [{ type: 'text', text: JSON.stringify(results) }] };
+      }
+    );
+  }
+
   server.tool(
     `${toolPrefix}_read`,
-    `Read the full content of a specific page in: ${description}\n\nPass the "file" value from a ${toolPrefix}_search or ${toolPrefix}_list result as the "path" argument here. IMPORTANT: Always use that exact path, never guess or construct paths yourself, as filenames may contain typos or unexpected spelling.\n\nRead whole concept/handbook pages, including any notes or FAQ sections at the end, where prerequisites and caveats often live.`,
+    `Read one page of: ${description}\nUse "file" and "locator" from ${toolPrefix}_search verbatim. "heading" remains a fallback; without either, long pages return intro plus a table of contents.`,
     {
-      path: z.string().describe(`Exact document path (the "file" field) from ${toolPrefix}_search or ${toolPrefix}_list results, without .md extension.`),
-      max_length: z.number().int().min(1).max(200000).optional().describe('Maximum content length in characters (default: 50000, max: 200000).'),
-      heading: z.string().optional().describe('Optional heading text from a search result. When set, returns only that section instead of the full page.'),
+      path: z.string().describe('Exact "file" value from a search/list result, without .md.'),
+      heading: z.string().optional().describe('Returns only that section. Preferred on API/properties pages.'),
+      locator: z.string().optional().describe('Exact section locator from search.'),
+      max_length: z.number().int().min(1).max(MAX_MCP_READ_LENGTH).optional().describe('Characters. Default 8000, capped at 25000.'),
+      max_tokens: z.number().int().min(50).max(50000).optional().describe('Hard response budget.'),
     },
     READONLY_TOOL,
     async (params) => {
-      const result = handleRead(vaultPath, params);
+      var result = handleRead(vaultPath, params, MAX_MCP_READ_LENGTH);
       if (result.error) {
         return { content: [{ type: 'text', text: result.error }], isError: true };
       }
@@ -92,31 +157,45 @@ function registerVaultTools(server, vault) {
       if (result.title) text += `# ${result.title}\n\n`;
       if (result.source) text += `Source: ${result.source}\n\n`;
       text += result.content;
-      if (result.truncated) text += '\n\n⚠️ Content was truncated.';
+      // 'toc', 'truncated' und 'heading-not-found' tragen ihren Hinweis schon
+      // im Text; nur der abgeschnittene Einzelabschnitt braucht noch einen.
+      if (result.truncated && result.mode === 'heading') {
+        text += `\n\n[section truncated, raise max_length]`;
+      }
+      if (Number.isFinite(Number(params.max_tokens))) {
+        var maxChars = Number(params.max_tokens) * 4;
+        if (text.length > maxChars && result.content.includes('heading="')) {
+          text = result.content;
+        }
+        if (text.length > maxChars) text = text.slice(0, maxChars);
+      }
       return { content: [{ type: 'text', text }] };
     }
   );
 
   server.tool(
     `${toolPrefix}_list`,
-    `List all pages in a section or subfolder of: ${description}\n\nReturns a JSON array of { "name": "<title>", "path": "<path>" } objects. Pass a "path" value verbatim as the "path" argument to ${toolPrefix}_read to read that page; never guess paths.`,
+    `Page titles in a section or subfolder of: ${description}\nSection and subfolder names come from ${toolPrefix}_overview. Long listings are capped.`,
     {
-      section: z.string().describe(`Section name. Use exact names as shown by ${toolPrefix}_overview.`),
-      subfolder: z.string().optional().describe('Subfolder within the section'),
+      section: z.string().describe('Section name.'),
+      subfolder: z.string().optional().describe('Subfolder within the section.'),
+      max_results: z.number().int().min(1).max(500).optional().describe('Default 50.'),
     },
     READONLY_TOOL,
     async (params) => {
-      const files = handleList(vaultPath, params);
-      if (isErrorResult(files)) {
-        return { content: [{ type: 'text', text: files.error }], isError: true };
+      var result = handleListPaged(vaultPath, params);
+      if (isErrorResult(result)) {
+        return { content: [{ type: 'text', text: result.error }], isError: true };
       }
-      return { content: [{ type: 'text', text: JSON.stringify(files) }] };
+      var text = JSON.stringify(result.files);
+      if (result.truncated) text += `\n${result.note}`;
+      return { content: [{ type: 'text', text }] };
     }
   );
 
   server.tool(
     `${toolPrefix}_status`,
-    `Check the freshness status of: ${description}\n\nReturns page count, PDF count, and how old the vault is.`,
+    `Freshness of: ${description}\nPage count, PDF count, vault age.`,
     {},
     READONLY_TOOL,
     async () => {
@@ -124,19 +203,6 @@ function registerVaultTools(server, vault) {
       return { content: [{ type: 'text', text: JSON.stringify(result) }] };
     }
   );
-}
-
-export function createMcpServer(vaultRegistry) {
-  const server = new McpServer({
-    name: 'docsvault',
-    version: '0.2.0',
-  });
-
-  for (const vault of vaultRegistry) {
-    registerVaultTools(server, vault);
-  }
-
-  return server;
 }
 
 export async function handleSseGet(req, res, vaultRegistry) {

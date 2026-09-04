@@ -8,12 +8,32 @@ Web Chat UI und MCP Server für deine Markdown-Dokumentation. Als AI Backend lä
 - **MCP Endpoints**: SSE (`/sse`) und Streamable HTTP (`/mcp`) für externe MCP Clients
 - **REST API**: `/api/vaults` (Liste), `/api/<prefix>/{search,read,list,overview,status}` pro Vault
 - **Bridge Switching**: Claude oder Codex per `BRIDGE` ENV Variable (Code Default `claude`, das mitgelieferte Docker Image setzt `BRIDGE=codex`)
-- **Volltextsuche**: nutzt [ripgrep](https://github.com/BurntSushi/ripgrep) (`rg`) für schnelle Suche, mit reinem Node Fallback falls `rg` fehlt
+- **Volltextsuche**: BM25 Index auf Abschnittsebene, beim Start im Speicher aufgebaut
 - **Sicherheit**: Rate Limiting, DOMPurify, Tool Whitelisting, Prompt Injection Schutz. Die Origin Validierung schützt allerdings nur den WebSocket. Optionale Bearer Token Auth für REST/MCP per `API_TOKEN` (siehe unten)
 
 ## Volltextsuche
 
-`<prefix>_search` durchsucht den Vault mit **ripgrep** (`rg`), sofern es im `PATH` liegt. Das ist deutlich schneller als der Node Fallback, der greift nur wenn `rg` fehlt. Deshalb installiert das Docker Image `ripgrep` gleich mit (siehe `Dockerfile`). Lokal (Dev) ohne installiertes `rg` läuft automatisch der Fallback. Das Suchergebnis ist identisch, nur langsamer.
+`<prefix>_search` läuft gegen einen **BM25 Index** ([MiniSearch](https://github.com/lucaong/minisearch)), der pro Vault beim Start im Speicher gebaut wird. Indexiert wird auf **Abschnittsebene**: ein Eintrag für den Introbereich und je Überschrift von `##` bis `######`, nicht pro Datei. Jeder Treffer liefert seine kompatiblen `headings` und einen eindeutigen `locator`. Ein Folge-`read` mit `file` als `path` und diesem `locator` holt auch bei doppelten Überschriften exakt den gefundenen Abschnitt. `heading` bleibt als Fallback unterstützt.
+
+Gerankt wird primär nach der abgedeckten **IDF Masse** der Query, nicht nach der rohen BM25 Summe. Eine Seite die den seltenen Begriff trifft schlägt damit eine Seite die nur die häufigen Wörter der Query oft enthält. Umlaute werden symmetrisch gefaltet (`ue`/`ü`, `ae`/`ä`, `ss`/`ß`).
+
+Der Startup ist deterministisch: Die Vault Registry ist nach `toolPrefix` sortiert, danach werden die Indizes nacheinander und vollständig aufgebaut, bevor HTTP-Server beziehungsweise stdio-Transport bereit sind. Ein gemessener Vault mit etwa 1800 Seiten braucht dafür ungefähr 2 bis 8 Sekunden und 100 MB Heap. Externe Suchbinaries braucht der Server nicht mehr.
+
+### Antwortgröße im Griff behalten
+
+- MCP `search` liefert standardmäßig 5 Treffer im kompakten Format. `response_format: "detailed"` liefert zusätzlich die bisherigen Trefferzeilen. `max_results` liegt zwischen 1 und 100.
+- MCP `read` liefert standardmäßig 8000 Zeichen. `max_length` ist bei MCP auf 25000 begrenzt. Werte unter 200 werden intern auf 200 angehoben.
+- MCP `list` liefert standardmäßig 50 und höchstens 500 Seiten.
+- `search` und `read` akzeptieren `max_tokens` von 50 bis 50000. Das wird als hartes Zeichenbudget von `max_tokens * 4` umgesetzt, nicht mit einem Modell-Tokenizer.
+
+Bei der REST API bleiben die bisherigen Verträge für `search` und `list` erhalten: `search` liefert standardmäßig 10 Treffer im `detailed`-Format und `list` bleibt ungekürzt. Der REST-`read`-Default sinkt von effektiv 25000 auf 8000 Zeichen. Dafür wird die Unterstützung für ein explizites `read.max_length` von bisher effektiv 25000 auf 200000 Zeichen erweitert. `response_format`, `max_tokens`, `heading` und `locator` funktionieren als Query-Parameter. Bei REST begrenzt `read.max_tokens` den Dokumentinhalt; das JSON mit Titel, Quelle und Metadaten kann entsprechend etwas größer sein.
+
+```bash
+curl "http://localhost:3000/api/docs/search?query=Installation&max_tokens=300"
+curl "http://localhost:3000/api/docs/read?path=api/DocFile&locator=L12"
+```
+
+Beim Update sinkt der MCP-Default von `search` von 10 auf 5 Treffer. Der `read`-Default sinkt bei MCP von 20000 und bei REST von effektiv 25000 auf 8000 Zeichen. Die maximale REST-Leselänge steigt gleichzeitig von effektiv 25000 auf 200000 Zeichen. Wer mehr braucht, setzt `max_results` beziehungsweise `max_length` explizit.
 
 ## Quick Start
 
@@ -65,7 +85,8 @@ Jeder Vault Ordner kann (und sollte!) eine `_meta.json` im Root haben. Der Serve
 {
   "name": "Anzeigename",
   "description": "Worum geht's im Vault? Landet in der Tool-Description die der LLM sieht.",
-  "toolPrefix": "mein_vault"
+  "toolPrefix": "mein_vault",
+  "technicalSection": "Reference/API"
 }
 ```
 
@@ -74,6 +95,7 @@ Jeder Vault Ordner kann (und sollte!) eine `_meta.json` im Root haben. Der Serve
 | `name` | nein | Ordnername | Anzeigename im System Prompt und `/api/vaults` |
 | `description` | nein, aber empfohlen | `"Documentation vault '<name>'"` | **Geht in die Tool Description.** Davon hängt ab ob der LLM den Vault richtig auswählt |
 | `toolPrefix` | nein | `slugify(Ordnername)` | Prefix für Tool Namen (`<prefix>_search` etc.), muss `/^[a-z][a-z0-9_]*$/` matchen |
+| `technicalSection` | nein | vorhandenes `Scripting/TERAS API`, sonst keine | Registriert `<prefix>_technical_search` für genau diesen Unterordner. Der Pfad muss kanonisch sein, im Vault liegen und existieren |
 
 Ohne `_meta.json` läuft der Vault trotzdem, kriegt aber nur generische Defaults. Der LLM weiß dann nicht worum's im Vault geht. Also immer dranbauen.
 
@@ -81,7 +103,7 @@ Bringt dein Vault Repo schon eine `_meta.json` mit, musst du selbst nichts anleg
 
 ## Weitere Vaults hinzufügen
 
-Jeder Unterordner unter dem gemounteten Vaults Verzeichnis wird zu einem eigenen Vault mit eigenen MCP Tools (`<prefix>_search`, `<prefix>_read`, `<prefix>_list`, `<prefix>_overview`, `<prefix>_status`).
+Jeder Unterordner unter dem gemounteten Vaults Verzeichnis wird zu einem eigenen Vault mit eigenen MCP Tools (`<prefix>_search`, `<prefix>_read`, `<prefix>_list`, `<prefix>_overview`, `<prefix>_status`). Vaults mit gültiger `technicalSection` bekommen zusätzlich `<prefix>_technical_search`.
 
 Verzeichnis anlegen:
 

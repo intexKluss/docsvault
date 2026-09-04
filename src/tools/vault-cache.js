@@ -1,35 +1,88 @@
 import { readdirSync, readFileSync, existsSync, statSync } from 'fs';
 import { join, relative, basename, sep } from 'path';
 import { isSkippedDir } from '../vault-registry.js';
+import { buildSearchIndex } from './search-index.js';
 
 // Modul-weiter Cache pro Vault. Vaults sind zwischen Crawls read-only, daher
-// können wir Manifest, Sections und einen Titel-/Pfad-Index halten und nur
-// invalidieren wenn sich die mtime von _manifest.json (fallback: Vault-Root)
-// ändert.
-const cache = new Map(); // vaultPath -> { mtimeMs, manifest, sections, titleIndex }
+// können wir Manifest, Sections, einen Titel-/Pfad-Index und den BM25-Index
+// halten und nur invalidieren wenn sich _manifest.json oder der rekursive
+// Markdown-Bestand eines Vaults ohne Manifest ändert.
+var cache = new Map();
+var MANIFESTLESS_VALIDATION_INTERVAL_MS = 1000;
 
-// Liefert die mtime die für die Invalidierung benutzt wird:
-// bevorzugt _manifest.json, sonst der Vault-Root-Ordner.
-function vaultMtime(vaultPath) {
-  try {
-    return statSync(join(vaultPath, '_manifest.json')).mtimeMs;
-  } catch {
-    try {
-      return statSync(vaultPath).mtimeMs;
-    } catch {
-      return 0;
+function vaultChangeKey(vaultPath) {
+  if (!existsSync(vaultPath)) return 'missing';
+
+  var manifestPath = join(vaultPath, '_manifest.json');
+  if (existsSync(manifestPath)) {
+    var manifestStats = statSync(manifestPath);
+    return `manifest:${manifestStats.mtimeMs}:${manifestStats.size}`;
+  }
+
+  var changes = [];
+  collectVaultChanges(vaultPath, changes);
+  changes.sort();
+
+  var key = '';
+  for (var changeIndex = 0; changeIndex < changes.length; changeIndex++) {
+    key += changes[changeIndex] + '\n';
+  }
+  return key;
+}
+
+function collectVaultChanges(directory, changes) {
+  var entries = readdirSync(directory, { withFileTypes: true });
+  for (var entryIndex = 0; entryIndex < entries.length; entryIndex++) {
+    var entry = entries[entryIndex];
+    var fullPath = join(directory, entry.name);
+    if (entry.isDirectory()) {
+      if (isSkippedDir(entry.name)) continue;
+      changes.push(`directory:${fullPath}`);
+      collectVaultChanges(fullPath, changes);
+      continue;
     }
+    if (!entry.isFile() || !entry.name.endsWith('.md')) continue;
+
+    var stats = statSync(fullPath);
+    changes.push(`file:${fullPath}:${stats.mtimeMs}:${stats.size}`);
   }
 }
 
-// Holt (oder baut) den Cache-Eintrag für einen Vault. Invalidiert bei
-// mtime-Änderung.
 function getEntry(vaultPath) {
-  const mtimeMs = vaultMtime(vaultPath);
-  const existing = cache.get(vaultPath);
-  if (existing && existing.mtimeMs === mtimeMs) return existing;
+  var existing = cache.get(vaultPath);
+  var hasManifest = existsSync(join(vaultPath, '_manifest.json'));
+  var now = Date.now();
+  if (
+    existing
+    && !hasManifest
+    && existing.manifestlessValidatedAt <= now
+    && existing.manifestlessValidUntil > now
+  ) {
+    return existing;
+  }
 
-  const entry = { mtimeMs, manifest: undefined, sections: undefined, titleIndex: undefined };
+  var changeKey = vaultChangeKey(vaultPath);
+  if (existing && existing.changeKey === changeKey) {
+    if (!hasManifest) {
+      existing.manifestlessValidatedAt = now;
+      existing.manifestlessValidUntil = now + MANIFESTLESS_VALIDATION_INTERVAL_MS;
+    }
+    return existing;
+  }
+
+  var entry = {
+    changeKey,
+    manifestlessValidatedAt: 0,
+    manifestlessValidUntil: 0,
+    manifest: undefined,
+    sections: undefined,
+    titleIndex: undefined,
+    searchIndex: undefined,
+  };
+  if (!hasManifest) {
+    entry.manifestlessValidatedAt = now;
+    entry.manifestlessValidUntil = now + MANIFESTLESS_VALIDATION_INTERVAL_MS;
+  }
   cache.set(vaultPath, entry);
   return entry;
 }
@@ -118,6 +171,23 @@ export function getCachedTitleIndex(vaultPath) {
     entry.titleIndex = buildTitleIndex(vaultPath);
   }
   return entry.titleIndex;
+}
+
+export function getCachedSearchIndex(vaultPath) {
+  var entry = getEntry(vaultPath);
+  if (entry.searchIndex === undefined) {
+    entry.searchIndex = buildSearchIndex(vaultPath);
+  }
+  return entry.searchIndex;
+}
+
+export function warmSearchIndex(vaultPath) {
+  try {
+    return getCachedSearchIndex(vaultPath);
+  } catch (err) {
+    console.warn(`[vault-cache] index build failed for ${vaultPath}: ${err.message}`);
+    return null;
+  }
 }
 
 // Cache leeren (vor allem für Tests).

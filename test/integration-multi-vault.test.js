@@ -1,15 +1,16 @@
 import { describe, it, after } from 'node:test';
 import assert from 'node:assert/strict';
 import { createTempVaultsRoot } from './helpers/temp-vault.js';
-import { loadVaultRegistry, TOOL_SUFFIXES } from '../src/vault-registry.js';
+import { loadVaultRegistry, getToolSuffixes } from '../src/vault-registry.js';
 import { createMcpServer } from '../src/mcp-handler.js';
 import { handleSearch } from '../src/tools/search.js';
 
 describe('Multi-vault integration', () => {
   const { root, cleanup } = createTempVaultsRoot({
     'otris': {
-      meta: { name: 'otris', toolPrefix: 'otris', description: 'otris Doku' },
+      meta: { name: 'otris', toolPrefix: 'otris', description: 'otris Doku', technicalSection: 'api/technical' },
       files: {
+        'api/technical/DocApi.md': '# DocApi',
         'api/DocFile.md': '# DocFile\n\nDas ist eine otris-API-Klasse zur Dateiverwaltung.',
         'howtos/upload.md': '# Upload\n\nSo lädst du Dateien hoch.',
       },
@@ -30,18 +31,38 @@ describe('Multi-vault integration', () => {
     assert.deepEqual(registry.map(v => v.toolPrefix).sort(), ['intex_regeln', 'otris']);
   });
 
-  it('creates MCP server with 5 tools per vault using correct prefixes', () => {
+  it('creates each vault\'s configured tools with correct prefixes', () => {
     const registry = loadVaultRegistry(root);
     const server = createMcpServer(registry);
     // uses SDK internal; may break on SDK upgrade
     const tools = server._registeredTools || {};
-    assert.equal(Object.keys(tools).length, registry.length * TOOL_SUFFIXES.length);
+    var toolCount = 0;
+    for (var vaultIndex = 0; vaultIndex < registry.length; vaultIndex++) {
+      toolCount += getToolSuffixes(registry[vaultIndex]).length;
+    }
+    assert.equal(Object.keys(tools).length, toolCount);
 
-    for (const prefix of ['otris', 'intex_regeln']) {
-      for (const suffix of TOOL_SUFFIXES) {
-        assert.ok(tools[`${prefix}_${suffix}`], `missing tool ${prefix}_${suffix}`);
+    var prefixes = ['otris', 'intex_regeln'];
+    for (var prefixIndex = 0; prefixIndex < prefixes.length; prefixIndex++) {
+      var vault;
+      for (var vaultIndex = 0; vaultIndex < registry.length; vaultIndex++) {
+        if (registry[vaultIndex].toolPrefix === prefixes[prefixIndex]) vault = registry[vaultIndex];
+      }
+      var suffixes = getToolSuffixes(vault);
+      for (var suffixIndex = 0; suffixIndex < suffixes.length; suffixIndex++) {
+        var toolName = `${prefixes[prefixIndex]}_${suffixes[suffixIndex]}`;
+        assert.ok(tools[toolName], `missing tool ${toolName}`);
       }
     }
+  });
+
+  it('registers technical search only for the configured vault', () => {
+    var registry = loadVaultRegistry(root);
+    var server = createMcpServer(registry);
+    var tools = server._registeredTools || {};
+
+    assert.ok(tools.otris_technical_search);
+    assert.ok(!tools.intex_regeln_technical_search);
   });
 
   it('search isolates per-vault content', () => {
