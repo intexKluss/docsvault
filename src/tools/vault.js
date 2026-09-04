@@ -261,6 +261,10 @@ export function searchDocs(vaultPath, query, options = {}) {
         if (existingHit.terms.includes(fuzzyHit.terms[fuzzyTermIndex])) continue;
         existingHit.terms.push(fuzzyHit.terms[fuzzyTermIndex]);
       }
+      for (var queryTermIndex = 0; queryTermIndex < fuzzyHit.queryTerms.length; queryTermIndex++) {
+        if (existingHit.queryTerms.includes(fuzzyHit.queryTerms[queryTermIndex])) continue;
+        existingHit.queryTerms.push(fuzzyHit.queryTerms[queryTermIndex]);
+      }
     }
   }
   if (hits.length === 0) return [];
@@ -674,16 +678,9 @@ function headingIsQuerySubset(heading, termSet) {
 }
 
 function aggregateByFile(hits, index, terms, queryFold, termSet) {
-  var knownTerms = [];
-  for (var termIndex = 0; termIndex < terms.length; termIndex++) {
-    if (index.hasTerm(terms[termIndex])) knownTerms.push(terms[termIndex]);
-  }
-  var scoringTerms = terms;
-  if (knownTerms.length) scoringTerms = knownTerms;
-
   var idfTotal = 0;
-  for (var termIndex = 0; termIndex < scoringTerms.length; termIndex++) {
-    idfTotal += index.idf(scoringTerms[termIndex]);
+  for (var termIndex = 0; termIndex < terms.length; termIndex++) {
+    idfTotal += index.idf(terms[termIndex]);
   }
   if (!idfTotal) idfTotal = 1;
 
@@ -698,13 +695,13 @@ function aggregateByFile(hits, index, terms, queryFold, termSet) {
       group = { file: segment.file, title: segment.title, terms: new Set(), segs: [] };
       files.set(segment.file, group);
     }
-    for (var termIndex = 0; termIndex < hit.terms.length; termIndex++) {
-      group.terms.add(hit.terms[termIndex]);
+    for (var termIndex = 0; termIndex < hit.queryTerms.length; termIndex++) {
+      group.terms.add(hit.queryTerms[termIndex]);
     }
 
     var matchedIdf = 0;
-    for (var termIndex = 0; termIndex < hit.terms.length; termIndex++) {
-      matchedIdf += index.idf(hit.terms[termIndex]);
+    for (var termIndex = 0; termIndex < hit.queryTerms.length; termIndex++) {
+      matchedIdf += index.idf(hit.queryTerms[termIndex]);
     }
     var segmentCoverage = matchedIdf / idfTotal;
     var score = hit.score * segmentCoverage;

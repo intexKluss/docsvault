@@ -504,6 +504,12 @@ describe('Vault', () => {
       assert.equal(results[0].file, 'fuzzy/Target');
     });
 
+    it('does not score a fuzzy query above the equivalent exact query', () => {
+      var fuzzyResults = searchDocs(VAULT_PATH, 'CommonSearchToken RareCorrectedNeedl');
+      var exactResults = searchDocs(VAULT_PATH, 'CommonSearchToken RareCorrectedNeedle');
+      assert.ok(fuzzyResults[0].score <= exactResults[0].score);
+    });
+
     it('scores results in descending order', () => {
       var results = searchDocs(VAULT_PATH, 'Mappentyp Eigenschaft');
       for (var resultIndex = 1; resultIndex < results.length; resultIndex++) {
