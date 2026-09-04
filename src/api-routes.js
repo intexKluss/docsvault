@@ -64,7 +64,7 @@ function registerVaultRoutes(router, vault) {
       max_results: clampInt(req.query.max_results, 1, 100, REST_DEFAULT_MAX_RESULTS),
       context_lines: clampInt(req.query.context_lines, 0, 20, 3),
       response_format: req.query.response_format === 'concise' ? 'concise' : 'detailed',
-      max_tokens: req.query.max_tokens,
+      max_tokens: clampInt(req.query.max_tokens, 50, 50000, undefined),
     });
     if (isErrorResult(results)) return res.status(400).json(results);
     res.json(results);
@@ -79,7 +79,7 @@ function registerVaultRoutes(router, vault) {
       path: docPath.trim(),
       heading: req.query.heading || undefined,
       max_length: clampInt(req.query.max_length, 1, 200000, DEFAULT_READ_LENGTH),
-      max_tokens: req.query.max_tokens,
+      max_tokens: clampInt(req.query.max_tokens, 50, 50000, undefined),
     });
     if (result.error) return res.status(404).json(result);
     res.json(result);

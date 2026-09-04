@@ -11,10 +11,12 @@ const REGISTRY = [
   { name: 'Intex Regeln',description: 'Firmenregeln', toolPrefix: 'intex_regeln', path: '/tmp/intex' },
 ];
 
+var LONG_TOC_HEADING = 'Eine aussergewoehnlich lange Ueberschrift die im finalen MCP-Text niemals abgeschnitten werden darf';
+
 const { root: MCP_VAULT_ROOT, cleanup: cleanupMcpVault } = createTempVaultsRoot({
   'otris': {
     files: {
-      'long/Read.md': '---\ntitle: Ein aussergewoehnlich langer MCP-Titel fuer das harte Antwortbudget\nsource: https://example.com/eine/aussergewoehnlich/lange/source/unter/engem/budget\n---\n# Read\n\n' + 'Inhalt '.repeat(100),
+      'long/Read.md': '---\ntitle: Ein aussergewoehnlich langer MCP-Titel fuer das harte Antwortbudget\nsource: https://example.com/eine/aussergewoehnlich/lange/source/unter/engem/budget\n---\n# Read\n\n## ' + LONG_TOC_HEADING + '\n\n' + 'Inhalt '.repeat(100) + '\n\n## Zwei\n\nInhalt.\n\n## Drei\n\nInhalt.\n\n## Vier\n\nInhalt.\n\n## Fuenf\n\nInhalt.',
     },
   },
 });
@@ -142,6 +144,7 @@ describe('MCP Handler', () => {
     const result = await server._registeredTools.otris_read.handler({ path: 'long/Read', max_tokens: 50 });
     const text = result.content[0].text;
     assert.ok(text.length <= 50 * 4, `budget verletzt: ${text.length} > ${50 * 4}`);
+    assert.ok(text.includes(LONG_TOC_HEADING), 'TOC-Heading darf nicht abgeschnitten werden');
   });
 
   it('limits MCP reads to 25000 characters', () => {

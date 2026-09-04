@@ -153,7 +153,11 @@ function registerVaultTools(server, vault) {
         text += `\n\n[section truncated, raise max_length]`;
       }
       if (Number.isFinite(Number(params.max_tokens))) {
-        text = text.slice(0, Number(params.max_tokens) * 4);
+        var maxChars = Number(params.max_tokens) * 4;
+        if (text.length > maxChars && result.content.includes('heading="')) {
+          text = result.content;
+        }
+        if (text.length > maxChars) text = text.slice(0, maxChars);
       }
       return { content: [{ type: 'text', text }] };
     }

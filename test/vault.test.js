@@ -538,6 +538,11 @@ describe('Vault', () => {
       assert.equal(res.error, 'Search index unavailable: Vault path is not a directory');
     });
 
+    it('returns an index error before validating a section on an invalid vault path', () => {
+      const res = handleSearch(join(VAULT_PATH, 'api', 'DocFile.md'), { query: 'function', section: 'api' });
+      assert.equal(res.error, 'Search index unavailable: Vault path is not a directory');
+    });
+
     it('returns an error for an unknown section in list', () => {
       const res = handleList(VAULT_PATH, { section: 'nope-not-a-section' });
       assert.ok(res && res.error);

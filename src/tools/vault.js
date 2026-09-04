@@ -157,22 +157,23 @@ function listHeadings(body) {
 // sprengt eine Seite mit 200 Abschnitten das Limit über den Umweg der TOC.
 function renderToc(headings, note, budget = Infinity) {
   if (!headings.length) return '';
-  let out = `\n\n---\n${note}\nWeiter mit heading="<name>", zum Beispiel heading="${headings[0].text}".\n\nAbschnitte (${headings.length}):\n`;
+  var out = `\n\n---\n${note}\nWeiter mit heading="<name>", zum Beispiel heading="${headings[0].text}".\n\nAbschnitte (${headings.length}):\n`;
   if (out.length > budget) {
-    out = `\n\nWeiter mit heading="<name>".\n\nAbschnitte (${headings.length}):\n`;
+    out = `\n\nWeiter mit heading="${headings[0].text}".\n\nAbschnitte (${headings.length}):\n`;
   }
   if (out.length > budget) out = `\n\nAbschnitte (${headings.length}):\n`;
 
-  let shown = 0;
+  var shown = 0;
   for (const h of headings) {
     if (shown >= MAX_TOC_ENTRIES) break;
-    var separator = shown > 0 ? ' | ' : '';
+    var separator = '';
+    if (shown > 0) separator = ' | ';
     if (out.length + separator.length + h.text.length > budget) break;
     out += separator + h.text;
     shown++;
   }
   var rest = headings.length - shown;
-  var restText = ` | ... +${rest} weitere, hol sie mit einem groesseren max_length`;
+  var restText = ` | ... +${rest} weitere, hol sie mit einem größeren max_length`;
   if (rest > 0 && out.length + restText.length <= budget) out += restText;
   return out;
 }
@@ -267,7 +268,8 @@ export function readDoc(vaultPath, docPath, maxLength = DEFAULT_READ_LENGTH, opt
   if (subHeadings.length >= TOC_MIN_HEADINGS) {
     const introEnd = body.split('\n').slice(0, subHeadings[0].line).join('\n').trimEnd();
     const intro = cutAtLineBoundary(introEnd, Math.floor(maxLength / 3));
-    var prefix = intro ? intro : `# ${meta.title || resolvedPath}`;
+    var prefix = intro;
+    if (!prefix) prefix = `# ${meta.title || resolvedPath}`;
     if (prefix.length > maxLength) prefix = '';
     var toc = renderToc(
       subHeadings,

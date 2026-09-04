@@ -152,6 +152,14 @@ describe('Server', () => {
       assert.equal(res.status, 200);
     });
 
+    it('GET /api/otris/search clamps fractional max_tokens to the minimum budget', async () => {
+      const res = await fetch(`${baseUrl}/api/otris/search?query=FileType&response_format=concise&max_tokens=0.1`);
+      assert.equal(res.status, 200);
+      const data = await res.json();
+      assert.equal(data.length, 1);
+      assert.ok(JSON.stringify(data).length <= 50 * 4);
+    });
+
     it('GET /api/otris/read requires path param', async () => {
       const res = await fetch(`${baseUrl}/api/otris/read`);
       assert.equal(res.status, 400);

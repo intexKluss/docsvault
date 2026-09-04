@@ -14,20 +14,19 @@ export function handleSearch(vaultPath, params) {
     max_tokens,
   } = params;
 
-  // unbekannte Section von "keine Treffer" unterscheiden: die mcp/api-Schicht
-  // kann das `error`-Signal in einen echten Fehler verwandeln.
-  if (section) {
-    const normalizedSection = normalize(section).split(/[\\/]+/).join('/');
-    const parts = normalizedSection.split('/').filter(Boolean);
-    const sectionPath = join(vaultPath, ...parts);
-    if (normalizedSection !== section || !parts.length || !getSections(vaultPath).includes(parts[0]) || !existsSync(sectionPath)) {
-      return { error: `Section "${section}" not found. Use the overview tool to see valid sections.` };
-    }
-  }
-
   try {
     if (!existsSync(vaultPath) || !statSync(vaultPath).isDirectory()) {
       throw new Error('Vault path is not a directory');
+    }
+    // unbekannte Section von "keine Treffer" unterscheiden: die mcp/api-Schicht
+    // kann das `error`-Signal in einen echten Fehler verwandeln.
+    if (section) {
+      const normalizedSection = normalize(section).split(/[\\/]+/).join('/');
+      const parts = normalizedSection.split('/').filter(Boolean);
+      const sectionPath = join(vaultPath, ...parts);
+      if (normalizedSection !== section || !parts.length || !getSections(vaultPath).includes(parts[0]) || !existsSync(sectionPath)) {
+        return { error: `Section "${section}" not found. Use the overview tool to see valid sections.` };
+      }
     }
     return searchDocs(vaultPath, query, {
       section,
