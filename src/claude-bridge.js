@@ -28,13 +28,15 @@ const DISALLOWED_TOOLS = [
 ];
 
 export class ClaudeBridge {
-  constructor(vaultRegistry) {
+  constructor(vaultRegistry, queryCallback) {
     this.vaultRegistry = (vaultRegistry || []).filter(
       v => v && typeof v.toolPrefix === 'string' && v.toolPrefix.length > 0
     );
+    this.queryCallback = queryCallback || query;
   }
 
   async createSession(toolPrefix) {
+    var queryCallback = this.queryCallback;
     const id = randomUUID();
     let destroyed = false;
     let sessionId = null;
@@ -86,7 +88,7 @@ export class ClaudeBridge {
         try {
           const options = buildOptions({ maxTurns: 1, abortController: abort });
 
-          for await (const message of query({ prompt: 'Antworte nur mit: Bereit.', options })) {
+          for await (var message of queryCallback({ prompt: 'Antworte nur mit: Bereit.', options })) {
             if (message.type === 'system' && message.subtype === 'init' && message.session_id) {
               sessionId = message.session_id;
             }
@@ -130,7 +132,7 @@ export class ClaudeBridge {
             resume: sessionId || undefined,
           });
 
-          for await (const message of query({ prompt: content, options })) {
+          for await (var message of queryCallback({ prompt: content, options })) {
             if (abort.signal.aborted) break;
 
             if (message.type === 'system' && message.subtype === 'init' && message.session_id) {
