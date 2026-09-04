@@ -6,7 +6,7 @@ import { loadVaultRegistry } from './vault-registry.js';
 import { warmSearchIndex } from './tools/vault-cache.js';
 
 var __filename = fileURLToPath(import.meta.url);
-const __dirname = dirname(__filename);
+var __dirname = dirname(__filename);
 const VAULTS_ROOT = process.env.VAULTS_ROOT || resolve(__dirname, '..', 'vaults');
 
 export async function startMcpStdio(options = {}) {
@@ -32,7 +32,7 @@ export async function startMcpStdio(options = {}) {
   await server.connect(transport);
 }
 
-if (process.argv[1] === __filename) {
+if (process.argv[1] && resolve(process.argv[1]) === __filename) {
   if (process.env.VAULT_PATH && !process.env.VAULTS_ROOT) {
     console.error('[mcp-stdio] VAULT_PATH is deprecated, use VAULTS_ROOT (pointing to the parent dir containing vault folders).');
   }
