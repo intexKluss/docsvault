@@ -56,6 +56,7 @@ const { root: TEST_VAULTS_ROOT, cleanup: cleanupTestVaults } = createTempVaultsR
     files: {
       'portalscript-api/DocFile.md': '# DocFile\n\nEine Klasse für Dateien.',
       'portalscript-api/FileType.md': '# FileType\n\nDateityp-Klasse.',
+      'portalscript-api/Duplicate.md': '# Duplicate\n\n## First\n\n### Details\n\nFirst section body.\n\n## Second\n\n### Details\n\nNestedLocatorNeedle belongs to the second section.',
       'howtos/upload.md': '# Upload\n\nDoc-Upload Anleitung.',
       'portalscript-api/Long.md': '# Long\n\n' + 'Langer REST-Inhalt. '.repeat(2000),
     },
@@ -159,6 +160,7 @@ describe('Server', () => {
       const data = await res.json();
       assert.ok(Array.isArray(data));
       assert.ok(Array.isArray(data[0].matches));
+      assert.ok(data[0].matches.length >= 1, 'title-only detailed hit needs a synthetic match');
     });
 
     it('GET /api/otris/search returns concise snippets on request', async () => {
@@ -167,6 +169,23 @@ describe('Server', () => {
       var data = await res.json();
       assert.ok(typeof data[0].snippet === 'string');
       assert.equal(data[0].matches, undefined);
+    });
+
+    it('chains a duplicate heading search result to the exact section', async () => {
+      var searchResponse = await fetch(`${baseUrl}/api/otris/search?query=NestedLocatorNeedle&response_format=concise`);
+      assert.equal(searchResponse.status, 200);
+      var results = await searchResponse.json();
+      assert.equal(results[0].file, 'portalscript-api/Duplicate');
+      assert.equal(results[0].headings[0], 'Details');
+      assert.equal(typeof results[0].locator, 'string');
+
+      var path = encodeURIComponent(results[0].file);
+      var locator = encodeURIComponent(results[0].locator);
+      var readResponse = await fetch(`${baseUrl}/api/otris/read?path=${path}&locator=${locator}`);
+      assert.equal(readResponse.status, 200);
+      var doc = await readResponse.json();
+      assert.match(doc.content, /NestedLocatorNeedle/);
+      assert.doesNotMatch(doc.content, /First section body/);
     });
 
     it('GET /api/otris/search clamps max_results', async () => {

@@ -7,6 +7,7 @@ export function handleRead(vaultPath, params, maxReadLength = MAX_READ_LENGTH) {
   var maxLength = Math.min(params.max_length || DEFAULT_READ_LENGTH, maxReadLength);
   var doc = readDoc(vaultPath, path, maxLength, {
     heading: params.heading,
+    locator: params.locator,
     maxTokens: params.max_tokens,
   });
   if (!doc) return { error: `Document not found: ${path}` };

@@ -4,6 +4,7 @@ import { join } from 'node:path';
 import {
   getSections, listFiles, readDoc, searchDocs, getManifest,
 } from '../src/tools/vault.js';
+import * as vaultTools from '../src/tools/vault.js';
 import { handleSearch, DEFAULT_MAX_RESULTS } from '../src/tools/search.js';
 import { FIELD_BOOSTS, splitIntoSections } from '../src/tools/search-index.js';
 import { handleList } from '../src/tools/list.js';
@@ -73,6 +74,39 @@ describe('Vault', () => {
       assert.equal(sections[0].body, '# Page\n\nIntro');
       assert.equal(sections[1].heading, 'Details');
       assert.equal(sections[1].body, 'Body');
+    });
+
+    it('ignores ATX headings inside backtick and tilde fences', () => {
+      var raw = '# Page\n\n```js\n## Backtick Fake\n```\n\n## Real One\n\n~~~text\n### Tilde Fake\n~~~\n\n## Real Two\n\nBody';
+      var sections = splitIntoSections(raw);
+      var headings = [];
+      for (var sectionIndex = 0; sectionIndex < sections.length; sectionIndex++) {
+        headings.push(sections[sectionIndex].heading);
+      }
+
+      assert.ok(headings.includes('Real One'));
+      assert.ok(headings.includes('Real Two'));
+      assert.ok(!headings.includes('Backtick Fake'));
+      assert.ok(!headings.includes('Tilde Fake'));
+    });
+
+    it('keeps parseRipgrepJson as a compatibility export', () => {
+      assert.equal(typeof vaultTools.parseRipgrepJson, 'function');
+      var event = {
+        type: 'match',
+        data: {
+          path: { text: join(VAULT_PATH, 'api', 'DocFile.md') },
+          line_number: 7,
+          lines: { text: 'CompatibilityNeedle\r\n' },
+        },
+      };
+      var parsed = vaultTools.parseRipgrepJson(VAULT_PATH, JSON.stringify(event), 10);
+
+      assert.deepEqual(parsed, [{
+        file: 'api/DocFile',
+        title: '',
+        matches: [{ line: 7, text: 'CompatibilityNeedle' }],
+      }]);
     });
   });
 

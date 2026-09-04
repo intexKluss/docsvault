@@ -41,15 +41,17 @@ export function buildSearchIndex(vaultPath) {
   var documents = [];
   var segments = new Map();
   var documentFrequency = new Map();
+  var fileCount = 0;
   var nextId = 0;
 
   for (var fileIndex = 0; fileIndex < files.length; fileIndex++) {
     var fullPath = files[fileIndex];
     try {
       var raw = readFileSync(fullPath, 'utf-8');
-    } catch {
-      continue;
+    } catch (error) {
+      throw new Error(`Failed to read Markdown file "${fullPath}": ${error.message}`);
     }
+    fileCount++;
 
     var pathParts = relative(vaultPath, fullPath).replace(/\.md$/, '').split(sep);
     var relativePath = '';
@@ -76,6 +78,7 @@ export function buildSearchIndex(vaultPath) {
         file: relativePath,
         title,
         heading: section.heading,
+        locator: `L${section.startLine}`,
         startLine: section.startLine,
         endLine: section.endLine,
       });
@@ -121,7 +124,7 @@ export function buildSearchIndex(vaultPath) {
   return {
     mini: miniSearch,
     segments,
-    fileCount: files.length,
+    fileCount,
     segmentCount: segments.size,
     idf,
     hasTerm,
@@ -132,8 +135,8 @@ export function buildSearchIndex(vaultPath) {
 function collectMdFilePaths(directory, results) {
   try {
     var entries = readdirSync(directory, { withFileTypes: true });
-  } catch {
-    return;
+  } catch (error) {
+    throw new Error(`Failed to read directory "${directory}": ${error.message}`);
   }
 
   for (var entryIndex = 0; entryIndex < entries.length; entryIndex++) {
@@ -164,10 +167,29 @@ export function splitIntoSections(raw) {
   var sectionStart = start;
   var body = '';
   var bodyLineCount = 0;
+  var fenceCharacter = '';
+  var fenceLength = 0;
 
   for (var lineIndex = start; lineIndex < lines.length; lineIndex++) {
     var line = lines[lineIndex].replace(/\r$/, '');
-    var headingMatch = line.match(/^(#{2,6})\s+(.+?)\s*$/);
+    var fenceMatch = line.match(/^ {0,3}(`{3,}|~{3,})(.*)$/);
+    var headingMatch;
+    if (fenceCharacter) {
+      if (
+        fenceMatch
+        && fenceMatch[1][0] === fenceCharacter
+        && fenceMatch[1].length >= fenceLength
+        && fenceMatch[2].trim() === ''
+      ) {
+        fenceCharacter = '';
+        fenceLength = 0;
+      }
+    } else if (fenceMatch) {
+      fenceCharacter = fenceMatch[1][0];
+      fenceLength = fenceMatch[1].length;
+    } else {
+      headingMatch = line.match(/^(#{2,6})\s+(.+?)\s*$/);
+    }
     if (!headingMatch) {
       if (bodyLineCount > 0) body += '\n';
       body += line;

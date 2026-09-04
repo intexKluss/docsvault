@@ -5,33 +5,55 @@ import { buildSearchIndex } from './search-index.js';
 
 // Modul-weiter Cache pro Vault. Vaults sind zwischen Crawls read-only, daher
 // können wir Manifest, Sections, einen Titel-/Pfad-Index und den BM25-Index
-// halten und nur invalidieren wenn sich die mtime von _manifest.json
-// (fallback: Vault-Root) ändert.
+// halten und nur invalidieren wenn sich _manifest.json oder der rekursive
+// Markdown-Bestand eines Vaults ohne Manifest ändert.
 var cache = new Map();
 
-// Liefert die mtime die für die Invalidierung benutzt wird:
-// bevorzugt _manifest.json, sonst der Vault-Root-Ordner.
-function vaultMtime(vaultPath) {
-  try {
-    return statSync(join(vaultPath, '_manifest.json')).mtimeMs;
-  } catch {
-    try {
-      return statSync(vaultPath).mtimeMs;
-    } catch {
-      return 0;
+function vaultChangeKey(vaultPath) {
+  if (!existsSync(vaultPath)) return 'missing';
+
+  var manifestPath = join(vaultPath, '_manifest.json');
+  if (existsSync(manifestPath)) {
+    var manifestStats = statSync(manifestPath);
+    return `manifest:${manifestStats.mtimeMs}:${manifestStats.size}`;
+  }
+
+  var changes = [];
+  collectVaultChanges(vaultPath, changes);
+  changes.sort();
+
+  var key = '';
+  for (var changeIndex = 0; changeIndex < changes.length; changeIndex++) {
+    key += changes[changeIndex] + '\n';
+  }
+  return key;
+}
+
+function collectVaultChanges(directory, changes) {
+  var entries = readdirSync(directory, { withFileTypes: true });
+  for (var entryIndex = 0; entryIndex < entries.length; entryIndex++) {
+    var entry = entries[entryIndex];
+    var fullPath = join(directory, entry.name);
+    if (entry.isDirectory()) {
+      if (isSkippedDir(entry.name)) continue;
+      changes.push(`directory:${fullPath}`);
+      collectVaultChanges(fullPath, changes);
+      continue;
     }
+    if (!entry.isFile() || !entry.name.endsWith('.md')) continue;
+
+    var stats = statSync(fullPath);
+    changes.push(`file:${fullPath}:${stats.mtimeMs}:${stats.size}`);
   }
 }
 
-// Holt (oder baut) den Cache-Eintrag für einen Vault. Invalidiert bei
-// mtime-Änderung.
 function getEntry(vaultPath) {
-  const mtimeMs = vaultMtime(vaultPath);
+  var changeKey = vaultChangeKey(vaultPath);
   const existing = cache.get(vaultPath);
-  if (existing && existing.mtimeMs === mtimeMs) return existing;
+  if (existing && existing.changeKey === changeKey) return existing;
 
   var entry = {
-    mtimeMs,
+    changeKey,
     manifest: undefined,
     sections: undefined,
     titleIndex: undefined,

@@ -117,12 +117,14 @@ describe('MCP Handler', () => {
     assert.match(description, /otris_read/);
   });
 
-  it('read accepts an optional heading param and bounds max_length', () => {
+  it('read accepts optional heading and locator params and bounds max_length', () => {
     var server = createMcpServer(REGISTRY);
     var schema = server._registeredTools.otris_read.inputSchema;
     assert.ok(schema, 'read tool should have an input schema');
+    assert.ok(schema.shape.locator, 'read tool should declare locator');
     assert.ok(schema.safeParse({ path: 'a/b' }).success);
     assert.ok(schema.safeParse({ path: 'a/b', heading: 'Intro' }).success);
+    assert.ok(schema.safeParse({ path: 'a/b', locator: 'L12' }).success);
     assert.ok(schema.safeParse({ path: 'a/b', max_length: 25000 }).success);
     assert.ok(!schema.safeParse({ path: 'a/b', max_length: 25001 }).success);
     assert.ok(!schema.safeParse({ path: 'a/b', max_length: 0 }).success);

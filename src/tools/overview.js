@@ -11,10 +11,14 @@ export function handleOverview(vaultPath, params, vaultName = 'Documentation') {
     if (files.length === 0) return `Section "${section}" not found or empty.`;
 
     var groupCounts = new Map();
+    var directPageCount = 0;
     for (var fileIndex = 0; fileIndex < files.length; fileIndex++) {
       var pathParts = files[fileIndex].path.split('/');
-      var group = '_root';
-      if (pathParts.length > 2) group = pathParts[1];
+      if (pathParts.length <= 2) {
+        directPageCount++;
+        continue;
+      }
+      var group = pathParts[1];
       groupCounts.set(group, (groupCounts.get(group) || 0) + 1);
     }
     var groups = Array.from(groupCounts.entries());
@@ -47,23 +51,18 @@ export function handleOverview(vaultPath, params, vaultName = 'Documentation') {
     }
 
     var result = `## ${section} (${files.length} pages, ${groups.length} subfolders)\n\n`;
+    if (directPageCount > 0) result += `- (direkt in ${section}): ${directPageCount} pages\n`;
     for (var groupIndex = 0; groupIndex < groups.length; groupIndex++) {
       var group = groups[groupIndex][0];
       var count = groups[groupIndex][1];
-      if (group === '_root') {
-        result += `- (direkt in ${section}): ${count} pages\n`;
-      } else {
-        result += `- ${group}: ${count} pages\n`;
-      }
+      result += `- ${group}: ${count} pages\n`;
     }
 
-    var example = groups[0][0];
-    for (var groupIndex = 0; groupIndex < groups.length; groupIndex++) {
-      if (groups[groupIndex][0] === '_root') continue;
-      example = groups[groupIndex][0];
-      break;
+    if (groups.length > 0) {
+      result += `\nSeitentitel: list(section="${section}", subfolder="${groups[0][0]}").`;
+    } else {
+      result += `\nSeitentitel: list(section="${section}").`;
     }
-    result += `\nSeitentitel: list(section="${section}", subfolder="${example}").`;
     result += '\nDirekt suchen ist meist schneller als durchblättern.';
     return result;
   }
@@ -79,32 +78,36 @@ export function handleOverview(vaultPath, params, vaultName = 'Documentation') {
     var sectionName = sections[sectionIndex];
     var files = listFiles(vaultPath, sectionName);
     var subfolders = new Set();
+    var rootPageCount = 0;
     for (var fileIndex = 0; fileIndex < files.length; fileIndex++) {
       var pathParts = files[fileIndex].path.split('/');
-      var group = '_root';
-      if (pathParts.length > 2) group = pathParts[1];
-      subfolders.add(group);
+      if (pathParts.length <= 2) {
+        rootPageCount++;
+        continue;
+      }
+      subfolders.add(pathParts[1]);
     }
     var sorted = Array.from(subfolders);
     sorted.sort();
     var sfInfo = '';
-    if (sorted.length > 0) {
-      if (sorted.length > MAX_INLINE_SUBFOLDERS) {
-        var shown = '';
-        for (var folderIndex = 0; folderIndex < MAX_INLINE_SUBFOLDERS; folderIndex++) {
-          if (shown) shown += ', ';
-          shown += sorted[folderIndex];
-        }
-        var rest = sorted.length - MAX_INLINE_SUBFOLDERS;
-        sfInfo = ` (${shown}, +${rest} weitere, nutze overview(${sectionName}))`;
-      } else {
-        var shown = '';
-        for (var folderIndex = 0; folderIndex < sorted.length; folderIndex++) {
-          if (shown) shown += ', ';
-          shown += sorted[folderIndex];
-        }
-        sfInfo = ` (${shown})`;
+    var shown = '';
+    if (rootPageCount > 0) shown = `${rootPageCount} direkt`;
+    if (sorted.length > MAX_INLINE_SUBFOLDERS) {
+      for (var folderIndex = 0; folderIndex < MAX_INLINE_SUBFOLDERS; folderIndex++) {
+        if (shown) shown += ', ';
+        shown += sorted[folderIndex];
       }
+      var rest = sorted.length - MAX_INLINE_SUBFOLDERS;
+      if (shown) shown += ', ';
+      shown += `+${rest} weitere, nutze overview(${sectionName})`;
+    } else {
+      for (var folderIndex = 0; folderIndex < sorted.length; folderIndex++) {
+        if (shown) shown += ', ';
+        shown += sorted[folderIndex];
+      }
+    }
+    if (shown) {
+      sfInfo = ` (${shown})`;
     }
     out += `- ${sectionName}: ${files.length} pages${sfInfo}\n`;
   }

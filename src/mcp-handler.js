@@ -49,9 +49,9 @@ export function createMcpServer(vaultRegistry) {
 export function buildInstructions(vaultRegistry) {
   var instructions = 'Read-only documentation vaults. Each vault has its own tool prefix.\n\n';
   instructions += 'Flow: <prefix>_overview for section names, <prefix>_search for the term, <prefix>_read for the page.\n\n';
-  instructions += 'Search results are section-level. Each hit is { file, title, headings, snippet, score }.\n';
-  instructions += 'Pass "file" verbatim as _read\'s "path" and one of "headings" as its "heading" to get just that\n';
-  instructions += 'section. Reading without a heading returns intro plus table of contents on long pages, by design.\n\n';
+  instructions += 'Search results are section-level. Each hit is { file, title, headings, locator, snippet, score }.\n';
+  instructions += 'Pass "file" verbatim as _read\'s "path" and "locator" as its "locator" to get the exact section.\n';
+  instructions += 'The heading fallback stays supported. Reading without either value returns intro plus a table of contents.\n\n';
   instructions += 'Rules:\n';
   instructions += '- Never guess or construct a path. Only use "file"/"path" values a tool returned.\n';
   instructions += '- Snippets are pointers, not the answer. Open the page before answering.\n';
@@ -96,7 +96,7 @@ function registerVaultTools(server, vault) {
 
   server.tool(
     `${toolPrefix}_search`,
-    `Full-text search in: ${description}\nReturns hits as { file, title, headings, snippet, score }, best first. Pass "file" verbatim to ${toolPrefix}_read, plus one of "headings" to read just that section.${hintRef}`,
+    `Full-text search in: ${description}\nReturns hits as { file, title, headings, locator, snippet, score }, best first. Pass "file" and "locator" verbatim to ${toolPrefix}_read.${hintRef}`,
     {
       query: z.string().describe('Search terms.'),
       section: z.string().optional().describe('Limit to one section.'),
@@ -139,10 +139,11 @@ function registerVaultTools(server, vault) {
 
   server.tool(
     `${toolPrefix}_read`,
-    `Read one page of: ${description}\nUse a "file" value from ${toolPrefix}_search verbatim. Set "heading" to read a single section; without it, long pages return intro plus a table of contents to pick from.`,
+    `Read one page of: ${description}\nUse "file" and "locator" from ${toolPrefix}_search verbatim. "heading" remains a fallback; without either, long pages return intro plus a table of contents.`,
     {
       path: z.string().describe('Exact "file" value from a search/list result, without .md.'),
       heading: z.string().optional().describe('Returns only that section. Preferred on API/properties pages.'),
+      locator: z.string().optional().describe('Exact section locator from search.'),
       max_length: z.number().int().min(1).max(MAX_MCP_READ_LENGTH).optional().describe('Characters. Default 8000, capped at 25000.'),
       max_tokens: z.number().int().min(50).max(50000).optional().describe('Hard response budget.'),
     },

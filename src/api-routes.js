@@ -80,6 +80,7 @@ function registerVaultRoutes(router, vault) {
     const result = handleRead(vaultPath, {
       path: docPath.trim(),
       heading: req.query.heading || undefined,
+      locator: req.query.locator || undefined,
       max_length: clampInt(req.query.max_length, 1, 200000, DEFAULT_READ_LENGTH),
       max_tokens: clampInt(req.query.max_tokens, 50, 50000, undefined),
     });

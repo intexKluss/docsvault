@@ -131,13 +131,13 @@ Die Tool-Beschreibungen sind bewusst ein bis zwei Sätze lang: sie liegen dauerh
 
 ### Suche
 
-`searchDocs()` läuft gegen den BM25-Index aus `tools/search-index.js`. Indexiert wird auf Abschnittsebene: ein Eintrag für den Introbereich und je Überschrift von `##` bis `######` mit den Feldern `title`, `heading`, `path`, `body`.
+`searchDocs()` läuft gegen den BM25-Index aus `tools/search-index.js`. Indexiert wird auf Abschnittsebene: ein Eintrag für den Introbereich und je Überschrift von `##` bis `######` mit den Feldern `title`, `heading`, `path`, `body`. Überschriften in Backtick- und Tilde-Fences werden ignoriert. Jedes Segment erhält außerdem einen opaken Locator im Format `L<startLine>`, den `read` exakt auf dieselben Segmentgrenzen auflöst. Die bisherigen Heading-Strings bleiben erhalten.
 
 Gerankt wird in zwei Stufen:
 1. **Abschnitt**: BM25-Score, gewichtet mit der IDF-Masse die dieser Abschnitt selbst abdeckt, plus Boost wenn die Überschrift komplett aus Query-Tokens besteht (`## hasInvoicePlugin`).
 2. **Datei**: bester Abschnitt mal der quadrierten IDF-Abdeckung der ganzen Datei. Damit schlägt eine Datei die den seltenen Token trifft eine Datei die nur häufige Tokens oft trifft.
 
-Die Registry sortiert Vaults nach `toolPrefix`. HTTP- und stdio-Startup bauen deren Indizes anschließend nacheinander mit `warmSearchIndex()` auf, bevor die Bridge beziehungsweise der Transport verbunden wird. Damit hängt die erste Suche nicht von einem Lazy-Aufbau ab. Der Cache invalidiert über die mtime von `_manifest.json`, ersatzweise über die mtime des Vault-Roots. Ein gemessener Vault mit etwa 1800 Seiten benötigt ungefähr 2 bis 8 Sekunden und 100 MB Heap.
+Die Registry sortiert Vaults nach `toolPrefix`. HTTP- und stdio-Startup bauen deren Indizes anschließend nacheinander mit `warmSearchIndex()` auf, bevor die Bridge beziehungsweise der Transport verbunden wird. Damit hängt die erste Suche nicht von einem Lazy-Aufbau ab. Der Cache invalidiert über mtime und Größe von `_manifest.json`. Ohne Manifest verwendet er eine rekursive Änderungskennung aus Pfad, mtime und Größe aller Markdown-Dateien. Ein gemessener Vault mit etwa 1800 Seiten benötigt ungefähr 2 bis 8 Sekunden und 100 MB Heap.
 
 ### Antwortbudgets und REST-Kompatibilität
 

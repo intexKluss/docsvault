@@ -1,7 +1,7 @@
 import { readdirSync, readFileSync, existsSync, statSync } from 'fs';
 import { join, relative, basename, sep, resolve } from 'path';
 import { getCachedManifest, getCachedSections, getCachedTitleIndex, getCachedSearchIndex } from './vault-cache.js';
-import { foldText, tokenize, queryTerms } from './search-index.js';
+import { foldText, tokenize, queryTerms, splitIntoSections } from './search-index.js';
 
 export { foldText };
 
@@ -40,6 +40,7 @@ export function listFiles(vaultPath, section, subfolder) {
 export function readDoc(vaultPath, docPath, maxLength = DEFAULT_READ_LENGTH, options = {}) {
   maxLength = clampInt(maxLength, 200, MAX_READ_LENGTH, DEFAULT_READ_LENGTH);
   var heading = options.heading;
+  var locator = options.locator;
   if (Number.isFinite(Number(options.maxTokens))) {
     var budget = clampInt(options.maxTokens, 50, 50000, maxLength / 4) * 4;
     maxLength = Math.min(maxLength, budget);
@@ -74,6 +75,53 @@ export function readDoc(vaultPath, docPath, maxLength = DEFAULT_READ_LENGTH, opt
   var subHeadings = [];
   for (var headingIndex = 0; headingIndex < headings.length; headingIndex++) {
     if (headings[headingIndex].level >= 2) subHeadings.push(headings[headingIndex]);
+  }
+
+  if (locator) {
+    var locatorMatch = String(locator).match(/^L([1-9]\d*)$/);
+    var locatorSection = '';
+    if (locatorMatch) {
+      var wantedStartLine = Number(locatorMatch[1]);
+      var indexedSections = splitIntoSections(raw);
+      for (var sectionIndex = 0; sectionIndex < indexedSections.length; sectionIndex++) {
+        if (indexedSections[sectionIndex].startLine !== wantedStartLine) continue;
+
+        var rawLines = raw.split('\n');
+        for (var lineIndex = wantedStartLine - 1; lineIndex < indexedSections[sectionIndex].endLine; lineIndex++) {
+          if (locatorSection) locatorSection += '\n';
+          locatorSection += rawLines[lineIndex];
+        }
+        locatorSection = locatorSection.trimEnd();
+        break;
+      }
+    }
+
+    if (locatorSection) {
+      var cutSection = cutAtLineBoundary(locatorSection, maxLength);
+      return {
+        ...meta,
+        content: cutSection,
+        truncated: cutSection.length < locatorSection.length,
+        mode: 'heading',
+      };
+    }
+
+    var content = `Abschnitt mit Locator "${locator}" existiert auf dieser Seite nicht.`;
+    var toc = renderToc(subHeadings, `Seite: ${resolvedPath}`, maxLength - content.length);
+    if (content.length + toc.length <= maxLength) {
+      return {
+        ...meta,
+        content: content + toc,
+        truncated: true,
+        mode: 'heading-not-found',
+      };
+    }
+    return {
+      ...meta,
+      content: renderToc(subHeadings, `Seite: ${resolvedPath}`, maxLength),
+      truncated: true,
+      mode: 'heading-not-found',
+    };
   }
 
   if (heading) {
@@ -206,6 +254,7 @@ export function searchDocs(vaultPath, query, options = {}) {
       file: group.file,
       title: group.title,
       headings: resultHeadings,
+      locator: group.segs[0].locator,
       snippet: buildSnippet(lines, group.segs[0], terms, index.idf, snippetSpan),
       score: Math.round(entry.score * 10) / 10,
     };
@@ -221,6 +270,15 @@ export function searchDocs(vaultPath, query, options = {}) {
       }
       result.titleMatch = titleMatch || baseMatch;
       result.matches = buildMatches(lines, group.segs.slice(0, 3), terms, index.idf, contextLines);
+      if (result.titleMatch && result.matches.length === 0) {
+        var syntheticText = group.title;
+        if (!titleMatch) syntheticText = group.file;
+        result.matches.push({
+          line: group.segs[0].startLine,
+          text: syntheticText,
+          heading: group.segs[0].heading,
+        });
+      }
     }
     results.push(result);
   }
@@ -230,6 +288,43 @@ export function searchDocs(vaultPath, query, options = {}) {
 
 export function getManifest(vaultPath) {
   return getCachedManifest(vaultPath);
+}
+
+export function parseRipgrepJson(vaultPath, output, maxResults) {
+  var fileGroups = new Map();
+  var distinctFiles = 0;
+  var lines = output.split(/\r?\n/);
+
+  for (var lineIndex = 0; lineIndex < lines.length; lineIndex++) {
+    if (!lines[lineIndex].trim()) continue;
+
+    try {
+      var event = JSON.parse(lines[lineIndex]);
+    } catch {
+      continue;
+    }
+    if (event.type !== 'match' && event.type !== 'context') continue;
+
+    var data = event.data;
+    if (!data || !data.path || typeof data.path.text !== 'string') continue;
+    var relativePath = normalizeSlashes(relative(vaultPath, data.path.text).replace(/\.md$/, ''));
+    if (!fileGroups.has(relativePath)) {
+      if (distinctFiles >= maxResults) continue;
+      distinctFiles++;
+      fileGroups.set(relativePath, { file: relativePath, title: '', matches: [] });
+    }
+
+    var text = '';
+    if (data.lines && typeof data.lines.text === 'string') {
+      text = data.lines.text.replace(/\r?\n$/, '');
+    }
+    if (typeof data.line_number !== 'number') continue;
+
+    var group = fileGroups.get(relativePath);
+    group.matches.push({ line: data.line_number, text });
+  }
+
+  return Array.from(fileGroups.values());
 }
 
 function isInsideVault(vaultPath, targetPath) {
@@ -427,11 +522,11 @@ function isNoiseLine(text) {
 function cachedLines(vaultPath, relativePath, store) {
   if (store.has(relativePath)) return store.get(relativePath);
 
-  var lines = [];
+  var filePath = join(vaultPath, relativePath + '.md');
   try {
-    lines = readFileSync(join(vaultPath, relativePath + '.md'), 'utf-8').split('\n');
-  } catch {
-    lines = [];
+    var lines = readFileSync(filePath, 'utf-8').split('\n');
+  } catch (error) {
+    throw new Error(`Failed to read Markdown file "${filePath}": ${error.message}`);
   }
   store.set(relativePath, lines);
   return lines;

@@ -16,10 +16,14 @@ var smallFiles = {
   'small/alpha/a.md': '# A\n\nbody',
   'small/beta/b.md': '# B\n\nbody',
 };
+var directFiles = {};
+for (var pageIndex = 1; pageIndex <= 41; pageIndex++) {
+  directFiles[`direct/page${pageIndex}.md`] = `# Direct Page ${pageIndex}\n\nbody`;
+}
 var testVault = createTempVaultsRoot({
   ov: {
     meta: { toolPrefix: 'ov' },
-    files: { ...bigFiles, ...smallFiles },
+    files: { ...bigFiles, ...smallFiles, ...directFiles },
   },
 });
 var VAULT_PATH = join(testVault.root, 'ov');
@@ -57,6 +61,19 @@ describe('handleOverview', () => {
     assert.match(output, /- sub12: 6 pages/);
     assert.doesNotMatch(output, /- Page 1-1/);
     assert.match(output, /list\(section="big", subfolder="sub01"\)/);
+  });
+
+  it('counts more than 40 direct pages without exposing _root as a subfolder', () => {
+    var output = handleOverview(VAULT_PATH, { section: 'direct' }, 'Test');
+    assert.match(output, /## direct \(41 pages, 0 subfolders\)/);
+    assert.match(output, /\(direkt in direct\): 41 pages/);
+    assert.match(output, /list\(section="direct"\)/);
+    assert.doesNotMatch(output, /_root/);
+    assert.doesNotMatch(output, /subfolder=/);
+
+    var rootOutput = handleOverview(VAULT_PATH, {}, 'Test');
+    assert.match(rootOutput, /direct: 41 pages \(41 direkt\)/);
+    assert.doesNotMatch(rootOutput, /_root/);
   });
 });
 
