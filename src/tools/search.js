@@ -44,6 +44,7 @@ export function handleSearch(vaultPath, params) {
       maxTokens: params.max_tokens,
     });
   } catch (err) {
-    return { error: `Search index unavailable: ${err.message}` };
+    console.error(`[search] index unavailable: ${err.message}`);
+    return { error: 'Search index unavailable.' };
   }
 }

@@ -632,13 +632,32 @@ describe('Vault', () => {
     });
 
     it('returns an index error for a file used as the vault path', () => {
-      var res = handleSearch(join(VAULT_PATH, 'api', 'DocFile.md'), { query: 'function' });
-      assert.equal(res.error, 'Search index unavailable: Vault path is not a directory');
+      var loggedError = '';
+      var originalError = console.error;
+      console.error = function (message) {
+        loggedError += message;
+      };
+
+      try {
+        var res = handleSearch(join(VAULT_PATH, 'api', 'DocFile.md'), { query: 'function' });
+      } finally {
+        console.error = originalError;
+      }
+
+      assert.equal(res.error, 'Search index unavailable.');
+      assert.match(loggedError, /Vault path is not a directory/);
     });
 
     it('returns an index error before validating a section on an invalid vault path', () => {
-      var res = handleSearch(join(VAULT_PATH, 'api', 'DocFile.md'), { query: 'function', section: 'api' });
-      assert.equal(res.error, 'Search index unavailable: Vault path is not a directory');
+      var originalError = console.error;
+      console.error = function () {};
+      try {
+        var res = handleSearch(join(VAULT_PATH, 'api', 'DocFile.md'), { query: 'function', section: 'api' });
+      } finally {
+        console.error = originalError;
+      }
+
+      assert.equal(res.error, 'Search index unavailable.');
     });
 
     it('returns an error for an unknown section in list', () => {

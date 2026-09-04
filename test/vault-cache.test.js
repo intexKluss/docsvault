@@ -60,9 +60,19 @@ describe('vault cache', () => {
     var brokenPath = join(BROKEN_VAULT_PATH, 'nested', 'Broken.md');
     unlinkSync(brokenPath);
 
-    var second = handleSearch(BROKEN_VAULT_PATH, { query: 'MissingMarkdownNeedle' });
-    assert.match(second.error, /^Search index unavailable:/);
-    assert.match(second.error, /Broken\.md/);
+    var loggedError = '';
+    var originalError = console.error;
+    console.error = function (message) {
+      loggedError += message;
+    };
+    try {
+      var second = handleSearch(BROKEN_VAULT_PATH, { query: 'MissingMarkdownNeedle' });
+    } finally {
+      console.error = originalError;
+    }
+
+    assert.equal(second.error, 'Search index unavailable.');
+    assert.match(loggedError, /Broken\.md/);
   });
 
   it('counts every successfully read Markdown file', () => {
