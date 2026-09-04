@@ -3,7 +3,7 @@ import { SSEServerTransport } from '@modelcontextprotocol/sdk/server/sse.js';
 import { z } from 'zod';
 import { handleOverview } from './tools/overview.js';
 import { handleSearch } from './tools/search.js';
-import { handleRead } from './tools/read.js';
+import { handleRead, MAX_MCP_READ_LENGTH } from './tools/read.js';
 import { handleListPaged } from './tools/list.js';
 import { handleStatus } from './tools/status.js';
 
@@ -134,12 +134,12 @@ function registerVaultTools(server, vault) {
     {
       path: z.string().describe('Exact "file" value from a search/list result, without .md.'),
       heading: z.string().optional().describe('Returns only that section. Preferred on API/properties pages.'),
-      max_length: z.number().int().min(1).max(200000).optional().describe('Characters. Default 8000, capped at 25000.'),
+      max_length: z.number().int().min(1).max(MAX_MCP_READ_LENGTH).optional().describe('Characters. Default 8000, capped at 25000.'),
       max_tokens: z.number().int().min(50).max(50000).optional().describe('Hard response budget.'),
     },
     READONLY_TOOL,
     async (params) => {
-      const result = handleRead(vaultPath, params);
+      const result = handleRead(vaultPath, params, MAX_MCP_READ_LENGTH);
       if (result.error) {
         return { content: [{ type: 'text', text: result.error }], isError: true };
       }
@@ -151,6 +151,9 @@ function registerVaultTools(server, vault) {
       // im Text; nur der abgeschnittene Einzelabschnitt braucht noch einen.
       if (result.truncated && result.mode === 'heading') {
         text += `\n\n[section truncated, raise max_length]`;
+      }
+      if (Number.isFinite(Number(params.max_tokens))) {
+        text = text.slice(0, Number(params.max_tokens) * 4);
       }
       return { content: [{ type: 'text', text }] };
     }

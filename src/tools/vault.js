@@ -21,7 +21,7 @@ const MAX_SNIPPET_LINE_CHARS = 200;
 // wird statt einer Option die niemand nutzt.
 export const DEFAULT_READ_LENGTH = 8000;
 // harte Obergrenze auch bei explizit grossem max_length
-export const MAX_READ_LENGTH = 25000;
+export var MAX_READ_LENGTH = 200000;
 // ab sovielen Überschriften gilt eine Seite als "navigierbar" und bekommt bei
 // fehlendem heading-Parameter Intro + Inhaltsverzeichnis statt der Rohseite.
 const TOC_MIN_HEADINGS = 5;
@@ -157,18 +157,23 @@ function listHeadings(body) {
 // sprengt eine Seite mit 200 Abschnitten das Limit über den Umweg der TOC.
 function renderToc(headings, note, budget = Infinity) {
   if (!headings.length) return '';
-  const shown = [];
-  let used = 0;
-  for (const h of headings) {
-    if (shown.length >= MAX_TOC_ENTRIES) break;
-    used += h.text.length + 3;
-    if (shown.length > 0 && used > budget) break;
-    shown.push(h.text);
+  let out = `\n\n---\n${note}\nWeiter mit heading="<name>", zum Beispiel heading="${headings[0].text}".\n\nAbschnitte (${headings.length}):\n`;
+  if (out.length > budget) {
+    out = `\n\nWeiter mit heading="<name>".\n\nAbschnitte (${headings.length}):\n`;
   }
-  const rest = headings.length - shown.length;
-  let out = `\n\n---\n${note}\nWeiter mit heading="<name>", zum Beispiel heading="${shown[0]}".\n\nAbschnitte (${headings.length}):\n`;
-  out += shown.join(' | ');
-  if (rest > 0) out += ` | ... +${rest} weitere, hol sie mit einem groesseren max_length`;
+  if (out.length > budget) out = `\n\nAbschnitte (${headings.length}):\n`;
+
+  let shown = 0;
+  for (const h of headings) {
+    if (shown >= MAX_TOC_ENTRIES) break;
+    var separator = shown > 0 ? ' | ' : '';
+    if (out.length + separator.length + h.text.length > budget) break;
+    out += separator + h.text;
+    shown++;
+  }
+  var rest = headings.length - shown;
+  var restText = ` | ... +${rest} weitere, hol sie mit einem groesseren max_length`;
+  if (rest > 0 && out.length + restText.length <= budget) out += restText;
   return out;
 }
 
@@ -188,8 +193,8 @@ export function readDoc(vaultPath, docPath, maxLength = DEFAULT_READ_LENGTH, opt
   maxLength = clampInt(maxLength, 200, MAX_READ_LENGTH, DEFAULT_READ_LENGTH);
   const { heading } = options;
   if (Number.isFinite(Number(options.maxTokens))) {
-    const budget = clampInt(options.maxTokens, 100, 200000, maxLength / 4) * 4;
-    maxLength = Math.max(200, Math.min(maxLength, budget));
+    const budget = clampInt(options.maxTokens, 50, 50000, maxLength / 4) * 4;
+    maxLength = Math.min(maxLength, budget);
   }
 
   let resolvedPath = docPath;
@@ -237,10 +242,17 @@ export function readDoc(vaultPath, docPath, maxLength = DEFAULT_READ_LENGTH, opt
     }
     // heading existiert nicht: NICHT still die ganze Seite ausliefern (das war
     // der teuerste Fehlerfall), sondern das Inhaltsverzeichnis anbieten.
+    var content = `Abschnitt "${heading}" existiert auf dieser Seite nicht.`;
+    var toc = renderToc(subHeadings, `Seite: ${resolvedPath}`, maxLength - content.length);
+    if (content.length + toc.length <= maxLength) return {
+      ...meta,
+      content: content + toc,
+      truncated: true,
+      mode: 'heading-not-found',
+    };
     return {
       ...meta,
-      content: `Abschnitt "${heading}" existiert auf dieser Seite nicht.`
-        + renderToc(subHeadings, `Seite: ${resolvedPath}`, maxLength),
+      content: renderToc(subHeadings, `Seite: ${resolvedPath}`, maxLength),
       truncated: true,
       mode: 'heading-not-found',
     };
@@ -255,26 +267,28 @@ export function readDoc(vaultPath, docPath, maxLength = DEFAULT_READ_LENGTH, opt
   if (subHeadings.length >= TOC_MIN_HEADINGS) {
     const introEnd = body.split('\n').slice(0, subHeadings[0].line).join('\n').trimEnd();
     const intro = cutAtLineBoundary(introEnd, Math.floor(maxLength / 3));
-    const toc = renderToc(
+    var prefix = intro ? intro : `# ${meta.title || resolvedPath}`;
+    if (prefix.length > maxLength) prefix = '';
+    var toc = renderToc(
       subHeadings,
       `Seite gekuerzt (${body.length} Zeichen, ${subHeadings.length} Abschnitte). Nur Intro oben.`,
-      maxLength - intro.length
+      maxLength - prefix.length
     );
     return {
       ...meta,
-      content: (intro ? intro : `# ${meta.title || resolvedPath}`) + toc,
+      content: prefix + toc,
       truncated: true,
       mode: 'toc',
     };
   }
 
   // 4) wenige Abschnitte: abschneiden und die verbleibenden Überschriften nennen
-  const cut = cutAtLineBoundary(body, maxLength);
+  const cut = cutAtLineBoundary(body, Math.floor(maxLength / 2));
   const cutLine = cut.split('\n').length - 1;
   const remaining = subHeadings.filter(h => h.line > cutLine);
   return {
     ...meta,
-    content: cut + renderToc(remaining, `Ab hier gekuerzt (${body.length} Zeichen gesamt).`, maxLength),
+    content: cut + renderToc(remaining, `Ab hier gekuerzt (${body.length} Zeichen gesamt).`, maxLength - cut.length),
     truncated: true,
     mode: 'truncated',
   };
@@ -515,12 +529,7 @@ export function searchDocs(vaultPath, query, options = {}) {
   const terms = queryTerms(query);
   if (terms.length === 0) return [];
 
-  let index;
-  try {
-    index = getCachedSearchIndex(vaultPath);
-  } catch {
-    return [];
-  }
+  var index = getCachedSearchIndex(vaultPath);
   if (!index || !index.segmentCount) return [];
 
   const sectionPrefix = section ? section.split(sep).join('/') + '/' : '';
@@ -581,18 +590,13 @@ export function searchDocs(vaultPath, query, options = {}) {
 function applyTokenBudget(results, maxTokens) {
   const budget = Number(maxTokens);
   if (!Number.isFinite(budget) || budget <= 0) return results;
-  const maxChars = Math.max(200, Math.trunc(budget) * 4);
+  const maxChars = Math.trunc(budget) * 4;
 
   let out = results;
   while (out.length > 1 && JSON.stringify(out).length > maxChars) {
     out = out.slice(0, out.length - 1);
   }
-  if (JSON.stringify(out).length > maxChars && out.length === 1) {
-    const only = { ...out[0] };
-    const overflow = JSON.stringify(out).length - maxChars;
-    only.snippet = only.snippet.slice(0, Math.max(0, only.snippet.length - overflow - 1));
-    out = [only];
-  }
+  if (JSON.stringify(out).length > maxChars) return [];
   return out;
 }
 

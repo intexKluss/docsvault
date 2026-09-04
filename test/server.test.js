@@ -55,6 +55,7 @@ const { root: TEST_VAULTS_ROOT, cleanup: cleanupTestVaults } = createTempVaultsR
       'portalscript-api/DocFile.md': '# DocFile\n\nEine Klasse für Dateien.',
       'portalscript-api/FileType.md': '# FileType\n\nDateityp-Klasse.',
       'howtos/upload.md': '# Upload\n\nDoc-Upload Anleitung.',
+      'portalscript-api/Long.md': '# Long\n\n' + 'Langer REST-Inhalt. '.repeat(2000),
     },
   },
 });
@@ -130,6 +131,15 @@ describe('Server', () => {
       assert.equal(res.status, 200);
       const data = await res.json();
       assert.ok(Array.isArray(data));
+      assert.ok(Array.isArray(data[0].matches));
+    });
+
+    it('GET /api/otris/search returns concise snippets on request', async () => {
+      const res = await fetch(`${baseUrl}/api/otris/search?query=DocFile&response_format=concise`);
+      assert.equal(res.status, 200);
+      const data = await res.json();
+      assert.ok(typeof data[0].snippet === 'string');
+      assert.equal(data[0].matches, undefined);
     });
 
     it('GET /api/otris/search clamps max_results', async () => {
@@ -150,6 +160,13 @@ describe('Server', () => {
     it('GET /api/otris/read returns 404 for missing doc', async () => {
       const res = await fetch(`${baseUrl}/api/otris/read?path=nonexistent/doc`);
       assert.equal(res.status, 404);
+    });
+
+    it('GET /api/otris/read permits an explicit 200000 character REST read', async () => {
+      const res = await fetch(`${baseUrl}/api/otris/read?path=portalscript-api/Long&max_length=200000`);
+      assert.equal(res.status, 200);
+      const data = await res.json();
+      assert.ok(data.content.length > 25000);
     });
 
     it('GET /api/otris/list requires section param', async () => {

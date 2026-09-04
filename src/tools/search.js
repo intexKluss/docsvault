@@ -1,5 +1,5 @@
 import { searchDocs, getSections } from './vault.js';
-import { existsSync } from 'fs';
+import { existsSync, statSync } from 'fs';
 import { join, normalize } from 'path';
 
 export const DEFAULT_MAX_RESULTS = 5;
@@ -25,11 +25,18 @@ export function handleSearch(vaultPath, params) {
     }
   }
 
-  return searchDocs(vaultPath, query, {
-    section,
-    maxResults: max_results,
-    contextLines: context_lines,
-    detailed: response_format === 'detailed',
-    maxTokens: max_tokens,
-  });
+  try {
+    if (!existsSync(vaultPath) || !statSync(vaultPath).isDirectory()) {
+      throw new Error('Vault path is not a directory');
+    }
+    return searchDocs(vaultPath, query, {
+      section,
+      maxResults: max_results,
+      contextLines: context_lines,
+      detailed: response_format === 'detailed',
+      maxTokens: max_tokens,
+    });
+  } catch (err) {
+    return { error: `Search index unavailable: ${err.message}` };
+  }
 }

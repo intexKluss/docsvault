@@ -1,6 +1,7 @@
-import { describe, it } from 'node:test';
+import { describe, it, after } from 'node:test';
 import assert from 'node:assert/strict';
 import { createMcpServer, buildInstructions } from '../src/mcp-handler.js';
+import { createTempVaultsRoot } from './helpers/temp-vault.js';
 
 // grobe Token-Schaetzung, ~4 Zeichen pro Token
 const tokens = (text) => Math.round(String(text).length / 4);
@@ -9,6 +10,15 @@ const REGISTRY = [
   { name: 'otris',       description: 'otris Docs',   toolPrefix: 'otris',        path: '/tmp/otris' },
   { name: 'Intex Regeln',description: 'Firmenregeln', toolPrefix: 'intex_regeln', path: '/tmp/intex' },
 ];
+
+const { root: MCP_VAULT_ROOT, cleanup: cleanupMcpVault } = createTempVaultsRoot({
+  'otris': {
+    files: {
+      'long/Read.md': '---\ntitle: Ein aussergewoehnlich langer MCP-Titel fuer das harte Antwortbudget\nsource: https://example.com/eine/aussergewoehnlich/lange/source/unter/engem/budget\n---\n# Read\n\n' + 'Inhalt '.repeat(100),
+    },
+  },
+});
+after(cleanupMcpVault);
 
 describe('MCP Handler', () => {
   it('accepts a vault registry', () => {
@@ -90,8 +100,8 @@ describe('MCP Handler', () => {
     assert.ok(schema.safeParse({ path: 'a/b', heading: 'Intro' }).success);
 
     // max_length ist nach oben gedeckelt
-    assert.ok(schema.safeParse({ path: 'a/b', max_length: 50000 }).success);
-    assert.ok(!schema.safeParse({ path: 'a/b', max_length: 999999 }).success);
+    assert.ok(schema.safeParse({ path: 'a/b', max_length: 25000 }).success);
+    assert.ok(!schema.safeParse({ path: 'a/b', max_length: 25001 }).success);
     assert.ok(!schema.safeParse({ path: 'a/b', max_length: 0 }).success);
   });
 
@@ -124,6 +134,21 @@ describe('MCP Handler', () => {
     const server = createMcpServer(REGISTRY);
     const schema = (server._registeredTools || {})['otris_read']?.inputSchema;
     assert.ok(schema.safeParse({ path: 'a/b', max_tokens: 500 }).success);
+  });
+
+  it('caps the final read text including title and source at max_tokens', async () => {
+    const vaultPath = `${MCP_VAULT_ROOT}/otris`;
+    const server = createMcpServer([{ name: 'otris', description: 'otris Docs', toolPrefix: 'otris', path: vaultPath }]);
+    const result = await server._registeredTools.otris_read.handler({ path: 'long/Read', max_tokens: 50 });
+    const text = result.content[0].text;
+    assert.ok(text.length <= 50 * 4, `budget verletzt: ${text.length} > ${50 * 4}`);
+  });
+
+  it('limits MCP reads to 25000 characters', () => {
+    const server = createMcpServer(REGISTRY);
+    const schema = server._registeredTools.otris_read.inputSchema;
+    assert.ok(schema.safeParse({ path: 'a/b', max_length: 25000 }).success);
+    assert.ok(!schema.safeParse({ path: 'a/b', max_length: 25001 }).success);
   });
 
   it('list accepts max_results', () => {
