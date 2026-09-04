@@ -3,32 +3,11 @@ import { readdirSync, readFileSync } from 'fs';
 import { join, relative, basename, sep } from 'path';
 import { isSkippedDir } from '../vault-registry.js';
 
-// BM25-Index auf Abschnittsebene.
-//
-// Statt Live-ripgrep + Handscoring wird pro Vault einmal ein In-Memory-Index
-// gebaut. Ein Index-Eintrag ist NICHT eine Datei, sondern ein Abschnitt
-// (## / ### bis zur naechsten Ueberschrift gleichen oder hoeheren Levels).
-// Damit liefert jeder Treffer direkt das passende `heading` mit, und ein
-// Folge-read kann gezielt nur diesen Abschnitt holen.
-//
-// Warum MiniSearch und nicht Orama: beide sind reines JS ohne native Deps und
-// beide koennen BM25. MiniSearch passt hier besser, weil
-//  - `addAll` synchron ist (searchDocs/handleSearch sind synchron und werden so
-//    auch aus den Express-Routen und dem MCP-Handler aufgerufen),
-//  - `tokenize`/`processTerm` als simple Funktions-Hooks das bestehende
-//    Umlaut-Folding unveraendert uebernehmen koennen (Orama braucht dafuer
-//    einen eigenen Tokenizer-/Plugin-Aufbau),
-//  - es keine Schema-/Instanz-Verwaltung mitbringt die wir nicht brauchen.
+var FIELD_BOOSTS = { title: 2, heading: 3, path: 1, body: 1 };
+var TOKEN_SPLIT = /[^\p{L}\p{N}_$]+/u;
 
-// Feld-Boosts. heading > title > path > body: die Ueberschrift ist bei
-// API-/Property-Seiten der eigentliche Bezeichner.
-export const FIELD_BOOSTS = { title: 2, heading: 3, path: 1, body: 1 };
-
-// Umlaut-/ss-Folding: normalisiert deutschen Text so dass ae/ä, oe/ö, ue/ü,
-// ss/ß als gleich gelten. Wird symmetrisch auf Query-Tokens UND Indexinhalt
-// angewandt, damit "uebersicht" auch "Übersicht" findet.
-export function foldText(str) {
-  return String(str)
+export function foldText(text) {
+  return String(text)
     .toLowerCase()
     .replace(/ä/g, 'ae')
     .replace(/ö/g, 'oe')
@@ -36,183 +15,200 @@ export function foldText(str) {
     .replace(/ß/g, 'ss');
 }
 
-// Tokenizer: split auf allem was kein Buchstabe/Ziffer/_/$ ist. Damit zerfaellt
-// "context.getDocument()" in "context" und "getDocument", Identifier bleiben
-// aber ganz. Min. Laenge 2.
-const TOKEN_SPLIT = /[^\p{L}\p{N}_$]+/u;
-
 export function tokenize(text) {
-  const out = [];
-  for (const part of String(text).split(TOKEN_SPLIT)) {
-    if (part.length >= 2) out.push(part);
+  var parts = String(text).split(TOKEN_SPLIT);
+  var tokens = [];
+  for (var partIndex = 0; partIndex < parts.length; partIndex++) {
+    if (parts[partIndex].length >= 2) tokens.push(parts[partIndex]);
   }
-  return out;
+  return tokens;
 }
 
-// gefaltete, deduplizierte Query-Tokens
 export function queryTerms(query) {
-  const seen = new Set();
-  for (const t of tokenize(query)) seen.add(foldText(t));
-  return [...seen];
+  var seen = new Set();
+  var tokens = tokenize(query);
+  for (var tokenIndex = 0; tokenIndex < tokens.length; tokenIndex++) {
+    seen.add(foldText(tokens[tokenIndex]));
+  }
+  return Array.from(seen);
 }
 
-function processTerm(term) {
-  const folded = foldText(term);
-  return folded.length >= 2 ? folded : null;
-}
-
-function collectMdFilePaths(dir, results) {
-  let entries;
-  try {
-    entries = readdirSync(dir, { withFileTypes: true });
-  } catch {
-    return;
-  }
-  for (const entry of entries) {
-    const full = join(dir, entry.name);
-    if (entry.isDirectory()) {
-      if (!isSkippedDir(entry.name)) collectMdFilePaths(full, results);
-    } else if (entry.isFile() && entry.name.endsWith('.md')) {
-      results.push(full);
-    }
-  }
-}
-
-// Zerlegt eine Markdown-Datei in Abschnitte. Der Text vor der ersten
-// ##-Ueberschrift wird zum Intro-Abschnitt (heading '').
-// Rueckgabe: [{ heading, level, body, startLine, endLine }] (1-basierte Zeilen)
-export function splitIntoSections(raw) {
-  const lines = raw.split('\n');
-  let start = 0;
-
-  // Frontmatter ueberspringen (nur wenn die allererste Zeile genau '---' ist)
-  if (lines.length && lines[0].replace(/\r$/, '').replace(/^﻿/, '') === '---') {
-    for (let i = 1; i < lines.length; i++) {
-      if (lines[i].replace(/\r$/, '') === '---') {
-        start = i + 1;
-        break;
-      }
-    }
-  }
-
-  const sections = [];
-  let heading = '';
-  let level = 0;
-  let sectionStart = start;
-  let buf = [];
-
-  function flush(endLine) {
-    const body = buf.join('\n').trim();
-    if (!body && !heading) return;
-    sections.push({ heading, level, body, startLine: sectionStart + 1, endLine });
-  }
-
-  for (let i = start; i < lines.length; i++) {
-    const line = lines[i].replace(/\r$/, '');
-    const m = line.match(/^(#{2,6})\s+(.+?)\s*$/);
-    if (!m) {
-      buf.push(line);
-      continue;
-    }
-    flush(i);
-    heading = m[2];
-    level = m[1].length;
-    sectionStart = i;
-    buf = [];
-  }
-  flush(lines.length);
-
-  return sections;
-}
-
-function readTitle(raw, fallback) {
-  if (raw.replace(/^﻿/, '').slice(0, 3) !== '---') return fallback;
-  const m = raw.match(/^﻿?---\r?\n([\s\S]*?)\r?\n---/);
-  if (!m) return fallback;
-  for (const line of m[1].split('\n')) {
-    const kv = line.match(/^title\s*:\s*"?(.+?)"?\s*$/);
-    if (kv) return kv[1].replace(/\r$/, '');
-  }
-  return fallback;
-}
-
-// Baut den kompletten Abschnitts-Index eines Vaults.
-// Rueckgabe: { mini, segments, fileCount, idf(term), buildMs }
 export function buildSearchIndex(vaultPath) {
-  const started = Date.now();
-  const files = [];
+  var started = Date.now();
+  var files = [];
   collectMdFilePaths(vaultPath, files);
 
-  const docs = [];
-  const segments = new Map(); // id -> { file, title, heading, startLine, endLine }
-  const df = new Map();       // gefalteter Term -> Anzahl Abschnitte
-  let nextId = 0;
+  var documents = [];
+  var segments = new Map();
+  var documentFrequency = new Map();
+  var nextId = 0;
 
-  for (const full of files) {
-    let raw;
+  for (var fileIndex = 0; fileIndex < files.length; fileIndex++) {
+    var fullPath = files[fileIndex];
     try {
-      raw = readFileSync(full, 'utf-8');
+      var raw = readFileSync(fullPath, 'utf-8');
     } catch {
       continue;
     }
-    const relPath = relative(vaultPath, full).replace(/\.md$/, '').split(sep).join('/');
-    const title = readTitle(raw, basename(full, '.md'));
-    const pathWords = relPath.split('/').join(' ');
 
-    for (const sec of splitIntoSections(raw)) {
-      const id = nextId++;
-      const doc = {
+    var pathParts = relative(vaultPath, fullPath).replace(/\.md$/, '').split(sep);
+    var relativePath = '';
+    for (var pathPartIndex = 0; pathPartIndex < pathParts.length; pathPartIndex++) {
+      if (pathPartIndex > 0) relativePath += '/';
+      relativePath += pathParts[pathPartIndex];
+    }
+    var title = readTitle(raw, basename(fullPath, '.md'));
+    var pathWords = relativePath.replace(/\//g, ' ');
+    var sections = splitIntoSections(raw);
+
+    for (var sectionIndex = 0; sectionIndex < sections.length; sectionIndex++) {
+      var section = sections[sectionIndex];
+      var id = nextId++;
+      var document = {
         id,
         title,
-        heading: sec.heading,
+        heading: section.heading,
         path: pathWords,
-        body: sec.body,
+        body: section.body,
       };
-      docs.push(doc);
+      documents.push(document);
       segments.set(id, {
-        file: relPath,
+        file: relativePath,
         title,
-        heading: sec.heading,
-        startLine: sec.startLine,
-        endLine: sec.endLine,
+        heading: section.heading,
+        startLine: section.startLine,
+        endLine: section.endLine,
       });
 
-      // eigene Dokumentfrequenz-Tabelle: MiniSearch legt sie nicht offen, wir
-      // brauchen die IDF fuer das Re-Ranking auf Dateiebene.
-      const seen = new Set();
-      for (const field of ['title', 'heading', 'path', 'body']) {
-        for (const t of tokenize(doc[field])) seen.add(foldText(t));
+      var seen = new Set();
+      var fields = ['title', 'heading', 'path', 'body'];
+      for (var fieldIndex = 0; fieldIndex < fields.length; fieldIndex++) {
+        var tokens = tokenize(document[fields[fieldIndex]]);
+        for (var tokenIndex = 0; tokenIndex < tokens.length; tokenIndex++) {
+          seen.add(foldText(tokens[tokenIndex]));
+        }
       }
-      for (const t of seen) df.set(t, (df.get(t) || 0) + 1);
+
+      var uniqueTokens = Array.from(seen);
+      for (var tokenIndex = 0; tokenIndex < uniqueTokens.length; tokenIndex++) {
+        var token = uniqueTokens[tokenIndex];
+        documentFrequency.set(token, (documentFrequency.get(token) || 0) + 1);
+      }
     }
   }
 
-  const mini = new MiniSearch({
+  var miniSearch = new MiniSearch({
     fields: ['title', 'heading', 'path', 'body'],
     storeFields: [],
     tokenize,
     processTerm,
     searchOptions: { boost: FIELD_BOOSTS, combineWith: 'OR' },
   });
-  mini.addAll(docs);
+  miniSearch.addAll(documents);
 
-  // Bodies nach dem Indexieren freigeben, sonst haelt der Cache den kompletten
-  // Vault-Text ein zweites Mal im Speicher.
-  docs.length = 0;
+  // MiniSearch hält den benötigten Text selbst. Die zweite Kopie kann weg.
+  documents.length = 0;
 
-  const n = segments.size || 1;
-  const idf = (term) => {
-    const d = df.get(term) || 0;
-    return Math.log(1 + (n - d + 0.5) / (d + 0.5));
+  var segmentCount = segments.size || 1;
+  var idf = function (term) {
+    var frequency = documentFrequency.get(term) || 0;
+    return Math.log(1 + (segmentCount - frequency + 0.5) / (frequency + 0.5));
+  };
+  var hasTerm = function (term) {
+    return documentFrequency.has(term);
   };
 
   return {
-    mini,
+    mini: miniSearch,
     segments,
     fileCount: files.length,
     segmentCount: segments.size,
     idf,
-    hasTerm: (term) => df.has(term),
+    hasTerm,
     buildMs: Date.now() - started,
   };
+}
+
+function collectMdFilePaths(directory, results) {
+  try {
+    var entries = readdirSync(directory, { withFileTypes: true });
+  } catch {
+    return;
+  }
+
+  for (var entryIndex = 0; entryIndex < entries.length; entryIndex++) {
+    var entry = entries[entryIndex];
+    var fullPath = join(directory, entry.name);
+    if (entry.isDirectory()) {
+      if (!isSkippedDir(entry.name)) collectMdFilePaths(fullPath, results);
+      continue;
+    }
+    if (entry.isFile() && entry.name.endsWith('.md')) results.push(fullPath);
+  }
+}
+
+function splitIntoSections(raw) {
+  var lines = raw.split('\n');
+  var start = 0;
+  if (lines.length && lines[0].replace(/\r$/, '').replace(/^﻿/, '') === '---') {
+    for (var lineIndex = 1; lineIndex < lines.length; lineIndex++) {
+      if (lines[lineIndex].replace(/\r$/, '') !== '---') continue;
+      start = lineIndex + 1;
+      break;
+    }
+  }
+
+  var sections = [];
+  var heading = '';
+  var level = 0;
+  var sectionStart = start;
+  var body = '';
+  var bodyLineCount = 0;
+
+  for (var lineIndex = start; lineIndex < lines.length; lineIndex++) {
+    var line = lines[lineIndex].replace(/\r$/, '');
+    var headingMatch = line.match(/^(#{2,6})\s+(.+?)\s*$/);
+    if (!headingMatch) {
+      if (bodyLineCount > 0) body += '\n';
+      body += line;
+      bodyLineCount++;
+      continue;
+    }
+
+    body = body.trim();
+    if (body || heading) {
+      sections.push({ heading, level, body, startLine: sectionStart + 1, endLine: lineIndex });
+    }
+    heading = headingMatch[2];
+    level = headingMatch[1].length;
+    sectionStart = lineIndex;
+    body = '';
+    bodyLineCount = 0;
+  }
+
+  body = body.trim();
+  if (body || heading) {
+    sections.push({ heading, level, body, startLine: sectionStart + 1, endLine: lines.length });
+  }
+  return sections;
+}
+
+function readTitle(raw, fallback) {
+  if (raw.replace(/^﻿/, '').slice(0, 3) !== '---') return fallback;
+
+  var frontmatter = raw.match(/^﻿?---\r?\n([\s\S]*?)\r?\n---/);
+  if (!frontmatter) return fallback;
+
+  var lines = frontmatter[1].split('\n');
+  for (var lineIndex = 0; lineIndex < lines.length; lineIndex++) {
+    var title = lines[lineIndex].match(/^title\s*:\s*"?(.+?)"?\s*$/);
+    if (title) return title[1].replace(/\r$/, '');
+  }
+  return fallback;
+}
+
+function processTerm(term) {
+  var folded = foldText(term);
+  if (folded.length < 2) return null;
+  return folded;
 }

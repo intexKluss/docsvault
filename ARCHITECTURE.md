@@ -119,14 +119,15 @@ Die Tools liegen in `src/tools/` und kommen über drei Wege raus:
 | Tool | Zweck |
 |---|---|
 | `<prefix>_search` | Dokumentation durchsuchen |
+| `<prefix>_technical_search` | Optionaler Suchpfad für die konfigurierte technische Section |
 | `<prefix>_read` | Dokument lesen |
 | `<prefix>_list` | Verzeichnis durchsuchen |
 | `<prefix>_overview` | Übersicht laden |
 | `<prefix>_status` | Status prüfen |
 
-> Pro Vault werden diese 5 Tools mit dem `toolPrefix` aus `_meta.json` registriert.
+Pro Vault werden fünf Tools mit dem `toolPrefix` aus `_meta.json` registriert. Setzt `_meta.json` eine existierende, kanonische `technicalSection` innerhalb des Vaults, kommt `<prefix>_technical_search` hinzu. Ohne Feld wird nur das vorhandene Standardverzeichnis `Scripting/TERAS API` erkannt. Die Toolmenge wird damit vollständig aus den Vault-Daten abgeleitet.
 
-Die Tool-Beschreibungen sind bewusst ein bis zwei Sätze lang: sie liegen dauerhaft im Kontext, einmal pro Vault. Die Recherche-Methodik und der `searchHint` aus `_meta.json` stehen stattdessen in den `instructions` der `initialize`-Response (`buildInstructions()` in `mcp-handler.js`), die es nur einmal pro Server gibt.
+Die Tool-Beschreibungen sind bewusst ein bis zwei Sätze lang: sie liegen dauerhaft im Kontext, einmal pro Vault. Die Recherche-Methodik und der `searchHint` aus `_meta.json` stehen stattdessen einmal pro Server in den `instructions` der `initialize`-Response.
 
 ### Suche
 
@@ -136,7 +137,20 @@ Gerankt wird in zwei Stufen:
 1. **Abschnitt**: BM25-Score, gewichtet mit der IDF-Masse die dieser Abschnitt selbst abdeckt, plus Boost wenn die Überschrift komplett aus Query-Tokens besteht (`## hasInvoicePlugin`).
 2. **Datei**: bester Abschnitt mal der quadrierten IDF-Abdeckung der ganzen Datei. Damit schlägt eine Datei die den seltenen Token trifft eine Datei die nur häufige Tokens oft trifft.
 
-Der Index wird beim Start gebaut (`warmSearchIndex()`) und über die mtime von `_manifest.json` invalidiert. Kosten: ~2 bis 8 s und ~100 MB Heap pro 1800 Seiten.
+Die Registry sortiert Vaults nach `toolPrefix`. HTTP- und stdio-Startup bauen deren Indizes anschließend nacheinander mit `warmSearchIndex()` auf, bevor die Bridge beziehungsweise der Transport verbunden wird. Damit hängt die erste Suche nicht von einem Lazy-Aufbau ab. Der Cache invalidiert über die mtime von `_manifest.json`, ersatzweise über die mtime des Vault-Roots. Ein gemessener Vault mit etwa 1800 Seiten benötigt ungefähr 2 bis 8 Sekunden und 100 MB Heap.
+
+### Antwortbudgets und REST-Kompatibilität
+
+| Pfad | Default | Grenzen und Format |
+|---|---|---|
+| MCP `search` | 5 Treffer, `concise` | `max_results` 1 bis 100, `max_tokens` 50 bis 50000 |
+| REST `search` | 10 Treffer, `detailed` | Gleiche Parameter, bewusst kompatibel zum bisherigen REST-Verhalten |
+| MCP `read` | 8000 Zeichen | `max_length` effektiv 200 bis 25000 |
+| REST `read` | 8000 Zeichen | `max_length` effektiv 200 bis 200000 |
+| MCP `list` | 50 Seiten | `max_results` 1 bis 500 |
+| REST `list` | ungekürzt | Gibt weiterhin das vollständige Array zurück |
+
+`max_tokens` wird bei `search` und `read` als `max_tokens * 4` Zeichen angenähert. Die MCP-Read-Schicht begrenzt damit den finalen Text einschließlich Titel und Quelle. Beim REST-Read gilt das Budget für den Dokumentinhalt; der JSON-Umschlag kann größer sein.
 
 Claude Bridge: explizit über `allowedTools` + `disallowedTools` (alle Built-in Tools gesperrt).
 Codex Bridge: nutzt MCP über die Codex CLI Config.
@@ -200,5 +214,6 @@ Codex Bridge: nutzt MCP über die Codex CLI Config.
 | `ws` | WebSocket Server |
 | `@anthropic-ai/claude-agent-sdk` | Claude Bridge |
 | `@openai/codex-sdk` | Codex Bridge |
+| `minisearch` | BM25-Volltextindex auf Abschnittsebene |
 
 Frontend (CDN): `marked.js`, `highlight.js`, `dompurify.js`

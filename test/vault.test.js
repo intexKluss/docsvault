@@ -30,9 +30,7 @@ const { root, cleanup } = createTempVaultsRoot({
       'Scripting/TERAS API/Gadget API/HTML.md': '# HTML\n\nappendHtml(newHtml: string): void',
       // frontmatter-only titleMatch: title enthält den Begriff, Body sonst nichts
       'api/FrontOnly.md': '---\ntitle: SonderBegriffXyz\n---\n# Heading One\n\nIrgendein Fließtext ohne den Begriff im Body.',
-      // viele example-pages die context erwähnen, damit context.md sonst untergeht.
-      // Sie nennen auch Mappentyp/Eigenschaft, damit diese Tokens im Fixture-
-      // Korpus wirklich häufig sind (das ist die Voraussetzung des IDF-Falls).
+      // Die häufigen Tokens machen den IDF-Regressionsfall realistisch.
       'examples/ex01.md': '# Example 1\n\nNutzt context irgendwo. Am Mappentyp wird die Eigenschaft gesetzt.',
       'examples/ex02.md': '# Example 2\n\nNutzt context irgendwo. Am Mappentyp wird die Eigenschaft gesetzt.',
       'examples/ex03.md': '# Example 3\n\nNutzt context irgendwo. Am Mappentyp wird die Eigenschaft gesetzt.',
@@ -42,17 +40,11 @@ const { root, cleanup } = createTempVaultsRoot({
       'api/Many.md': '# Many\n\ntoken\ntoken\ntoken\ntoken\ntoken\ntoken\ntoken\ntoken\ntoken\ntoken\ntoken\ntoken\ntoken\ntoken\ntoken',
       // doc für heading-targeting in readDoc
       'guides/Sections.md': '---\ntitle: Sections\n---\n# Sections\n\nIntro text.\n\n## Alpha\n\nAlpha body line.\n\n### Sub\n\nSub body.\n\n## Beta\n\nBeta body line.',
-      // IDF-Fall (hasInvoicePlugin): die kanonische Property-Seite nennt den
-      // seltenen Bezeichner nur als Überschrift, "Mappentyp"/"Eigenschaft"
-      // stehen irgendwo anders auf derselben Seite.
       'Properties/DlcFile.md': '---\ntitle: "Properties: DlcFile"\n---\n# Properties: DlcFile\n\nEigenschaften am Mappentyp.\n\n## enableAlpha\n\n- **Typ:** enum\n\nSchaltet Alpha ein.\n\n## hasInvoicePlugin\n\n- **Objekte:** DlcFile\n- **Typ:** enum\n\nDas Invoice Plugin kann hiermit aktiviert werden.\n\n## zetaMode\n\n- **Typ:** string\n\nSteuert Zeta.',
-      // Distraktoren: viele häufige Tokens, aber nie der seltene Bezeichner.
       'Handbuch/Mappentyp Konfiguration.md': '# Mappentyp Konfiguration\n\n## Eigenschaft setzen\n\nJeder Mappentyp hat Eigenschaften. Die Eigenschaft wird am Mappentyp gepflegt. Eigenschaft und Mappentyp gehören zusammen.\n\n## Weitere Eigenschaft\n\nNoch eine Eigenschaft am Mappentyp.',
       'Handbuch/Eigenschaften und Felder.md': '# Eigenschaften und Felder\n\n## Eigenschaft am Mappentyp\n\nEine Eigenschaft am Mappentyp steuert das Verhalten. Mappentyp, Eigenschaft, Eigenschaft, Mappentyp.',
       'HowTos/Mappentyp Eigenschaft pflegen.md': '# Mappentyp Eigenschaft pflegen\n\n## Eigenschaft anlegen\n\nSo legst du eine Eigenschaft an einem Mappentyp an. Mappentyp Eigenschaft Mappentyp Eigenschaft.',
-      // Seite mit vielen Abschnitten für die TOC-Logik in readDoc
-      'guides/Many Sections.md': '---\ntitle: Many Sections\n---\n# Many Sections\n\nIntro der Seite mit reichlich Text damit das Intro nicht leer ist.\n\n## Ein\n\nInhalt eins mit genug Text um das Limit zu sprengen.\n\n## Zwei\n\nInhalt zwei mit genug Text um das Limit zu sprengen.\n\n## Drei\n\nInhalt drei mit genug Text um das Limit zu sprengen.\n\n## Vier\n\nInhalt vier mit genug Text um das Limit zu sprengen.\n\n## Fuenf\n\nInhalt fuenf mit genug Text um das Limit zu sprengen.\n\n## Sechs\n\nInhalt sechs mit genug Text um das Limit zu sprengen.',
-      // lange Seite mit nur wenigen Abschnitten: truncate + Rest-TOC
+      'guides/Many Sections.md': '---\ntitle: Many Sections\n---\n# Many Sections\n\nIntro der Seite mit reichlich Text damit das Intro nicht leer ist.\n\n## Ein\n\nInhalt eins mit genug Text um das Limit zu sprengen.\n\n## Zwei\n\nInhalt zwei mit genug Text um das Limit zu sprengen.\n\n## Drei\n\nInhalt drei mit genug Text um das Limit zu sprengen.\n\n## Vier\n\nInhalt vier mit genug Text um das Limit zu sprengen.\n\n## Fünf\n\nInhalt fünf mit genug Text um das Limit zu sprengen.\n\n## Sechs\n\nInhalt sechs mit genug Text um das Limit zu sprengen.',
       'guides/Long Flat.md': '---\ntitle: Long Flat\n---\n# Long Flat\n\n' + 'Fliesstext der einfach immer weiter geht und geht. '.repeat(20) + '\n\n## Hinten\n\nDer hintere Abschnitt.',
       'budget/very-long-path-name-that-must-remain-verbatim-in-search-results.md': '---\ntitle: Ein außergewöhnlich langer Dokumenttitel der das kleine Antwortbudget deutlich übersteigt\n---\n# Budget\n\n## Eine außergewöhnlich lange Überschrift die nicht abgeschnitten werden darf\n\nBudgetMarker',
       'guides/Very Long Navigation.md': '# Navigation\n\nIntro.\n\n## Eine außergewöhnlich lange Überschrift für das enge Antwortbudget Nummer eins\n\nText.\n\n## Eine außergewöhnlich lange Überschrift für das enge Antwortbudget Nummer zwei\n\nText.\n\n## Eine außergewöhnlich lange Überschrift für das enge Antwortbudget Nummer drei\n\nText.\n\n## Eine außergewöhnlich lange Überschrift für das enge Antwortbudget Nummer vier\n\nText.\n\n## Eine außergewöhnlich lange Überschrift für das enge Antwortbudget Nummer fünf\n\nText.',
@@ -139,7 +131,7 @@ describe('Vault', () => {
     });
 
     it('truncates content when maxLength exceeded', () => {
-      const doc = readDoc(VAULT_PATH, 'guides/Long Flat', 300);
+      var doc = readDoc(VAULT_PATH, 'guides/Long Flat', 300);
       assert.ok(doc.content.length < 1000);
       assert.equal(doc.truncated, true);
     });
@@ -165,12 +157,11 @@ describe('Vault', () => {
       assert.equal(doc.title, 'DocFile');
     });
 
-    // Punkt 12: maxLength wird geclampt (0/negativ -> nutzbares Minimum, kein crash)
     it('clamps maxLength defensively', () => {
       const doc = readDoc(VAULT_PATH, 'guides/Sections', 0);
       assert.ok(doc);
       assert.ok(doc.content.length > 0);
-      const huge = readDoc(VAULT_PATH, 'guides/Long Flat', 999999);
+      var huge = readDoc(VAULT_PATH, 'guides/Long Flat', 999999);
       assert.ok(huge.content.length <= 25000);
     });
   });
@@ -198,7 +189,7 @@ describe('Vault', () => {
 
     // Punkt 1: Frontmatter-Zeilen (---/title/source) dürfen keine Treffer sein
     it('does not return matches inside the frontmatter block', () => {
-      const results = searchDocs(VAULT_PATH, 'DocFile', { detailed: true });
+      var results = searchDocs(VAULT_PATH, 'DocFile', { detailed: true });
       const doc = results.find(r => r.file === 'api/DocFile');
       assert.ok(doc, 'DocFile sollte gefunden werden (Titel im Heading)');
       for (const m of doc.matches) {
@@ -210,7 +201,7 @@ describe('Vault', () => {
 
     // Punkt 2: jeder Treffer trägt die nächste vorausgehende Überschrift
     it('attaches the nearest preceding heading to each match', () => {
-      const results = searchDocs(VAULT_PATH, 'upload', { detailed: true });
+      var results = searchDocs(VAULT_PATH, 'upload', { detailed: true });
       assert.ok(results.length > 0);
       for (const r of results) {
         for (const m of r.matches) {
@@ -227,14 +218,14 @@ describe('Vault', () => {
 
     // Punkt 3: Titel-/Pfad-Treffer kommen zuerst und sind markiert
     it('ranks title/path matches first with titleMatch flag', () => {
-      const results = searchDocs(VAULT_PATH, 'Interface', { detailed: true });
+      var results = searchDocs(VAULT_PATH, 'Interface', { detailed: true });
       assert.ok(results.length > 0);
       assert.equal(results[0].file, 'api/Interface');
       assert.equal(results[0].titleMatch, true);
     });
 
     it('sets titleMatch flag on every detailed result', () => {
-      const results = searchDocs(VAULT_PATH, 'function', { detailed: true });
+      var results = searchDocs(VAULT_PATH, 'function', { detailed: true });
       for (const r of results) {
         assert.ok('titleMatch' in r);
         assert.equal(typeof r.titleMatch, 'boolean');
@@ -252,7 +243,7 @@ describe('Vault', () => {
 
     // Punkt 5: trailing \r wird aus dem Treffer-Text gestrippt
     it('strips trailing carriage returns from match text', () => {
-      const results = searchDocs(VAULT_PATH, 'carriage', { detailed: true });
+      var results = searchDocs(VAULT_PATH, 'carriage', { detailed: true });
       assert.ok(results.length > 0);
       for (const r of results) {
         for (const m of r.matches) {
@@ -267,9 +258,8 @@ describe('Vault', () => {
       assert.ok(!results.some(r => r.file.startsWith('crawl/')));
     });
 
-    // detailed behält das alte Schema (file, title, matches[{line,text,heading}])
     it('keeps the legacy result schema intact in detailed mode', () => {
-      const results = searchDocs(VAULT_PATH, 'function', { detailed: true });
+      var results = searchDocs(VAULT_PATH, 'function', { detailed: true });
       assert.ok(results.length > 0);
       for (const r of results) {
         assert.ok('file' in r);
@@ -283,37 +273,37 @@ describe('Vault', () => {
       }
     });
 
-    // concise (Default): ein Snippet + Heading-Liste, keine matches-Flut
     it('returns the compact shape by default', () => {
-      const results = searchDocs(VAULT_PATH, 'function');
+      var results = searchDocs(VAULT_PATH, 'function');
       assert.ok(results.length > 0);
-      for (const r of results) {
-        assert.ok('file' in r);
-        assert.ok('title' in r);
-        assert.ok(Array.isArray(r.headings), 'headings fehlt');
-        assert.equal(typeof r.snippet, 'string');
-        assert.ok(!('matches' in r), 'concise darf keine matches enthalten');
+      for (var resultIndex = 0; resultIndex < results.length; resultIndex++) {
+        assert.ok('file' in results[resultIndex]);
+        assert.ok('title' in results[resultIndex]);
+        assert.ok(Array.isArray(results[resultIndex].headings), 'headings fehlt');
+        assert.equal(typeof results[resultIndex].snippet, 'string');
+        assert.ok(!('matches' in results[resultIndex]), 'concise darf keine matches enthalten');
       }
     });
 
     it('defaults to five results', () => {
-      const results = searchDocs(VAULT_PATH, 'function');
+      var results = searchDocs(VAULT_PATH, 'function');
       assert.ok(results.length <= 5);
     });
 
     it('never uses bare code fences or blank lines as snippet', () => {
-      const results = searchDocs(VAULT_PATH, 'function');
-      for (const r of results) {
-        for (const line of r.snippet.split('\n')) {
-          assert.notEqual(line.trim(), '');
-          assert.ok(!/^`{3,}$/.test(line.trim()), `code fence als snippet: ${r.file}`);
+      var results = searchDocs(VAULT_PATH, 'function');
+      for (var resultIndex = 0; resultIndex < results.length; resultIndex++) {
+        var lines = results[resultIndex].snippet.split('\n');
+        for (var lineIndex = 0; lineIndex < lines.length; lineIndex++) {
+          assert.notEqual(lines[lineIndex].trim(), '');
+          assert.ok(!/^`{3,}$/.test(lines[lineIndex].trim()), `code fence als snippet: ${results[resultIndex].file}`);
         }
       }
     });
 
     // Punkt 3: rank-before-slice - kanonische Seite überlebt trotz vieler examples
     it('surfaces the canonical title page even with many example hits', () => {
-      const results = searchDocs(VAULT_PATH, 'context', { maxResults: 3, detailed: true });
+      var results = searchDocs(VAULT_PATH, 'context', { maxResults: 3, detailed: true });
       const ctx = results.find(r => r.file === 'Scripting/PortalscriptAPI/classes/context');
       assert.ok(ctx, 'die kanonische context-Klasse muss in den top results sein');
       assert.equal(ctx.titleMatch, true);
@@ -321,7 +311,7 @@ describe('Vault', () => {
 
     // Punkt 4: per-file cap - keine Datei flutet die Antwort
     it('caps matches per file and drops blank lines', () => {
-      const results = searchDocs(VAULT_PATH, 'token', { detailed: true });
+      var results = searchDocs(VAULT_PATH, 'token', { detailed: true });
       const many = results.find(r => r.file === 'api/Many');
       assert.ok(many);
       assert.ok(many.matches.length <= 10, `per-file cap verletzt: ${many.matches.length}`);
@@ -332,7 +322,7 @@ describe('Vault', () => {
 
     // Punkt 5: context_lines wird auch für multi-token honoriert
     it('honors context_lines for multi-token queries', () => {
-      const results = searchDocs(VAULT_PATH, 'Methoden upload', { contextLines: 2, detailed: true });
+      var results = searchDocs(VAULT_PATH, 'Methoden upload', { contextLines: 2, detailed: true });
       const doc = results.find(r => r.file === 'api/DocFile');
       assert.ok(doc);
       // bei context 2 muss es mehr als nur die reinen treffer-zeilen geben
@@ -350,7 +340,6 @@ describe('Vault', () => {
       assert.ok(results.some(r => r.file === 'api/Uebersicht'));
     });
 
-    // Titel-Treffer ohne Body-Treffer wird nicht gedroppt
     it('still returns a snippet when only the title matches', () => {
       const results = searchDocs(VAULT_PATH, 'SonderBegriffXyz');
       const front = results.find(r => r.file === 'api/FrontOnly');
@@ -372,8 +361,8 @@ describe('Vault', () => {
     });
 
     it('honors max_tokens as a hard budget', () => {
-      const budget = 60;
-      const results = searchDocs(VAULT_PATH, 'function', { maxResults: 5, maxTokens: budget });
+      var budget = 60;
+      var results = searchDocs(VAULT_PATH, 'function', { maxResults: 5, maxTokens: budget });
       assert.ok(results.length >= 1, 'budget darf nicht alles wegschneiden');
       assert.ok(
         JSON.stringify(results).length <= budget * 4,
@@ -382,9 +371,9 @@ describe('Vault', () => {
     });
 
     it('returns no result when a long path and heading cannot fit the exact budget', () => {
-      const budget = 50;
-      const full = searchDocs(VAULT_PATH, 'BudgetMarker');
-      const results = searchDocs(VAULT_PATH, 'BudgetMarker', { maxTokens: budget });
+      var budget = 50;
+      var full = searchDocs(VAULT_PATH, 'BudgetMarker');
+      var results = searchDocs(VAULT_PATH, 'BudgetMarker', { maxTokens: budget });
       assert.equal(full.length, 1);
       assert.match(full[0].file, /very-long-path-name/);
       assert.match(full[0].headings[0], /außergewöhnlich lange Überschrift/i);
@@ -393,79 +382,78 @@ describe('Vault', () => {
     });
   });
 
-  // BM25/IDF statt Handscoring: der seltene Token muss die Query dominieren.
   describe('searchDocs BM25 ranking', () => {
     it('finds the canonical page for a rare single token', () => {
-      const results = searchDocs(VAULT_PATH, 'hasInvoicePlugin');
+      var results = searchDocs(VAULT_PATH, 'hasInvoicePlugin');
       assert.equal(results[0].file, 'Properties/DlcFile');
     });
 
-    // Der Regressionsfall: "Mappentyp" und "Eigenschaft" sind häufig, unter dem
-    // alten Handscoring haben sie irrelevante Seiten nach oben geboostet.
     it('lets the rare token win over frequent tokens (hasInvoicePlugin case)', () => {
-      const results = searchDocs(VAULT_PATH, 'Mappentyp Eigenschaft hasInvoicePlugin');
+      var results = searchDocs(VAULT_PATH, 'Mappentyp Eigenschaft hasInvoicePlugin');
+      var resultFiles = '';
+      for (var resultIndex = 0; resultIndex < results.length; resultIndex++) {
+        if (resultFiles) resultFiles += ', ';
+        resultFiles += results[resultIndex].file;
+      }
       assert.equal(
         results[0].file,
         'Properties/DlcFile',
-        `falsches Top-Ergebnis: ${results.map(r => r.file).join(', ')}`
+        `falsches Top-Ergebnis: ${resultFiles}`
       );
     });
 
-    // Der Treffer muss das heading mitliefern, damit ein Folge-read gezielt sein kann.
     it('reports the matched heading so a follow-up read can target it', () => {
-      const results = searchDocs(VAULT_PATH, 'Mappentyp Eigenschaft hasInvoicePlugin');
+      var results = searchDocs(VAULT_PATH, 'Mappentyp Eigenschaft hasInvoicePlugin');
       assert.equal(results[0].headings[0], 'hasInvoicePlugin');
-      const doc = readDoc(VAULT_PATH, results[0].file, 8000, { heading: results[0].headings[0] });
+      var doc = readDoc(VAULT_PATH, results[0].file, 8000, { heading: results[0].headings[0] });
       assert.equal(doc.mode, 'heading');
       assert.match(doc.content, /Invoice Plugin/);
     });
 
     it('keeps the section scope', () => {
-      const results = searchDocs(VAULT_PATH, 'Eigenschaft', { section: 'Properties' });
+      var results = searchDocs(VAULT_PATH, 'Eigenschaft', { section: 'Properties' });
       assert.ok(results.length > 0);
-      for (const r of results) {
-        assert.ok(r.file.startsWith('Properties/'), `ausserhalb der section: ${r.file}`);
+      for (var resultIndex = 0; resultIndex < results.length; resultIndex++) {
+        assert.ok(results[resultIndex].file.startsWith('Properties/'), `außerhalb der section: ${results[resultIndex].file}`);
       }
     });
 
     it('falls back to fuzzy matching only when the exact search finds nothing', () => {
-      const typo = searchDocs(VAULT_PATH, 'hasInvoicePlugn');
+      var typo = searchDocs(VAULT_PATH, 'hasInvoicePlugn');
       assert.ok(typo.length > 0, 'tippfehler sollte gerettet werden');
       assert.equal(typo[0].file, 'Properties/DlcFile');
     });
 
     it('scores results in descending order', () => {
-      const results = searchDocs(VAULT_PATH, 'Mappentyp Eigenschaft');
-      for (let i = 1; i < results.length; i++) {
-        assert.ok(results[i - 1].score >= results[i].score);
+      var results = searchDocs(VAULT_PATH, 'Mappentyp Eigenschaft');
+      for (var resultIndex = 1; resultIndex < results.length; resultIndex++) {
+        assert.ok(results[resultIndex - 1].score >= results[resultIndex].score);
       }
     });
   });
 
-  // read: kleines Default-Budget, TOC statt Rohseite
   describe('readDoc truncation and table of contents', () => {
     it('returns the full body when it fits the budget', () => {
-      const doc = readDoc(VAULT_PATH, 'guides/Sections');
+      var doc = readDoc(VAULT_PATH, 'guides/Sections');
       assert.equal(doc.mode, 'full');
       assert.equal(doc.truncated, false);
       assert.match(doc.content, /Beta body line/);
     });
 
     it('returns only the requested section with heading', () => {
-      const doc = readDoc(VAULT_PATH, 'guides/Sections', 8000, { heading: 'Beta' });
+      var doc = readDoc(VAULT_PATH, 'guides/Sections', 8000, { heading: 'Beta' });
       assert.equal(doc.mode, 'heading');
       assert.match(doc.content, /Beta body line/);
       assert.ok(!/Alpha body line/.test(doc.content));
     });
 
     it('folds umlauts when matching a heading', () => {
-      const doc = readDoc(VAULT_PATH, 'api/Uebersicht', 8000, { heading: 'Uebersicht' });
+      var doc = readDoc(VAULT_PATH, 'api/Uebersicht', 8000, { heading: 'Uebersicht' });
       assert.ok(doc);
     });
 
-    // teuerster Altfehler: unbekanntes heading lieferte still die ganze Seite
     it('offers the table of contents instead of the raw page for an unknown heading', () => {
-      const doc = readDoc(VAULT_PATH, 'guides/Many Sections', 8000, { heading: 'GibtEsNicht' });
+      var doc = readDoc(VAULT_PATH, 'guides/Many Sections', 8000, { heading: 'GibtEsNicht' });
       assert.equal(doc.mode, 'heading-not-found');
       assert.ok(!/Inhalt eins/.test(doc.content), 'darf nicht den Seiteninhalt dumpen');
       assert.match(doc.content, /Ein \| Zwei \| Drei/);
@@ -473,17 +461,17 @@ describe('Vault', () => {
     });
 
     it('returns intro plus toc for a long page with many sections', () => {
-      const doc = readDoc(VAULT_PATH, 'guides/Many Sections', 200);
+      var doc = readDoc(VAULT_PATH, 'guides/Many Sections', 200);
       assert.equal(doc.mode, 'toc');
       assert.equal(doc.truncated, true);
       assert.match(doc.content, /Abschnitte \(6\)/);
-      assert.match(doc.content, /Ein \| Zwei \| Drei \| Vier \| Fuenf \| Sechs/);
+      assert.match(doc.content, /Ein \| Zwei \| Drei \| Vier \| Fünf \| Sechs/);
       assert.match(doc.content, /heading=/);
       assert.ok(!/Inhalt sechs/.test(doc.content), 'TOC-Modus darf keine Abschnittsinhalte enthalten');
     });
 
     it('lists the remaining headings when a flat page is cut off', () => {
-      const doc = readDoc(VAULT_PATH, 'guides/Long Flat', 300);
+      var doc = readDoc(VAULT_PATH, 'guides/Long Flat', 300);
       assert.equal(doc.mode, 'truncated');
       assert.equal(doc.truncated, true);
       assert.match(doc.content, /Hinten/);
@@ -491,21 +479,20 @@ describe('Vault', () => {
     });
 
     it('honors max_tokens as a read budget', () => {
-      const doc = readDoc(VAULT_PATH, 'guides/Long Flat', 8000, { maxTokens: 100 });
+      var doc = readDoc(VAULT_PATH, 'guides/Long Flat', 8000, { maxTokens: 100 });
       assert.ok(doc.content.length <= 100 * 4 + 600, `budget verletzt: ${doc.content.length}`);
     });
 
-    // die TOC darf das Budget nicht über die Hintertür sprengen
     it('caps the table of contents by the budget too', () => {
-      const wide = readDoc(VAULT_PATH, 'guides/Many Sections', 800);
-      const tight = readDoc(VAULT_PATH, 'guides/Many Sections', 200);
-      assert.ok(tight.content.length < wide.content.length, 'kleineres budget muss kuerzer sein');
+      var wide = readDoc(VAULT_PATH, 'guides/Many Sections', 800);
+      var tight = readDoc(VAULT_PATH, 'guides/Many Sections', 200);
+      assert.ok(tight.content.length < wide.content.length, 'kleineres budget muss kürzer sein');
       assert.match(tight.content, /Abschnitte \(6\)/);
     });
 
     it('keeps long navigation content within the exact read budget', () => {
-      const budget = 50;
-      const doc = readDoc(VAULT_PATH, 'guides/Very Long Navigation', 8000, { maxTokens: budget });
+      var budget = 50;
+      var doc = readDoc(VAULT_PATH, 'guides/Very Long Navigation', 8000, { maxTokens: budget });
       assert.ok(doc.content.length <= budget * 4, `budget verletzt: ${doc.content.length} > ${budget * 4}`);
     });
   });
@@ -523,23 +510,23 @@ describe('Vault', () => {
     });
 
     it('accepts a nested technical section in search', () => {
-      const res = handleSearch(VAULT_PATH, { query: 'appendHtml', section: 'Scripting/TERAS API' });
+      var res = handleSearch(VAULT_PATH, { query: 'appendHtml', section: 'Scripting/TERAS API' });
       assert.ok(Array.isArray(res));
       assert.equal(res[0].file, 'Scripting/TERAS API/Gadget API/HTML');
     });
 
     it('rejects a non-canonical nested section path', () => {
-      const res = handleSearch(VAULT_PATH, { query: 'appendHtml', section: 'Scripting/../Scripting/TERAS API' });
+      var res = handleSearch(VAULT_PATH, { query: 'appendHtml', section: 'Scripting/../Scripting/TERAS API' });
       assert.ok(res && res.error, 'non-canonical section must return an error');
     });
 
     it('returns an index error for a file used as the vault path', () => {
-      const res = handleSearch(join(VAULT_PATH, 'api', 'DocFile.md'), { query: 'function' });
+      var res = handleSearch(join(VAULT_PATH, 'api', 'DocFile.md'), { query: 'function' });
       assert.equal(res.error, 'Search index unavailable: Vault path is not a directory');
     });
 
     it('returns an index error before validating a section on an invalid vault path', () => {
-      const res = handleSearch(join(VAULT_PATH, 'api', 'DocFile.md'), { query: 'function', section: 'api' });
+      var res = handleSearch(join(VAULT_PATH, 'api', 'DocFile.md'), { query: 'function', section: 'api' });
       assert.equal(res.error, 'Search index unavailable: Vault path is not a directory');
     });
 

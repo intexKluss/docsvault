@@ -70,12 +70,15 @@ export async function createServer(opts = {}) {
   } else {
     console.log(`[server] loaded ${vaultRegistry.length} vault(s): ${vaultRegistry.map(v => v.toolPrefix).join(', ')}`);
     if (vaultRegistry.length > 20) {
-      const toolCount = vaultRegistry.reduce((count, vault) => count + getToolSuffixes(vault).length, 0);
+      var toolCount = 0;
+      for (var vaultIndex = 0; vaultIndex < vaultRegistry.length; vaultIndex++) {
+        toolCount += getToolSuffixes(vaultRegistry[vaultIndex]).length;
+      }
       console.warn(`[server] WARNING: ${vaultRegistry.length} vaults = ${toolCount} tools, some agents may hit tool-count limits.`);
     }
-    // BM25-Index vorab bauen, damit die erste Suche nicht dafür bezahlt.
-    for (const vault of vaultRegistry) {
-      const index = warmSearchIndex(vault.path);
+    for (var vaultIndex = 0; vaultIndex < vaultRegistry.length; vaultIndex++) {
+      var vault = vaultRegistry[vaultIndex];
+      var index = warmSearchIndex(vault.path);
       if (index) {
         console.log(`[server] ${vault.toolPrefix}: ${index.fileCount} pages, ${index.segmentCount} sections indexed in ${index.buildMs}ms`);
       }

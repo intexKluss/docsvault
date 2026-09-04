@@ -28,46 +28,55 @@ function isErrorResult(value) {
 // cancelt den call headless ("user cancelled MCP tool call").
 const READONLY_TOOL = { readOnlyHint: true, openWorldHint: false };
 
-// Die Recherche-Methodik steht bewusst NICHT in jeder Tool-Beschreibung.
-// Tool-Beschreibungen liegen dauerhaft im Kontext, einmal pro Vault; die
-// initialize-instructions gibt es einmal pro Server. Jede Tool-Beschreibung
-// ist deshalb ein bis zwei Sätze, alles Methodische steht hier.
-export function buildInstructions(vaultRegistry) {
-  const lines = [
-    'Read-only documentation vaults. Each vault has its own tool prefix.',
-    '',
-    'Flow: <prefix>_overview for section names, <prefix>_search for the term, <prefix>_read for the page.',
-    '',
-    'Search results are section-level. Each hit is { file, title, headings, snippet, score }.',
-    'Pass "file" verbatim as _read\'s "path" and one of "headings" as its "heading" to get just that',
-    'section. Reading without a heading returns intro plus table of contents on long pages, by design.',
-    '',
-    'Rules:',
-    '- Never guess or construct a path. Only use "file"/"path" values a tool returned.',
-    '- Snippets are pointers, not the answer. Open the page before answering.',
-    '- Thin results: search again with other words (synonym, German and English, method and concept name).',
-    '- Concept/handbook, API reference and properties/config pages answer different parts of a question.',
-    '  Check every relevant type, not just the first hit.',
-    '- Tight context budget: set max_tokens on search and read.',
-  ];
+export function createMcpServer(vaultRegistry) {
+  var server = new McpServer(
+    {
+      name: 'docsvault',
+      version: '0.2.0',
+    },
+    {
+      instructions: buildInstructions(vaultRegistry),
+    }
+  );
+
+  for (var vaultIndex = 0; vaultIndex < vaultRegistry.length; vaultIndex++) {
+    registerVaultTools(server, vaultRegistry[vaultIndex]);
+  }
+
+  return server;
+}
+
+function buildInstructions(vaultRegistry) {
+  var instructions = 'Read-only documentation vaults. Each vault has its own tool prefix.\n\n';
+  instructions += 'Flow: <prefix>_overview for section names, <prefix>_search for the term, <prefix>_read for the page.\n\n';
+  instructions += 'Search results are section-level. Each hit is { file, title, headings, snippet, score }.\n';
+  instructions += 'Pass "file" verbatim as _read\'s "path" and one of "headings" as its "heading" to get just that\n';
+  instructions += 'section. Reading without a heading returns intro plus table of contents on long pages, by design.\n\n';
+  instructions += 'Rules:\n';
+  instructions += '- Never guess or construct a path. Only use "file"/"path" values a tool returned.\n';
+  instructions += '- Snippets are pointers, not the answer. Open the page before answering.\n';
+  instructions += '- Thin results: search again with other words (synonym, German and English, method and concept name).\n';
+  instructions += '- Concept/handbook, API reference and properties/config pages answer different parts of a question.\n';
+  instructions += '  Check every relevant type, not just the first hit.\n';
+  instructions += '- Tight context budget: set max_tokens on search and read.';
 
   if (vaultRegistry.length) {
-    lines.push('', 'Vaults:');
-    for (const vault of vaultRegistry) {
-      lines.push(`- ${vault.toolPrefix}_*: ${vault.description}`);
-      if (vault.searchHint) lines.push(`  ${vault.searchHint}`);
+    instructions += '\n\nVaults:';
+    for (var vaultIndex = 0; vaultIndex < vaultRegistry.length; vaultIndex++) {
+      var vault = vaultRegistry[vaultIndex];
+      instructions += `\n- ${vault.toolPrefix}_*: ${vault.description}`;
+      if (vault.searchHint) instructions += `\n  ${vault.searchHint}`;
     }
   }
 
-  return lines.join('\n');
+  return instructions;
 }
 
 function registerVaultTools(server, vault) {
   const { toolPrefix, description } = vault;
   const vaultPath = vault.path;
-  // vault-spezifischer Hinweis aus _meta.json: nur noch als Verweis, der Text
-  // selbst steht in den Server-instructions.
-  const hintRef = vault.searchHint ? ` See this server's instructions for what lives where.` : '';
+  var hintRef = '';
+  if (vault.searchHint) hintRef = ` See this server's instructions for what lives where.`;
 
   // Jedes neue Tool hier muss auch in TOOL_SUFFIXES in vault-registry.js ergänzt werden,
   // sonst wird es nicht in describeVaults()/System-Prompt auftauchen.
@@ -119,7 +128,7 @@ function registerVaultTools(server, vault) {
       },
       READONLY_TOOL,
       async (params) => {
-        const results = handleSearch(vaultPath, { ...params, section: vault.technicalSection });
+        var results = handleSearch(vaultPath, { ...params, section: vault.technicalSection });
         if (isErrorResult(results)) {
           return { content: [{ type: 'text', text: results.error }], isError: true };
         }
@@ -139,7 +148,7 @@ function registerVaultTools(server, vault) {
     },
     READONLY_TOOL,
     async (params) => {
-      const result = handleRead(vaultPath, params, MAX_MCP_READ_LENGTH);
+      var result = handleRead(vaultPath, params, MAX_MCP_READ_LENGTH);
       if (result.error) {
         return { content: [{ type: 'text', text: result.error }], isError: true };
       }
@@ -173,11 +182,11 @@ function registerVaultTools(server, vault) {
     },
     READONLY_TOOL,
     async (params) => {
-      const result = handleListPaged(vaultPath, params);
+      var result = handleListPaged(vaultPath, params);
       if (isErrorResult(result)) {
         return { content: [{ type: 'text', text: result.error }], isError: true };
       }
-      let text = JSON.stringify(result.files);
+      var text = JSON.stringify(result.files);
       if (result.truncated) text += `\n${result.note}`;
       return { content: [{ type: 'text', text }] };
     }
@@ -193,24 +202,6 @@ function registerVaultTools(server, vault) {
       return { content: [{ type: 'text', text: JSON.stringify(result) }] };
     }
   );
-}
-
-export function createMcpServer(vaultRegistry) {
-  const server = new McpServer(
-    {
-      name: 'docsvault',
-      version: '0.2.0',
-    },
-    {
-      instructions: buildInstructions(vaultRegistry),
-    }
-  );
-
-  for (const vault of vaultRegistry) {
-    registerVaultTools(server, vault);
-  }
-
-  return server;
 }
 
 export async function handleSseGet(req, res, vaultRegistry) {

@@ -31,19 +31,27 @@ describe('Multi-vault integration', () => {
     assert.deepEqual(registry.map(v => v.toolPrefix).sort(), ['intex_regeln', 'otris']);
   });
 
-  it('creates MCP server with 5 tools per vault using correct prefixes', () => {
+  it('creates each vault\'s configured tools with correct prefixes', () => {
     const registry = loadVaultRegistry(root);
     const server = createMcpServer(registry);
     // uses SDK internal; may break on SDK upgrade
     const tools = server._registeredTools || {};
-    let toolCount = 0;
-    for (const vault of registry) toolCount += getToolSuffixes(vault).length;
+    var toolCount = 0;
+    for (var vaultIndex = 0; vaultIndex < registry.length; vaultIndex++) {
+      toolCount += getToolSuffixes(registry[vaultIndex]).length;
+    }
     assert.equal(Object.keys(tools).length, toolCount);
 
-    for (const prefix of ['otris', 'intex_regeln']) {
-      const vault = registry.find((entry) => entry.toolPrefix === prefix);
-      for (const suffix of getToolSuffixes(vault)) {
-        assert.ok(tools[`${prefix}_${suffix}`], `missing tool ${prefix}_${suffix}`);
+    var prefixes = ['otris', 'intex_regeln'];
+    for (var prefixIndex = 0; prefixIndex < prefixes.length; prefixIndex++) {
+      var vault;
+      for (var vaultIndex = 0; vaultIndex < registry.length; vaultIndex++) {
+        if (registry[vaultIndex].toolPrefix === prefixes[prefixIndex]) vault = registry[vaultIndex];
+      }
+      var suffixes = getToolSuffixes(vault);
+      for (var suffixIndex = 0; suffixIndex < suffixes.length; suffixIndex++) {
+        var toolName = `${prefixes[prefixIndex]}_${suffixes[suffixIndex]}`;
+        assert.ok(tools[toolName], `missing tool ${toolName}`);
       }
     }
   });

@@ -7,7 +7,7 @@ import { buildSearchIndex } from './search-index.js';
 // können wir Manifest, Sections, einen Titel-/Pfad-Index und den BM25-Index
 // halten und nur invalidieren wenn sich die mtime von _manifest.json
 // (fallback: Vault-Root) ändert.
-const cache = new Map(); // vaultPath -> { mtimeMs, manifest, sections, titleIndex, searchIndex }
+var cache = new Map();
 
 // Liefert die mtime die für die Invalidierung benutzt wird:
 // bevorzugt _manifest.json, sonst der Vault-Root-Ordner.
@@ -30,7 +30,7 @@ function getEntry(vaultPath) {
   const existing = cache.get(vaultPath);
   if (existing && existing.mtimeMs === mtimeMs) return existing;
 
-  const entry = {
+  var entry = {
     mtimeMs,
     manifest: undefined,
     sections: undefined,
@@ -127,18 +127,14 @@ export function getCachedTitleIndex(vaultPath) {
   return entry.titleIndex;
 }
 
-// gecachter BM25-Abschnitts-Index. Lazy: erst beim ersten Suchlauf gebaut,
-// danach bis zur nächsten mtime-Änderung wiederverwendet.
 export function getCachedSearchIndex(vaultPath) {
-  const entry = getEntry(vaultPath);
+  var entry = getEntry(vaultPath);
   if (entry.searchIndex === undefined) {
     entry.searchIndex = buildSearchIndex(vaultPath);
   }
   return entry.searchIndex;
 }
 
-// Baut den Index vorab, damit der erste Suchlauf nicht dafür bezahlt.
-// Fehler werden geschluckt: ein kaputter Vault darf den Serverstart nicht kippen.
 export function warmSearchIndex(vaultPath) {
   try {
     return getCachedSearchIndex(vaultPath);

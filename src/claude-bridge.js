@@ -49,9 +49,14 @@ export class ClaudeBridge {
       registry = [scoped];
     }
     const systemPrompt = buildSystemPrompt(registry);
-  const allowedTools = registry.flatMap(v =>
-      getToolSuffixes(v).map(s => `mcp__docsvault__${v.toolPrefix}_${s}`)
-    );
+    var allowedTools = [];
+    for (var vaultIndex = 0; vaultIndex < registry.length; vaultIndex++) {
+      var vault = registry[vaultIndex];
+      var toolSuffixes = getToolSuffixes(vault);
+      for (var suffixIndex = 0; suffixIndex < toolSuffixes.length; suffixIndex++) {
+        allowedTools.push(`mcp__docsvault__${vault.toolPrefix}_${toolSuffixes[suffixIndex]}`);
+      }
+    }
 
     // security-relevante felder NACH spread, nicht überschreibbar
     function buildOptions(overrides = {}) {

@@ -17,9 +17,9 @@ try {
   if (registry.length === 0) {
     console.error(`[mcp-stdio] WARNING: no vaults found under ${VAULTS_ROOT}`);
   }
-  // BM25-Index vorab bauen, damit die erste Suche nicht dafür bezahlt.
-  for (const vault of registry) {
-    const index = warmSearchIndex(vault.path);
+  for (var vaultIndex = 0; vaultIndex < registry.length; vaultIndex++) {
+    var vault = registry[vaultIndex];
+    var index = warmSearchIndex(vault.path);
     if (index) {
       console.error(`[mcp-stdio] ${vault.toolPrefix}: ${index.fileCount} pages, ${index.segmentCount} sections indexed in ${index.buildMs}ms`);
     }

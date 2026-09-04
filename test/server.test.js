@@ -162,9 +162,9 @@ describe('Server', () => {
     });
 
     it('GET /api/otris/search returns concise snippets on request', async () => {
-      const res = await fetch(`${baseUrl}/api/otris/search?query=DocFile&response_format=concise`);
+      var res = await fetch(`${baseUrl}/api/otris/search?query=DocFile&response_format=concise`);
       assert.equal(res.status, 200);
-      const data = await res.json();
+      var data = await res.json();
       assert.ok(typeof data[0].snippet === 'string');
       assert.equal(data[0].matches, undefined);
     });
@@ -180,9 +180,9 @@ describe('Server', () => {
     });
 
     it('GET /api/otris/search clamps fractional max_tokens to the minimum budget', async () => {
-      const res = await fetch(`${baseUrl}/api/otris/search?query=FileType&response_format=concise&max_tokens=0.1`);
+      var res = await fetch(`${baseUrl}/api/otris/search?query=FileType&response_format=concise&max_tokens=0.1`);
       assert.equal(res.status, 200);
-      const data = await res.json();
+      var data = await res.json();
       assert.equal(data.length, 1);
       assert.ok(JSON.stringify(data).length <= 50 * 4);
     });
@@ -198,9 +198,9 @@ describe('Server', () => {
     });
 
     it('GET /api/otris/read permits an explicit 200000 character REST read', async () => {
-      const res = await fetch(`${baseUrl}/api/otris/read?path=portalscript-api/Long&max_length=200000`);
+      var res = await fetch(`${baseUrl}/api/otris/read?path=portalscript-api/Long&max_length=200000`);
       assert.equal(res.status, 200);
-      const data = await res.json();
+      var data = await res.json();
       assert.ok(data.content.length > 25000);
     });
 
