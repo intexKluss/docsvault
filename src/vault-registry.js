@@ -1,4 +1,4 @@
-import { readdirSync, readFileSync, existsSync, statSync } from 'node:fs';
+import { readdirSync, readFileSync, existsSync, statSync, realpathSync } from 'node:fs';
 import { join, resolve, relative, normalize, isAbsolute, sep } from 'node:path';
 
 // Ordner die kein Vault-Content sind und übersprungen werden (zusätzlich
@@ -68,6 +68,11 @@ function findExistingSection(vaultDir, section) {
   try {
     if (!existsSync(sectionPath)) return undefined;
     if (!statSync(sectionPath).isDirectory()) return undefined;
+    var realVaultPath = realpathSync(vaultDir);
+    var realSectionPath = realpathSync(sectionPath);
+    var realRelativePath = relative(realVaultPath, realSectionPath);
+    if (!realRelativePath || isAbsolute(realRelativePath)) return undefined;
+    if (realRelativePath === '..' || realRelativePath.startsWith('..' + sep)) return undefined;
   } catch {
     return undefined;
   }

@@ -1,7 +1,16 @@
 import { describe, it, after } from 'node:test';
 import assert from 'node:assert/strict';
+import { mkdirSync, symlinkSync, writeFileSync } from 'node:fs';
+import { join } from 'node:path';
 import { slugify, loadVaultRegistry, getToolSuffixes, describeVaults } from '../src/vault-registry.js';
 import { createTempVaultsRoot } from './helpers/temp-vault.js';
+
+function findVault(registry, toolPrefix) {
+  for (var i = 0; i < registry.length; i++) {
+    if (registry[i].toolPrefix === toolPrefix) return registry[i];
+  }
+  return undefined;
+}
 
 describe('slugify', () => {
   const cases = [
@@ -154,6 +163,55 @@ describe('loadVaultRegistry: basic scan', () => {
     var vault = loadVaultRegistry(fixture.root)[0];
     assert.equal(vault.technicalSection, 'Scripting/TERAS API');
     assert.ok(getToolSuffixes(vault).includes('technical_search'));
+  });
+
+  it('rejects non-canonical technical section paths', () => {
+    var fixture = createTempVaultsRoot({
+      outside: { files: { 'Doc.md': '# Outside' } },
+      parent: { files: { 'Guide.md': '# Guide' } },
+      absolute: { files: { 'Guide.md': '# Guide' } },
+      duplicate: { files: { 'Reference/API/Doc.md': '# Doc' } },
+    });
+    after(fixture.cleanup);
+
+    writeFileSync(join(fixture.root, 'parent', '_meta.json'), JSON.stringify({ toolPrefix: 'parent', technicalSection: '../outside' }));
+    writeFileSync(join(fixture.root, 'absolute', '_meta.json'), JSON.stringify({ toolPrefix: 'absolute', technicalSection: join(fixture.root, 'outside') }));
+    writeFileSync(join(fixture.root, 'duplicate', '_meta.json'), JSON.stringify({ toolPrefix: 'duplicate', technicalSection: 'Reference//API' }));
+
+    var registry = loadVaultRegistry(fixture.root);
+    assert.equal(findVault(registry, 'parent').technicalSection, undefined);
+    assert.equal(findVault(registry, 'absolute').technicalSection, undefined);
+    assert.equal(findVault(registry, 'duplicate').technicalSection, undefined);
+  });
+
+  it('rejects a technical section that escapes through a symbolic link', (t) => {
+    var fixture = createTempVaultsRoot({
+      'api-reference': {
+        meta: { toolPrefix: 'api_reference', technicalSection: 'Reference/API' },
+        files: { 'Guide.md': '# Guide' },
+      },
+      outside: { files: { 'Doc.md': '# Outside' } },
+    });
+    after(fixture.cleanup);
+
+    var sectionDir = join(fixture.root, 'api-reference', 'Reference');
+    var linkPath = join(sectionDir, 'API');
+    var linkType = 'dir';
+    if (process.platform === 'win32') linkType = 'junction';
+    mkdirSync(sectionDir, { recursive: true });
+
+    try {
+      symlinkSync(join(fixture.root, 'outside'), linkPath, linkType);
+    } catch (err) {
+      if (err.code === 'EPERM' || err.code === 'EACCES') {
+        t.skip(`symbolic links unavailable: ${err.code}`);
+        return;
+      }
+      throw err;
+    }
+
+    var vault = findVault(loadVaultRegistry(fixture.root), 'api_reference');
+    assert.equal(vault.technicalSection, undefined);
   });
 });
 
