@@ -17,6 +17,7 @@ after(testVault.cleanup);
 
 it('reuses the manifestless change signature during the validation interval', async () => {
   var originalReaddirSync = fs.readdirSync;
+  var originalNow = Date.now;
   var rootReads = 0;
   fs.readdirSync = function (directory, options) {
     if (resolve(directory) === resolve(VAULT_PATH)) rootReads++;
@@ -36,7 +37,17 @@ it('reuses the manifestless change signature during the validation interval', as
     });
     assert.equal(result.length, 1);
     assert.equal(rootReads, 0);
+
+    rootReads = 0;
+    var currentTime = originalNow();
+    Date.now = function () {
+      return currentTime - 5000;
+    };
+    result = searchTools.handleSearch(VAULT_PATH, { query: 'TraversalNeedle' });
+    assert.equal(result.length, 1);
+    assert.equal(rootReads, 1);
   } finally {
+    Date.now = originalNow;
     fs.readdirSync = originalReaddirSync;
     syncBuiltinESMExports();
   }

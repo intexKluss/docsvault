@@ -55,6 +55,7 @@ function getEntry(vaultPath) {
   if (
     existing
     && !hasManifest
+    && existing.manifestlessValidatedAt <= now
     && existing.manifestlessValidUntil > now
   ) {
     return existing;
@@ -63,6 +64,7 @@ function getEntry(vaultPath) {
   var changeKey = vaultChangeKey(vaultPath);
   if (existing && existing.changeKey === changeKey) {
     if (!hasManifest) {
+      existing.manifestlessValidatedAt = now;
       existing.manifestlessValidUntil = now + MANIFESTLESS_VALIDATION_INTERVAL_MS;
     }
     return existing;
@@ -70,6 +72,7 @@ function getEntry(vaultPath) {
 
   var entry = {
     changeKey,
+    manifestlessValidatedAt: 0,
     manifestlessValidUntil: 0,
     manifest: undefined,
     sections: undefined,
@@ -77,6 +80,7 @@ function getEntry(vaultPath) {
     searchIndex: undefined,
   };
   if (!hasManifest) {
+    entry.manifestlessValidatedAt = now;
     entry.manifestlessValidUntil = now + MANIFESTLESS_VALIDATION_INTERVAL_MS;
   }
   cache.set(vaultPath, entry);
