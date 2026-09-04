@@ -293,7 +293,14 @@ export function searchDocs(vaultPath, query, options = {}) {
       if (result.matches.length === 0) {
         var topSegment = group.segs[0];
         var syntheticText = '';
-        if (topSegment.heading && headingIsQuerySubset(topSegment.heading, termSet)) {
+        var headingTermMatch = false;
+        var headingTerms = new Set(queryTerms(topSegment.heading));
+        for (var matchedTermIndex = 0; matchedTermIndex < topSegment.matchedTerms.length; matchedTermIndex++) {
+          if (!headingTerms.has(foldText(topSegment.matchedTerms[matchedTermIndex]))) continue;
+          headingTermMatch = true;
+          break;
+        }
+        if (headingTermMatch) {
           syntheticText = topSegment.heading;
         } else if (result.titleMatch) {
           syntheticText = group.title;

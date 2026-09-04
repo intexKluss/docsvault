@@ -59,6 +59,7 @@ const { root: TEST_VAULTS_ROOT, cleanup: cleanupTestVaults } = createTempVaultsR
       'portalscript-api/Duplicate.md': '# Duplicate\n\n## First\n\n### Details\n\nFirst section body.\n\n## Second\n\n### Details\n\nNestedLocatorNeedle belongs to the second section.',
       'portalscript-api/Guide.md': '# Guide\n\nGeneric intro.\n\n## UniqueHeading\n\nGeneric body.',
       'portalscript-api/HeadingOnly.md': '# Heading Page\n\nGeneric intro.\n\n## UniqueHeading\n\nGeneric body.',
+      'portalscript-api/MultiHeading.md': '# Heading Page\n\nGeneric intro.\n\n## Unique Heading Name\n\nGeneric body.',
       'portalscript-api/TopHeading.md': '# UniqueTopHeading\n\nGeneric body.',
       'SpecialFolder/Page.md': '# Page\n\nBodyNeedle appears without the parent folder name.',
       'howtos/upload.md': '# Upload\n\nDoc-Upload Anleitung.',
@@ -261,6 +262,22 @@ describe('Server', () => {
       assert.equal(page.matches[0].text, 'UniqueHeading');
       assert.equal(page.matches[0].line, 5);
       assert.equal(page.matches[0].heading, 'UniqueHeading');
+    });
+
+    it('returns a partially matched multi-token heading as the synthetic match', async () => {
+      var response = await fetch(`${baseUrl}/api/otris/search?query=Unique`);
+      assert.equal(response.status, 200);
+      var results = await response.json();
+      var page;
+      for (var resultIndex = 0; resultIndex < results.length; resultIndex++) {
+        if (results[resultIndex].file === 'portalscript-api/MultiHeading') page = results[resultIndex];
+      }
+
+      assert.ok(page);
+      assert.equal(page.matches.length, 1);
+      assert.equal(page.matches[0].text, 'Unique Heading Name');
+      assert.equal(page.matches[0].line, 5);
+      assert.equal(page.matches[0].heading, 'Unique Heading Name');
     });
 
     it('GET /api/otris/search returns concise snippets on request', async () => {
