@@ -52,6 +52,8 @@ const { root, cleanup } = createTempVaultsRoot({
       'guides/Very Long Navigation.md': '# Navigation\n\nIntro.\n\n## Eine außergewöhnlich lange Überschrift für das enge Antwortbudget Nummer eins\n\nText.\n\n## Eine außergewöhnlich lange Überschrift für das enge Antwortbudget Nummer zwei\n\nText.\n\n## Eine außergewöhnlich lange Überschrift für das enge Antwortbudget Nummer drei\n\nText.\n\n## Eine außergewöhnlich lange Überschrift für das enge Antwortbudget Nummer vier\n\nText.\n\n## Eine außergewöhnlich lange Überschrift für das enge Antwortbudget Nummer fünf\n\nText.',
       'guides/Fenced Headings.md': '# Fenced Headings\n\nIntro.\n\n## Real One\n\n' + 'Long section content. '.repeat(80) + '\n\n```js\n## Backtick Fake\nBacktick hidden body.\n```\n\n~~~text\n### Tilde Fake\nTilde hidden body.\n~~~\n\n## Real Two\n\nBody two.\n\n## Real Three\n\nBody three.\n\n## Real Four\n\nBody four.\n\n## Real Five\n\nBody five.',
       'guides/H1 Boundaries.md': '# First Page\n\nFirst H1 body.\n\n## Child Section\n\nChild body.\n\n# Second Page\n\nSecond H1 body.',
+      'scope/Page.md': '# Scoped Page\n\nSectionBoundaryNeedle',
+      'scope.md': '# Scope Landing Page\n\nSectionBoundaryNeedle',
     },
   },
 });
@@ -474,6 +476,16 @@ describe('Vault', () => {
       for (var resultIndex = 0; resultIndex < results.length; resultIndex++) {
         assert.ok(results[resultIndex].file.startsWith('Properties/'), `außerhalb der section: ${results[resultIndex].file}`);
       }
+    });
+
+    it('does not include a sibling page with the same name as the section', () => {
+      var results = searchDocs(VAULT_PATH, 'SectionBoundaryNeedle', { section: 'scope' });
+      var files = [];
+      for (var resultIndex = 0; resultIndex < results.length; resultIndex++) {
+        files.push(results[resultIndex].file);
+      }
+
+      assert.deepEqual(files, ['scope/Page']);
     });
 
     it('falls back to fuzzy matching only when the exact search finds nothing', () => {

@@ -227,7 +227,7 @@ export function searchDocs(vaultPath, query, options = {}) {
     sectionPrefix = normalizeSlashes(section) + '/';
     filter = function (result) {
       var segment = index.segments.get(result.id);
-      return !!segment && (segment.file === section || segment.file.startsWith(sectionPrefix));
+      return !!segment && segment.file.startsWith(sectionPrefix);
     };
   }
 
