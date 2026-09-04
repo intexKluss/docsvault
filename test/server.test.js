@@ -57,6 +57,7 @@ const { root: TEST_VAULTS_ROOT, cleanup: cleanupTestVaults } = createTempVaultsR
       'portalscript-api/DocFile.md': '# DocFile\n\nEine Klasse für Dateien.',
       'portalscript-api/FileType.md': '# FileType\n\nDateityp-Klasse.',
       'portalscript-api/Duplicate.md': '# Duplicate\n\n## First\n\n### Details\n\nFirst section body.\n\n## Second\n\n### Details\n\nNestedLocatorNeedle belongs to the second section.',
+      'SpecialFolder/Page.md': '# Page\n\nGeneric body without the parent folder name.',
       'howtos/upload.md': '# Upload\n\nDoc-Upload Anleitung.',
       'portalscript-api/Long.md': '# Long\n\n' + 'Langer REST-Inhalt. '.repeat(2000),
     },
@@ -161,6 +162,21 @@ describe('Server', () => {
       assert.ok(Array.isArray(data));
       assert.ok(Array.isArray(data[0].matches));
       assert.ok(data[0].matches.length >= 1, 'title-only detailed hit needs a synthetic match');
+    });
+
+    it('keeps parent-folder path matches in the legacy detailed shape', async () => {
+      var response = await fetch(`${baseUrl}/api/otris/search?query=SpecialFolder`);
+      assert.equal(response.status, 200);
+      var results = await response.json();
+      var page;
+      for (var resultIndex = 0; resultIndex < results.length; resultIndex++) {
+        if (results[resultIndex].file === 'SpecialFolder/Page') page = results[resultIndex];
+      }
+
+      assert.ok(page);
+      assert.equal(page.titleMatch, true);
+      assert.ok(page.matches.length >= 1);
+      assert.match(page.matches[0].text, /SpecialFolder/);
     });
 
     it('GET /api/otris/search returns concise snippets on request', async () => {

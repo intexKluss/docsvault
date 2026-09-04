@@ -71,10 +71,15 @@ export function readDoc(vaultPath, docPath, maxLength = DEFAULT_READ_LENGTH, opt
     path: resolvedPath,
   };
 
-  var headings = listHeadings(body);
+  var bodySections = splitIntoSections(body);
   var subHeadings = [];
-  for (var headingIndex = 0; headingIndex < headings.length; headingIndex++) {
-    if (headings[headingIndex].level >= 2) subHeadings.push(headings[headingIndex]);
+  for (var sectionIndex = 0; sectionIndex < bodySections.length; sectionIndex++) {
+    if (!bodySections[sectionIndex].heading) continue;
+    subHeadings.push({
+      text: bodySections[sectionIndex].heading,
+      level: bodySections[sectionIndex].level,
+      line: bodySections[sectionIndex].startLine - 1,
+    });
   }
 
   if (locator) {
@@ -82,12 +87,12 @@ export function readDoc(vaultPath, docPath, maxLength = DEFAULT_READ_LENGTH, opt
     var locatorSection = '';
     if (locatorMatch) {
       var wantedStartLine = Number(locatorMatch[1]);
-      var indexedSections = splitIntoSections(raw);
-      for (var sectionIndex = 0; sectionIndex < indexedSections.length; sectionIndex++) {
-        if (indexedSections[sectionIndex].startLine !== wantedStartLine) continue;
+      var rawSections = splitIntoSections(raw);
+      for (var sectionIndex = 0; sectionIndex < rawSections.length; sectionIndex++) {
+        if (rawSections[sectionIndex].startLine !== wantedStartLine) continue;
 
         var rawLines = raw.split('\n');
-        for (var lineIndex = wantedStartLine - 1; lineIndex < indexedSections[sectionIndex].endLine; lineIndex++) {
+        for (var lineIndex = wantedStartLine - 1; lineIndex < rawSections[sectionIndex].endLine; lineIndex++) {
           if (locatorSection) locatorSection += '\n';
           locatorSection += rawLines[lineIndex];
         }
@@ -125,7 +130,7 @@ export function readDoc(vaultPath, docPath, maxLength = DEFAULT_READ_LENGTH, opt
   }
 
   if (heading) {
-    var section = extractHeadingSection(body, heading);
+    var section = extractHeadingSection(body, heading, bodySections);
     if (section) {
       var cutSection = cutAtLineBoundary(section, maxLength);
       return {
@@ -262,13 +267,16 @@ export function searchDocs(vaultPath, query, options = {}) {
     if (detailed) {
       var titleFold = foldText(group.title || '');
       var baseFold = foldText(basename(group.file));
+      var pathFold = foldText(group.file);
       var titleMatch = true;
       var baseMatch = true;
+      var pathMatch = true;
       for (var termIndex = 0; termIndex < terms.length; termIndex++) {
         if (!titleFold.includes(terms[termIndex])) titleMatch = false;
         if (!baseFold.includes(terms[termIndex])) baseMatch = false;
+        if (!pathFold.includes(terms[termIndex])) pathMatch = false;
       }
-      result.titleMatch = titleMatch || baseMatch;
+      result.titleMatch = titleMatch || baseMatch || pathMatch;
       result.matches = buildMatches(lines, group.segs.slice(0, 3), terms, index.idf, contextLines);
       if (result.titleMatch && result.matches.length === 0) {
         var syntheticText = group.title;
@@ -428,36 +436,26 @@ function parseFrontmatter(raw) {
   return { frontmatter, body: match[2] };
 }
 
-function listHeadings(body) {
-  var lines = body.split('\n');
-  var headings = [];
-  for (var lineIndex = 0; lineIndex < lines.length; lineIndex++) {
-    var match = lines[lineIndex].replace(/\r$/, '').match(/^(#{1,6})\s+(.+?)\s*$/);
-    if (match) headings.push({ text: match[2], level: match[1].length, line: lineIndex });
-  }
-  return headings;
-}
-
-function extractHeadingSection(body, heading) {
+function extractHeadingSection(body, heading, sections) {
   var wanted = foldText(heading.trim());
   var lines = body.split('\n');
-  var startLevel = 0;
   var startIndex = -1;
+  var startLevel = 0;
+  var matchedSectionIndex = -1;
 
-  for (var lineIndex = 0; lineIndex < lines.length; lineIndex++) {
-    var match = lines[lineIndex].replace(/\r$/, '').match(/^(#{1,6})\s+(.+?)\s*$/);
-    if (!match || foldText(match[2].trim()) !== wanted) continue;
-    startLevel = match[1].length;
-    startIndex = lineIndex;
+  for (var sectionIndex = 0; sectionIndex < sections.length; sectionIndex++) {
+    if (foldText(sections[sectionIndex].heading.trim()) !== wanted) continue;
+    startIndex = sections[sectionIndex].startLine - 1;
+    startLevel = sections[sectionIndex].level;
+    matchedSectionIndex = sectionIndex;
     break;
   }
   if (startIndex === -1) return '';
 
   var endIndex = lines.length;
-  for (var lineIndex = startIndex + 1; lineIndex < lines.length; lineIndex++) {
-    var match = lines[lineIndex].replace(/\r$/, '').match(/^(#{1,6})\s+/);
-    if (!match || match[1].length > startLevel) continue;
-    endIndex = lineIndex;
+  for (var sectionIndex = matchedSectionIndex + 1; sectionIndex < sections.length; sectionIndex++) {
+    if (sections[sectionIndex].level > startLevel) continue;
+    endIndex = sections[sectionIndex].startLine - 1;
     break;
   }
 

@@ -1,6 +1,7 @@
-import { searchDocs, getSections } from './vault.js';
+import { searchDocs } from './vault.js';
 import { existsSync, statSync } from 'fs';
 import { join, normalize } from 'path';
+import { isSkippedDir } from '../vault-registry.js';
 
 export var DEFAULT_MAX_RESULTS = 5;
 
@@ -25,7 +26,13 @@ export function handleSearch(vaultPath, params) {
         if (rawParts[partIndex]) parts.push(rawParts[partIndex]);
       }
       var sectionPath = join(vaultPath, ...parts);
-      if (normalizedSection !== section || !parts.length || !getSections(vaultPath).includes(parts[0]) || !existsSync(sectionPath)) {
+      if (
+        normalizedSection !== section
+        || !parts.length
+        || isSkippedDir(parts[0])
+        || !existsSync(sectionPath)
+        || !statSync(sectionPath).isDirectory()
+      ) {
         return { error: `Section "${section}" not found. Use the overview tool to see valid sections.` };
       }
     }

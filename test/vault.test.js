@@ -50,6 +50,7 @@ const { root, cleanup } = createTempVaultsRoot({
       'guides/Long Flat.md': '---\ntitle: Long Flat\n---\n# Long Flat\n\n' + 'Fliesstext der einfach immer weiter geht und geht. '.repeat(20) + '\n\n## Hinten\n\nDer hintere Abschnitt.',
       'budget/very-long-path-name-that-must-remain-verbatim-in-search-results.md': '---\ntitle: Ein außergewöhnlich langer Dokumenttitel der das kleine Antwortbudget deutlich übersteigt\n---\n# Budget\n\n## Eine außergewöhnlich lange Überschrift die nicht abgeschnitten werden darf\n\nBudgetMarker',
       'guides/Very Long Navigation.md': '# Navigation\n\nIntro.\n\n## Eine außergewöhnlich lange Überschrift für das enge Antwortbudget Nummer eins\n\nText.\n\n## Eine außergewöhnlich lange Überschrift für das enge Antwortbudget Nummer zwei\n\nText.\n\n## Eine außergewöhnlich lange Überschrift für das enge Antwortbudget Nummer drei\n\nText.\n\n## Eine außergewöhnlich lange Überschrift für das enge Antwortbudget Nummer vier\n\nText.\n\n## Eine außergewöhnlich lange Überschrift für das enge Antwortbudget Nummer fünf\n\nText.',
+      'guides/Fenced Headings.md': '# Fenced Headings\n\nIntro.\n\n## Real One\n\n' + 'Long section content. '.repeat(80) + '\n\n```js\n## Backtick Fake\nBacktick hidden body.\n```\n\n~~~text\n### Tilde Fake\nTilde hidden body.\n~~~\n\n## Real Two\n\nBody two.\n\n## Real Three\n\nBody three.\n\n## Real Four\n\nBody four.\n\n## Real Five\n\nBody five.',
     },
   },
 });
@@ -500,6 +501,24 @@ describe('Vault', () => {
       assert.equal(doc.mode, 'heading');
       assert.match(doc.content, /Beta body line/);
       assert.ok(!/Alpha body line/.test(doc.content));
+    });
+
+    it('does not open headings inside backtick or tilde fences', () => {
+      var backtick = readDoc(VAULT_PATH, 'guides/Fenced Headings', 8000, { heading: 'Backtick Fake' });
+      assert.equal(backtick.mode, 'heading-not-found');
+      assert.doesNotMatch(backtick.content, /Backtick hidden body/);
+
+      var tilde = readDoc(VAULT_PATH, 'guides/Fenced Headings', 8000, { heading: 'Tilde Fake' });
+      assert.equal(tilde.mode, 'heading-not-found');
+      assert.doesNotMatch(tilde.content, /Tilde hidden body/);
+    });
+
+    it('does not offer fenced headings in the table of contents', () => {
+      var doc = readDoc(VAULT_PATH, 'guides/Fenced Headings', 1000);
+      assert.equal(doc.mode, 'toc');
+      assert.doesNotMatch(doc.content, /Backtick Fake/);
+      assert.doesNotMatch(doc.content, /Tilde Fake/);
+      assert.match(doc.content, /Real Five/);
     });
 
     it('folds umlauts when matching a heading', () => {
