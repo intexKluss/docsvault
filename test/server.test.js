@@ -57,7 +57,9 @@ const { root: TEST_VAULTS_ROOT, cleanup: cleanupTestVaults } = createTempVaultsR
       'portalscript-api/DocFile.md': '# DocFile\n\nEine Klasse für Dateien.',
       'portalscript-api/FileType.md': '# FileType\n\nDateityp-Klasse.',
       'portalscript-api/Duplicate.md': '# Duplicate\n\n## First\n\n### Details\n\nFirst section body.\n\n## Second\n\n### Details\n\nNestedLocatorNeedle belongs to the second section.',
+      'portalscript-api/Guide.md': '# Guide\n\nGeneric intro.\n\n## UniqueHeading\n\nGeneric body.',
       'portalscript-api/HeadingOnly.md': '# Heading Page\n\nGeneric intro.\n\n## UniqueHeading\n\nGeneric body.',
+      'portalscript-api/TopHeading.md': '# UniqueTopHeading\n\nGeneric body.',
       'SpecialFolder/Page.md': '# Page\n\nBodyNeedle appears without the parent folder name.',
       'howtos/upload.md': '# Upload\n\nDoc-Upload Anleitung.',
       'portalscript-api/Long.md': '# Long\n\n' + 'Langer REST-Inhalt. '.repeat(2000),
@@ -227,6 +229,40 @@ describe('Server', () => {
       assert.equal(page.matches[0].heading, 'UniqueHeading');
     });
 
+    it('returns the structural H1 as a synthetic detailed match', async () => {
+      var response = await fetch(`${baseUrl}/api/otris/search?query=UniqueTopHeading`);
+      assert.equal(response.status, 200);
+      var results = await response.json();
+      var page;
+      for (var resultIndex = 0; resultIndex < results.length; resultIndex++) {
+        if (results[resultIndex].file === 'portalscript-api/TopHeading') page = results[resultIndex];
+      }
+
+      assert.ok(page);
+      assert.equal(page.headings.length, 0);
+      assert.equal(page.matches.length, 1);
+      assert.equal(page.matches[0].text, 'UniqueTopHeading');
+      assert.equal(page.matches[0].line, 1);
+      assert.equal(page.matches[0].heading, 'UniqueTopHeading');
+    });
+
+    it('prefers a concrete H2 match over the title fallback', async () => {
+      var response = await fetch(`${baseUrl}/api/otris/search?query=Guide%20UniqueHeading`);
+      assert.equal(response.status, 200);
+      var results = await response.json();
+      var page;
+      for (var resultIndex = 0; resultIndex < results.length; resultIndex++) {
+        if (results[resultIndex].file === 'portalscript-api/Guide') page = results[resultIndex];
+      }
+
+      assert.ok(page);
+      assert.equal(page.titleMatch, true);
+      assert.equal(page.matches.length, 1);
+      assert.equal(page.matches[0].text, 'UniqueHeading');
+      assert.equal(page.matches[0].line, 5);
+      assert.equal(page.matches[0].heading, 'UniqueHeading');
+    });
+
     it('GET /api/otris/search returns concise snippets on request', async () => {
       var res = await fetch(`${baseUrl}/api/otris/search?query=DocFile&response_format=concise`);
       assert.equal(res.status, 200);
@@ -273,6 +309,32 @@ describe('Server', () => {
     it('GET /api/otris/read requires path param', async () => {
       const res = await fetch(`${baseUrl}/api/otris/read`);
       assert.equal(res.status, 400);
+    });
+
+    it('GET /api/otris/read rejects repeated heading parameters', async () => {
+      var response = await fetch(`${baseUrl}/api/otris/read?path=portalscript-api/Guide&heading=Guide&heading=UniqueHeading`);
+      assert.equal(response.status, 400);
+    });
+
+    it('GET /api/otris/read rejects repeated locator parameters', async () => {
+      var response = await fetch(`${baseUrl}/api/otris/read?path=portalscript-api/Guide&locator=L1&locator=L5`);
+      assert.equal(response.status, 400);
+    });
+
+    it('GET /api/otris/read accepts a single heading parameter', async () => {
+      var response = await fetch(`${baseUrl}/api/otris/read?path=portalscript-api/Guide&heading=UniqueHeading`);
+      assert.equal(response.status, 200);
+      var document = await response.json();
+      assert.equal(document.mode, 'heading');
+      assert.match(document.content, /Generic body/);
+    });
+
+    it('GET /api/otris/read accepts a single locator parameter', async () => {
+      var response = await fetch(`${baseUrl}/api/otris/read?path=portalscript-api/Guide&locator=L5`);
+      assert.equal(response.status, 200);
+      var document = await response.json();
+      assert.equal(document.mode, 'heading');
+      assert.match(document.content, /UniqueHeading/);
     });
 
     it('GET /api/otris/read returns 404 for missing doc', async () => {

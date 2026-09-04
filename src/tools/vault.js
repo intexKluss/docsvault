@@ -238,7 +238,8 @@ export function searchDocs(vaultPath, query, options = {}) {
   if (hits.length === 0) return [];
 
   var queryFold = foldText(query.trim());
-  var ranked = aggregateByFile(hits, index, terms, queryFold);
+  var termSet = new Set(terms);
+  var ranked = aggregateByFile(hits, index, terms, queryFold, termSet);
   var top = ranked.slice(0, maxResults);
   var lineStore = new Map();
   var snippetSpan = Math.min(contextLines, 1);
@@ -252,7 +253,9 @@ export function searchDocs(vaultPath, query, options = {}) {
     var resultHeadings = [];
     for (var segmentIndex = 0; segmentIndex < group.segs.length; segmentIndex++) {
       var segment = group.segs[segmentIndex];
-      if (segment.heading && !resultHeadings.includes(segment.heading)) resultHeadings.push(segment.heading);
+      if (segment.level >= 2 && segment.heading && !resultHeadings.includes(segment.heading)) {
+        resultHeadings.push(segment.heading);
+      }
       if (resultHeadings.length >= MAX_HEADINGS_PER_RESULT) break;
     }
 
@@ -288,17 +291,20 @@ export function searchDocs(vaultPath, query, options = {}) {
         || pathTermMatch;
       result.matches = buildMatches(lines, group.segs.slice(0, 3), terms, index.idf, contextLines);
       if (result.matches.length === 0) {
-        var syntheticText = group.segs[0].heading;
-        if (result.titleMatch) {
+        var topSegment = group.segs[0];
+        var syntheticText = '';
+        if (topSegment.heading && headingIsQuerySubset(topSegment.heading, termSet)) {
+          syntheticText = topSegment.heading;
+        } else if (result.titleMatch) {
           syntheticText = group.title;
           if (!exactTitleMatch && !allTermsInTitle && !titleTermMatch) syntheticText = group.file;
         }
         if (!syntheticText) syntheticText = result.snippet;
         if (!syntheticText) syntheticText = group.file;
         result.matches.push({
-          line: group.segs[0].startLine,
+          line: topSegment.startLine,
           text: syntheticText,
-          heading: group.segs[0].heading,
+          heading: topSegment.heading,
         });
       }
     }
@@ -632,7 +638,7 @@ function headingIsQuerySubset(heading, termSet) {
   return true;
 }
 
-function aggregateByFile(hits, index, terms, queryFold) {
+function aggregateByFile(hits, index, terms, queryFold, termSet) {
   var knownTerms = [];
   for (var termIndex = 0; termIndex < terms.length; termIndex++) {
     if (index.hasTerm(terms[termIndex])) knownTerms.push(terms[termIndex]);
@@ -646,7 +652,6 @@ function aggregateByFile(hits, index, terms, queryFold) {
   }
   if (!idfTotal) idfTotal = 1;
 
-  var termSet = new Set(terms);
   var files = new Map();
   for (var hitIndex = 0; hitIndex < hits.length; hitIndex++) {
     var hit = hits[hitIndex];
@@ -668,7 +673,7 @@ function aggregateByFile(hits, index, terms, queryFold) {
     }
     var segmentCoverage = matchedIdf / idfTotal;
     var score = hit.score * segmentCoverage;
-    if (segment.heading && headingIsQuerySubset(segment.heading, termSet)) {
+    if (segment.level >= 2 && segment.heading && headingIsQuerySubset(segment.heading, termSet)) {
       var headingTokens = tokenize(segment.heading);
       var headingIdf = 0;
       for (var termIndex = 0; termIndex < headingTokens.length; termIndex++) {

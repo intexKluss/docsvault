@@ -84,7 +84,8 @@ export function buildSearchIndex(vaultPath) {
       segments.set(id, {
         file: relativePath,
         title,
-        heading: indexedHeading,
+        heading: section.heading,
+        level: section.level,
         locator: `L${section.startLine}`,
         startLine: section.startLine,
         endLine: section.endLine,

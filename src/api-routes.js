@@ -77,10 +77,18 @@ function registerVaultRoutes(router, vault) {
     if (!docPath || typeof docPath !== 'string' || !docPath.trim()) {
       return res.status(400).json({ error: 'path parameter required' });
     }
+    var heading = req.query.heading;
+    if (heading !== undefined && typeof heading !== 'string') {
+      return res.status(400).json({ error: 'heading parameter must be a string' });
+    }
+    var locator = req.query.locator;
+    if (locator !== undefined && typeof locator !== 'string') {
+      return res.status(400).json({ error: 'locator parameter must be a string' });
+    }
     const result = handleRead(vaultPath, {
       path: docPath.trim(),
-      heading: req.query.heading || undefined,
-      locator: req.query.locator || undefined,
+      heading: heading || undefined,
+      locator: locator || undefined,
       max_length: clampInt(req.query.max_length, 1, 200000, DEFAULT_READ_LENGTH),
       max_tokens: clampInt(req.query.max_tokens, 50, 50000, undefined),
     });
