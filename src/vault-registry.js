@@ -1,5 +1,5 @@
-import { readdirSync, readFileSync, existsSync } from 'node:fs';
-import { join, resolve } from 'node:path';
+import { readdirSync, readFileSync, existsSync, statSync } from 'node:fs';
+import { join, resolve, relative, normalize, isAbsolute, sep } from 'node:path';
 
 // Ordner die kein Vault-Content sind und übersprungen werden (zusätzlich
 // zu '.'- und '_'-Präfix). crawl = Crawler-Code, node_modules = Deps.
@@ -44,7 +44,35 @@ function buildEntry(folderName, vaultDir, meta) {
   // optionaler vault-spezifischer Such-Hinweis, wird in die Tool-Beschreibungen eingehängt
   const searchHint = (meta?.searchHint && String(meta.searchHint).trim()) || '';
 
-  return { name, description, toolPrefix, searchHint, path: vaultDir };
+  var technicalSection = findTechnicalSection(vaultDir, meta);
+
+  return { name, description, toolPrefix, searchHint, technicalSection, path: vaultDir };
+}
+
+function findTechnicalSection(vaultDir, meta) {
+  if (meta && Object.hasOwn(meta, 'technicalSection')) {
+    return findExistingSection(vaultDir, String(meta.technicalSection).trim());
+  }
+  return findExistingSection(vaultDir, 'Scripting/TERAS API');
+}
+
+function findExistingSection(vaultDir, section) {
+  var normalizedSection = normalize(section).replace(/\\/g, '/');
+  if (!section || normalizedSection !== section) return undefined;
+
+  var sectionPath = resolve(vaultDir, normalizedSection);
+  var vaultRelativePath = relative(vaultDir, sectionPath);
+  if (!vaultRelativePath || isAbsolute(vaultRelativePath)) return undefined;
+  if (vaultRelativePath === '..' || vaultRelativePath.startsWith('..' + sep)) return undefined;
+
+  try {
+    if (!existsSync(sectionPath)) return undefined;
+    if (!statSync(sectionPath).isDirectory()) return undefined;
+  } catch {
+    return undefined;
+  }
+
+  return normalizedSection;
 }
 
 const TOOL_PREFIX_PATTERN = /^[a-z][a-z0-9_]*$/;
@@ -123,10 +151,10 @@ export function loadVaultRegistry(vaultsRoot) {
   return registry;
 }
 
-export const TOOL_SUFFIXES = ['search', 'read', 'list', 'overview', 'status'];
+export var TOOL_SUFFIXES = ['search', 'read', 'list', 'overview', 'status'];
 
 export function getToolSuffixes(vault) {
-  if (vault.toolPrefix === 'otris') {
+  if (vault.technicalSection) {
     return ['search', 'technical_search', 'read', 'list', 'overview', 'status'];
   }
   return TOOL_SUFFIXES;

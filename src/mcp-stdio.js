@@ -17,18 +17,16 @@ try {
   if (registry.length === 0) {
     console.error(`[mcp-stdio] WARNING: no vaults found under ${VAULTS_ROOT}`);
   }
-  const server = createMcpServer(registry);
-  const transport = new StdioServerTransport();
-  await server.connect(transport);
-
   // BM25-Index vorab bauen, damit die erste Suche nicht dafür bezahlt.
-  // Nach dem connect, damit der Client nicht auf den Handshake warten muss.
   for (const vault of registry) {
     const index = warmSearchIndex(vault.path);
     if (index) {
       console.error(`[mcp-stdio] ${vault.toolPrefix}: ${index.fileCount} pages, ${index.segmentCount} sections indexed in ${index.buildMs}ms`);
     }
   }
+  const server = createMcpServer(registry);
+  const transport = new StdioServerTransport();
+  await server.connect(transport);
 } catch (err) {
   console.error(`[mcp-stdio] failed to start: ${err.message}`);
   process.exit(1);

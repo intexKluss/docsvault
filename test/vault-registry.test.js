@@ -1,6 +1,6 @@
 import { describe, it, after } from 'node:test';
 import assert from 'node:assert/strict';
-import { slugify, loadVaultRegistry, describeVaults } from '../src/vault-registry.js';
+import { slugify, loadVaultRegistry, getToolSuffixes, describeVaults } from '../src/vault-registry.js';
 import { createTempVaultsRoot } from './helpers/temp-vault.js';
 
 describe('slugify', () => {
@@ -112,6 +112,48 @@ describe('loadVaultRegistry: basic scan', () => {
     after(cleanup);
     const [vault] = loadVaultRegistry(root);
     assert.equal(vault.searchHint, '');
+  });
+
+  it('keeps a configured technical section for a renamed vault', () => {
+    var fixture = createTempVaultsRoot({
+      'api-reference': {
+        meta: { toolPrefix: 'api_reference', technicalSection: 'Reference/API' },
+        files: { 'Reference/API/DocFile.md': '# DocFile' },
+      },
+    });
+    after(fixture.cleanup);
+
+    var vault = loadVaultRegistry(fixture.root)[0];
+    assert.equal(vault.technicalSection, 'Reference/API');
+    assert.ok(getToolSuffixes(vault).includes('technical_search'));
+  });
+
+  it('does not assign a technical section to otris without configuration', () => {
+    var fixture = createTempVaultsRoot({
+      'otris': {
+        meta: { toolPrefix: 'otris' },
+        files: { 'api/DocFile.md': '# DocFile' },
+      },
+    });
+    after(fixture.cleanup);
+
+    var vault = loadVaultRegistry(fixture.root)[0];
+    assert.equal(vault.technicalSection, undefined);
+    assert.ok(!getToolSuffixes(vault).includes('technical_search'));
+  });
+
+  it('detects the TERAS API section only when it exists', () => {
+    var fixture = createTempVaultsRoot({
+      'otris': {
+        meta: { toolPrefix: 'otris' },
+        files: { 'Scripting/TERAS API/DocFile.md': '# DocFile' },
+      },
+    });
+    after(fixture.cleanup);
+
+    var vault = loadVaultRegistry(fixture.root)[0];
+    assert.equal(vault.technicalSection, 'Scripting/TERAS API');
+    assert.ok(getToolSuffixes(vault).includes('technical_search'));
   });
 });
 

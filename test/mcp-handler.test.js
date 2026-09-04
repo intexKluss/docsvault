@@ -7,7 +7,7 @@ import { createTempVaultsRoot } from './helpers/temp-vault.js';
 const tokens = (text) => Math.round(String(text).length / 4);
 
 const REGISTRY = [
-  { name: 'otris',       description: 'otris Docs',   toolPrefix: 'otris',        path: '/tmp/otris' },
+  { name: 'otris',       description: 'otris Docs',   toolPrefix: 'otris',        technicalSection: 'Scripting/TERAS API', path: '/tmp/otris' },
   { name: 'Intex Regeln',description: 'Firmenregeln', toolPrefix: 'intex_regeln', path: '/tmp/intex' },
 ];
 
@@ -16,6 +16,7 @@ var LONG_TOC_HEADING = 'Eine außergewöhnlich lange Überschrift die im finalen
 const { root: MCP_VAULT_ROOT, cleanup: cleanupMcpVault } = createTempVaultsRoot({
   'otris': {
     files: {
+      'general/Other.md': '# Other\n\nMCP general documentation.',
       'long/Read.md': '---\ntitle: Ein außergewöhnlich langer MCP-Titel für das harte Antwortbudget\nsource: https://example.com/eine/außergewöhnlich/lange/source/unter/engem/budget\n---\n# Read\n\n## ' + LONG_TOC_HEADING + '\n\n' + 'Inhalt '.repeat(100) + '\n\n## Zwei\n\nInhalt.\n\n## Drei\n\nInhalt.\n\n## Vier\n\nInhalt.\n\n## Fünf\n\nInhalt.',
     },
   },
@@ -29,7 +30,7 @@ describe('MCP Handler', () => {
     assert.ok(typeof server.tool === 'function');
   });
 
-  it('registers the separate technical search only for otris', () => {
+  it('registers the separate technical search only for configured vaults', () => {
     // MCP server exposes registered tools via _registeredTools or listTools
     const server = createMcpServer(REGISTRY);
     const tools = server._registeredTools || {};
@@ -43,6 +44,31 @@ describe('MCP Handler', () => {
     assert.ok(names.includes('otris_technical_search'));
     assert.ok(!names.includes('intex_regeln_technical_search'));
     assert.equal(names.length, 11);
+  });
+
+  it('derives technical search from a vault technicalSection', () => {
+    var registry = [
+      { name: 'API Reference', description: 'API Docs', toolPrefix: 'api_reference', technicalSection: 'Reference/API', path: '/tmp/api-reference' },
+      { name: 'otris', description: 'otris Docs', toolPrefix: 'otris', path: '/tmp/otris' },
+    ];
+    var server = createMcpServer(registry);
+    var tools = server._registeredTools || {};
+
+    assert.ok(tools.api_reference_technical_search);
+    assert.ok(!tools.otris_technical_search);
+    assert.equal(Object.keys(tools).length, 11);
+  });
+
+  it('searches only the configured technical section', async () => {
+    var vaultPath = `${MCP_VAULT_ROOT}/otris`;
+    var server = createMcpServer([
+      { name: 'API Reference', description: 'API Docs', toolPrefix: 'api_reference', technicalSection: 'long', path: vaultPath },
+    ]);
+    var result = await server._registeredTools.api_reference_technical_search.handler({ query: 'MCP' });
+    var hits = JSON.parse(result.content[0].text);
+
+    assert.equal(hits.length, 1);
+    assert.equal(hits[0].file, 'long/Read');
   });
 
   it('includes vault description in tool description', () => {

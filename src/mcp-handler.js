@@ -106,10 +106,10 @@ function registerVaultTools(server, vault) {
     }
   );
 
-  if (toolPrefix === 'otris') {
+  if (vault.technicalSection) {
     server.tool(
-      'otris_technical_search',
-      'Exact otris TypeScript API search.',
+      `${toolPrefix}_technical_search`,
+      `Exact technical API search in ${vault.technicalSection}.`,
       {
         query: z.string().describe('API term.'),
         max_results: z.number().int().min(1).max(100).optional(),
@@ -119,7 +119,7 @@ function registerVaultTools(server, vault) {
       },
       READONLY_TOOL,
       async (params) => {
-        const results = handleSearch(vaultPath, { ...params, section: 'Scripting/TERAS API' });
+        const results = handleSearch(vaultPath, { ...params, section: vault.technicalSection });
         if (isErrorResult(results)) {
           return { content: [{ type: 'text', text: results.error }], isError: true };
         }

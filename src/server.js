@@ -74,15 +74,12 @@ export async function createServer(opts = {}) {
       console.warn(`[server] WARNING: ${vaultRegistry.length} vaults = ${toolCount} tools, some agents may hit tool-count limits.`);
     }
     // BM25-Index vorab bauen, damit die erste Suche nicht dafür bezahlt.
-    // setImmediate: der Server soll währenddessen schon Verbindungen annehmen.
-    setImmediate(() => {
-      for (const vault of vaultRegistry) {
-        const index = warmSearchIndex(vault.path);
-        if (index) {
-          console.log(`[server] ${vault.toolPrefix}: ${index.fileCount} pages, ${index.segmentCount} sections indexed in ${index.buildMs}ms`);
-        }
+    for (const vault of vaultRegistry) {
+      const index = warmSearchIndex(vault.path);
+      if (index) {
+        console.log(`[server] ${vault.toolPrefix}: ${index.fileCount} pages, ${index.segmentCount} sections indexed in ${index.buildMs}ms`);
       }
-    });
+    }
   }
 
   // opts.bridge erlaubt tests einen kontrollierbaren fake-bridge zu injizieren.

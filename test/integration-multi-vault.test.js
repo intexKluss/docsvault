@@ -8,8 +8,9 @@ import { handleSearch } from '../src/tools/search.js';
 describe('Multi-vault integration', () => {
   const { root, cleanup } = createTempVaultsRoot({
     'otris': {
-      meta: { name: 'otris', toolPrefix: 'otris', description: 'otris Doku' },
+      meta: { name: 'otris', toolPrefix: 'otris', description: 'otris Doku', technicalSection: 'api/technical' },
       files: {
+        'api/technical/DocApi.md': '# DocApi',
         'api/DocFile.md': '# DocFile\n\nDas ist eine otris-API-Klasse zur Dateiverwaltung.',
         'howtos/upload.md': '# Upload\n\nSo lädst du Dateien hoch.',
       },
@@ -45,6 +46,15 @@ describe('Multi-vault integration', () => {
         assert.ok(tools[`${prefix}_${suffix}`], `missing tool ${prefix}_${suffix}`);
       }
     }
+  });
+
+  it('registers technical search only for the configured vault', () => {
+    var registry = loadVaultRegistry(root);
+    var server = createMcpServer(registry);
+    var tools = server._registeredTools || {};
+
+    assert.ok(tools.otris_technical_search);
+    assert.ok(!tools.intex_regeln_technical_search);
   });
 
   it('search isolates per-vault content', () => {

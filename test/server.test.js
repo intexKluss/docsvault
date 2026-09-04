@@ -1,6 +1,8 @@
 import { describe, it, before, after } from 'node:test';
 import assert from 'node:assert/strict';
+import { join } from 'node:path';
 import { createServer } from '../src/server.js';
+import { clearVaultCache } from '../src/tools/vault-cache.js';
 import { createTempVaultsRoot } from './helpers/temp-vault.js';
 
 // minimaler fake-bridge für die ws-tests. warmUp ist sofort fertig, send liefert
@@ -96,6 +98,31 @@ describe('Server', () => {
       assert.ok(csp);
       assert.ok(csp.includes("default-src 'self'"));
     });
+  });
+
+  it('builds the search index before createServer returns', async () => {
+    await new Promise(resolve => setImmediate(resolve));
+    clearVaultCache(join(TEST_VAULTS_ROOT, 'otris'));
+
+    var logs = [];
+    var originalLog = console.log;
+    console.log = function (message) {
+      logs.push(message);
+    };
+
+    var result;
+    try {
+      result = await createServer({ port: 0, bridge: fakeBridge() });
+    } finally {
+      console.log = originalLog;
+    }
+
+    result.server.close();
+    var sawIndex = false;
+    for (var i = 0; i < logs.length; i++) {
+      if (logs[i].startsWith('[server] otris: ')) sawIndex = true;
+    }
+    assert.ok(sawIndex);
   });
 
   describe('REST API', () => {
