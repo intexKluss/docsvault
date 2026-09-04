@@ -65,19 +65,26 @@ export function buildSearchIndex(vaultPath) {
 
     for (var sectionIndex = 0; sectionIndex < sections.length; sectionIndex++) {
       var section = sections[sectionIndex];
+      var indexedHeading = section.heading;
+      var indexedBody = section.body;
+      if (section.level === 1) {
+        indexedHeading = '';
+        indexedBody = section.heading;
+        if (section.body) indexedBody += '\n' + section.body;
+      }
       var id = nextId++;
       var document = {
         id,
         title,
-        heading: section.heading,
+        heading: indexedHeading,
         path: pathWords,
-        body: section.body,
+        body: indexedBody,
       };
       documents.push(document);
       segments.set(id, {
         file: relativePath,
         title,
-        heading: section.heading,
+        heading: indexedHeading,
         locator: `L${section.startLine}`,
         startLine: section.startLine,
         endLine: section.endLine,
@@ -188,7 +195,7 @@ export function splitIntoSections(raw) {
       fenceCharacter = fenceMatch[1][0];
       fenceLength = fenceMatch[1].length;
     } else {
-      headingMatch = line.match(/^(#{2,6})\s+(.+?)\s*$/);
+      headingMatch = line.match(/^(#{1,6})\s+(.+?)\s*$/);
     }
     if (!headingMatch) {
       if (bodyLineCount > 0) body += '\n';

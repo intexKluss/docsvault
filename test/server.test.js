@@ -57,7 +57,8 @@ const { root: TEST_VAULTS_ROOT, cleanup: cleanupTestVaults } = createTempVaultsR
       'portalscript-api/DocFile.md': '# DocFile\n\nEine Klasse für Dateien.',
       'portalscript-api/FileType.md': '# FileType\n\nDateityp-Klasse.',
       'portalscript-api/Duplicate.md': '# Duplicate\n\n## First\n\n### Details\n\nFirst section body.\n\n## Second\n\n### Details\n\nNestedLocatorNeedle belongs to the second section.',
-      'SpecialFolder/Page.md': '# Page\n\nGeneric body without the parent folder name.',
+      'portalscript-api/HeadingOnly.md': '# Heading Page\n\nGeneric intro.\n\n## UniqueHeading\n\nGeneric body.',
+      'SpecialFolder/Page.md': '# Page\n\nBodyNeedle appears without the parent folder name.',
       'howtos/upload.md': '# Upload\n\nDoc-Upload Anleitung.',
       'portalscript-api/Long.md': '# Long\n\n' + 'Langer REST-Inhalt. '.repeat(2000),
     },
@@ -177,6 +178,53 @@ describe('Server', () => {
       assert.equal(page.titleMatch, true);
       assert.ok(page.matches.length >= 1);
       assert.match(page.matches[0].text, /SpecialFolder/);
+    });
+
+    it('marks a mixed path and body query as a legacy titleMatch', async () => {
+      var response = await fetch(`${baseUrl}/api/otris/search?query=SpecialFolder%20BodyNeedle`);
+      assert.equal(response.status, 200);
+      var results = await response.json();
+      var page;
+      for (var resultIndex = 0; resultIndex < results.length; resultIndex++) {
+        if (results[resultIndex].file === 'SpecialFolder/Page') page = results[resultIndex];
+      }
+
+      assert.ok(page);
+      assert.equal(page.titleMatch, true);
+      var sawBodyNeedle = false;
+      for (var matchIndex = 0; matchIndex < page.matches.length; matchIndex++) {
+        if (/BodyNeedle/.test(page.matches[matchIndex].text)) sawBodyNeedle = true;
+      }
+      assert.equal(sawBodyNeedle, true);
+    });
+
+    it('does not mark partial path words as a legacy titleMatch', async () => {
+      var response = await fetch(`${baseUrl}/api/otris/search?query=Special`);
+      assert.equal(response.status, 200);
+      var results = await response.json();
+      var page;
+      for (var resultIndex = 0; resultIndex < results.length; resultIndex++) {
+        if (results[resultIndex].file === 'SpecialFolder/Page') page = results[resultIndex];
+      }
+
+      assert.ok(page);
+      assert.equal(page.titleMatch, false);
+    });
+
+    it('returns a synthetic detailed match for a heading-only hit', async () => {
+      var response = await fetch(`${baseUrl}/api/otris/search?query=UniqueHeading`);
+      assert.equal(response.status, 200);
+      var results = await response.json();
+      var page;
+      for (var resultIndex = 0; resultIndex < results.length; resultIndex++) {
+        if (results[resultIndex].file === 'portalscript-api/HeadingOnly') page = results[resultIndex];
+      }
+
+      assert.ok(page);
+      assert.equal(page.matches.length, 1);
+      assert.equal(page.matches[0].text, 'UniqueHeading');
+      assert.equal(page.matches[0].line, 5);
+      assert.equal(page.matches[0].heading, 'UniqueHeading');
     });
 
     it('GET /api/otris/search returns concise snippets on request', async () => {

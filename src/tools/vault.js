@@ -74,7 +74,7 @@ export function readDoc(vaultPath, docPath, maxLength = DEFAULT_READ_LENGTH, opt
   var bodySections = splitIntoSections(body);
   var subHeadings = [];
   for (var sectionIndex = 0; sectionIndex < bodySections.length; sectionIndex++) {
-    if (!bodySections[sectionIndex].heading) continue;
+    if (bodySections[sectionIndex].level < 2) continue;
     subHeadings.push({
       text: bodySections[sectionIndex].heading,
       level: bodySections[sectionIndex].level,
@@ -237,7 +237,8 @@ export function searchDocs(vaultPath, query, options = {}) {
   }
   if (hits.length === 0) return [];
 
-  var ranked = aggregateByFile(hits, index, terms, foldText(query.trim()));
+  var queryFold = foldText(query.trim());
+  var ranked = aggregateByFile(hits, index, terms, queryFold);
   var top = ranked.slice(0, maxResults);
   var lineStore = new Map();
   var snippetSpan = Math.min(contextLines, 1);
@@ -266,21 +267,34 @@ export function searchDocs(vaultPath, query, options = {}) {
 
     if (detailed) {
       var titleFold = foldText(group.title || '');
-      var baseFold = foldText(basename(group.file));
-      var pathFold = foldText(group.file);
-      var titleMatch = true;
-      var baseMatch = true;
-      var pathMatch = true;
+      var titleTerms = new Set(queryTerms(group.title || ''));
+      var baseTerms = new Set(queryTerms(basename(group.file)));
+      var pathTerms = new Set(queryTerms(group.file));
+      var exactTitleMatch = titleFold === queryFold;
+      var allTermsInTitle = true;
+      var titleTermMatch = false;
+      var baseTermMatch = false;
+      var pathTermMatch = false;
       for (var termIndex = 0; termIndex < terms.length; termIndex++) {
-        if (!titleFold.includes(terms[termIndex])) titleMatch = false;
-        if (!baseFold.includes(terms[termIndex])) baseMatch = false;
-        if (!pathFold.includes(terms[termIndex])) pathMatch = false;
+        if (!titleTerms.has(terms[termIndex])) allTermsInTitle = false;
+        if (titleTerms.has(terms[termIndex])) titleTermMatch = true;
+        if (baseTerms.has(terms[termIndex])) baseTermMatch = true;
+        if (pathTerms.has(terms[termIndex])) pathTermMatch = true;
       }
-      result.titleMatch = titleMatch || baseMatch || pathMatch;
+      result.titleMatch = exactTitleMatch
+        || allTermsInTitle
+        || titleTermMatch
+        || baseTermMatch
+        || pathTermMatch;
       result.matches = buildMatches(lines, group.segs.slice(0, 3), terms, index.idf, contextLines);
-      if (result.titleMatch && result.matches.length === 0) {
-        var syntheticText = group.title;
-        if (!titleMatch) syntheticText = group.file;
+      if (result.matches.length === 0) {
+        var syntheticText = group.segs[0].heading;
+        if (result.titleMatch) {
+          syntheticText = group.title;
+          if (!exactTitleMatch && !allTermsInTitle && !titleTermMatch) syntheticText = group.file;
+        }
+        if (!syntheticText) syntheticText = result.snippet;
+        if (!syntheticText) syntheticText = group.file;
         result.matches.push({
           line: group.segs[0].startLine,
           text: syntheticText,

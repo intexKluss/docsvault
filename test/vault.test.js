@@ -51,6 +51,7 @@ const { root, cleanup } = createTempVaultsRoot({
       'budget/very-long-path-name-that-must-remain-verbatim-in-search-results.md': '---\ntitle: Ein außergewöhnlich langer Dokumenttitel der das kleine Antwortbudget deutlich übersteigt\n---\n# Budget\n\n## Eine außergewöhnlich lange Überschrift die nicht abgeschnitten werden darf\n\nBudgetMarker',
       'guides/Very Long Navigation.md': '# Navigation\n\nIntro.\n\n## Eine außergewöhnlich lange Überschrift für das enge Antwortbudget Nummer eins\n\nText.\n\n## Eine außergewöhnlich lange Überschrift für das enge Antwortbudget Nummer zwei\n\nText.\n\n## Eine außergewöhnlich lange Überschrift für das enge Antwortbudget Nummer drei\n\nText.\n\n## Eine außergewöhnlich lange Überschrift für das enge Antwortbudget Nummer vier\n\nText.\n\n## Eine außergewöhnlich lange Überschrift für das enge Antwortbudget Nummer fünf\n\nText.',
       'guides/Fenced Headings.md': '# Fenced Headings\n\nIntro.\n\n## Real One\n\n' + 'Long section content. '.repeat(80) + '\n\n```js\n## Backtick Fake\nBacktick hidden body.\n```\n\n~~~text\n### Tilde Fake\nTilde hidden body.\n~~~\n\n## Real Two\n\nBody two.\n\n## Real Three\n\nBody three.\n\n## Real Four\n\nBody four.\n\n## Real Five\n\nBody five.',
+      'guides/H1 Boundaries.md': '# First Page\n\nFirst H1 body.\n\n## Child Section\n\nChild body.\n\n# Second Page\n\nSecond H1 body.',
     },
   },
 });
@@ -67,12 +68,13 @@ describe('Vault', () => {
       assert.deepEqual(FIELD_BOOSTS, { title: 2, heading: 3, path: 1, body: 1 });
     });
 
-    it('exports section splitting including the intro', () => {
+    it('exports section splitting with structural H1 headings', () => {
       assert.equal(typeof splitIntoSections, 'function');
       var sections = splitIntoSections('# Page\n\nIntro\n\n## Details\n\nBody');
       assert.equal(sections.length, 2);
-      assert.equal(sections[0].heading, '');
-      assert.equal(sections[0].body, '# Page\n\nIntro');
+      assert.equal(sections[0].heading, 'Page');
+      assert.equal(sections[0].level, 1);
+      assert.equal(sections[0].body, 'Intro');
       assert.equal(sections[1].heading, 'Details');
       assert.equal(sections[1].body, 'Body');
     });
@@ -501,6 +503,22 @@ describe('Vault', () => {
       assert.equal(doc.mode, 'heading');
       assert.match(doc.content, /Beta body line/);
       assert.ok(!/Alpha body line/.test(doc.content));
+    });
+
+    it('reads an H1 through the shared section analysis', () => {
+      var doc = readDoc(VAULT_PATH, 'guides/H1 Boundaries', 8000, { heading: 'First Page' });
+      assert.equal(doc.mode, 'heading');
+      assert.match(doc.content, /First H1 body/);
+      assert.match(doc.content, /Child body/);
+      assert.doesNotMatch(doc.content, /Second H1 body/);
+    });
+
+    it('ends an H2 section at the next H1', () => {
+      var doc = readDoc(VAULT_PATH, 'guides/H1 Boundaries', 8000, { heading: 'Child Section' });
+      assert.equal(doc.mode, 'heading');
+      assert.match(doc.content, /Child body/);
+      assert.doesNotMatch(doc.content, /Second Page/);
+      assert.doesNotMatch(doc.content, /Second H1 body/);
     });
 
     it('does not open headings inside backtick or tilde fences', () => {
