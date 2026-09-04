@@ -25,12 +25,15 @@ var BROKEN_VAULT_PATH = join(testVault.root, 'broken');
 after(testVault.cleanup);
 
 describe('vault cache', () => {
-  it('invalidates a manifestless index when nested Markdown content changes', () => {
+  it('invalidates a manifestless index when nested Markdown content changes', async () => {
     clearVaultCache(VAULT_PATH);
     var first = handleSearch(VAULT_PATH, { query: 'OriginalCacheNeedle' });
     assert.equal(first.length, 1);
 
     writeFileSync(join(VAULT_PATH, 'nested', 'Page.md'), '# Page\n\nUpdatedCacheNeedle with changed length');
+    await new Promise(function (resolve) {
+      setTimeout(resolve, 1100);
+    });
 
     var second = handleSearch(VAULT_PATH, { query: 'UpdatedCacheNeedle' });
     assert.equal(second.length, 1);

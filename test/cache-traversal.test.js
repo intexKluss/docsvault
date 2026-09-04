@@ -15,7 +15,7 @@ var testVault = createTempVaultsRoot({
 var VAULT_PATH = join(testVault.root, 'traversal');
 after(testVault.cleanup);
 
-it('computes the manifestless change signature once per section search', async () => {
+it('reuses the manifestless change signature during the validation interval', async () => {
   var originalReaddirSync = fs.readdirSync;
   var rootReads = 0;
   fs.readdirSync = function (directory, options) {
@@ -35,7 +35,7 @@ it('computes the manifestless change signature once per section search', async (
       section: 'nested',
     });
     assert.equal(result.length, 1);
-    assert.equal(rootReads, 1);
+    assert.equal(rootReads, 0);
   } finally {
     fs.readdirSync = originalReaddirSync;
     syncBuiltinESMExports();

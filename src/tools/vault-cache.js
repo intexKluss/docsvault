@@ -8,6 +8,7 @@ import { buildSearchIndex } from './search-index.js';
 // halten und nur invalidieren wenn sich _manifest.json oder der rekursive
 // Markdown-Bestand eines Vaults ohne Manifest ändert.
 var cache = new Map();
+var MANIFESTLESS_VALIDATION_INTERVAL_MS = 1000;
 
 function vaultChangeKey(vaultPath) {
   if (!existsSync(vaultPath)) return 'missing';
@@ -48,17 +49,36 @@ function collectVaultChanges(directory, changes) {
 }
 
 function getEntry(vaultPath) {
+  var existing = cache.get(vaultPath);
+  var hasManifest = existsSync(join(vaultPath, '_manifest.json'));
+  var now = Date.now();
+  if (
+    existing
+    && !hasManifest
+    && existing.manifestlessValidUntil > now
+  ) {
+    return existing;
+  }
+
   var changeKey = vaultChangeKey(vaultPath);
-  const existing = cache.get(vaultPath);
-  if (existing && existing.changeKey === changeKey) return existing;
+  if (existing && existing.changeKey === changeKey) {
+    if (!hasManifest) {
+      existing.manifestlessValidUntil = now + MANIFESTLESS_VALIDATION_INTERVAL_MS;
+    }
+    return existing;
+  }
 
   var entry = {
     changeKey,
+    manifestlessValidUntil: 0,
     manifest: undefined,
     sections: undefined,
     titleIndex: undefined,
     searchIndex: undefined,
   };
+  if (!hasManifest) {
+    entry.manifestlessValidUntil = now + MANIFESTLESS_VALIDATION_INTERVAL_MS;
+  }
   cache.set(vaultPath, entry);
   return entry;
 }
