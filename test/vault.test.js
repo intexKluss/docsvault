@@ -54,8 +54,8 @@ const { root, cleanup } = createTempVaultsRoot({
       'guides/Many Sections.md': '---\ntitle: Many Sections\n---\n# Many Sections\n\nIntro der Seite mit reichlich Text damit das Intro nicht leer ist.\n\n## Ein\n\nInhalt eins mit genug Text um das Limit zu sprengen.\n\n## Zwei\n\nInhalt zwei mit genug Text um das Limit zu sprengen.\n\n## Drei\n\nInhalt drei mit genug Text um das Limit zu sprengen.\n\n## Vier\n\nInhalt vier mit genug Text um das Limit zu sprengen.\n\n## Fuenf\n\nInhalt fuenf mit genug Text um das Limit zu sprengen.\n\n## Sechs\n\nInhalt sechs mit genug Text um das Limit zu sprengen.',
       // lange Seite mit nur wenigen Abschnitten: truncate + Rest-TOC
       'guides/Long Flat.md': '---\ntitle: Long Flat\n---\n# Long Flat\n\n' + 'Fliesstext der einfach immer weiter geht und geht. '.repeat(20) + '\n\n## Hinten\n\nDer hintere Abschnitt.',
-      'budget/very-long-path-name-that-must-remain-verbatim-in-search-results.md': '---\ntitle: Ein aussergewoehnlich langer Dokumenttitel der das kleine Antwortbudget deutlich uebersteigt\n---\n# Budget\n\n## Eine aussergewoehnlich lange Ueberschrift die nicht abgeschnitten werden darf\n\nBudgetMarker',
-      'guides/Very Long Navigation.md': '# Navigation\n\nIntro.\n\n## Eine aussergewoehnlich lange Ueberschrift fuer das enge Antwortbudget Nummer eins\n\nText.\n\n## Eine aussergewoehnlich lange Ueberschrift fuer das enge Antwortbudget Nummer zwei\n\nText.\n\n## Eine aussergewoehnlich lange Ueberschrift fuer das enge Antwortbudget Nummer drei\n\nText.\n\n## Eine aussergewoehnlich lange Ueberschrift fuer das enge Antwortbudget Nummer vier\n\nText.\n\n## Eine aussergewoehnlich lange Ueberschrift fuer das enge Antwortbudget Nummer fuenf\n\nText.',
+      'budget/very-long-path-name-that-must-remain-verbatim-in-search-results.md': '---\ntitle: Ein außergewöhnlich langer Dokumenttitel der das kleine Antwortbudget deutlich übersteigt\n---\n# Budget\n\n## Eine außergewöhnlich lange Überschrift die nicht abgeschnitten werden darf\n\nBudgetMarker',
+      'guides/Very Long Navigation.md': '# Navigation\n\nIntro.\n\n## Eine außergewöhnlich lange Überschrift für das enge Antwortbudget Nummer eins\n\nText.\n\n## Eine außergewöhnlich lange Überschrift für das enge Antwortbudget Nummer zwei\n\nText.\n\n## Eine außergewöhnlich lange Überschrift für das enge Antwortbudget Nummer drei\n\nText.\n\n## Eine außergewöhnlich lange Überschrift für das enge Antwortbudget Nummer vier\n\nText.\n\n## Eine außergewöhnlich lange Überschrift für das enge Antwortbudget Nummer fünf\n\nText.',
     },
   },
 });
@@ -387,7 +387,7 @@ describe('Vault', () => {
       const results = searchDocs(VAULT_PATH, 'BudgetMarker', { maxTokens: budget });
       assert.equal(full.length, 1);
       assert.match(full[0].file, /very-long-path-name/);
-      assert.match(full[0].headings[0], /aussergewoehnlich lange Ueberschrift/i);
+      assert.match(full[0].headings[0], /außergewöhnlich lange Überschrift/i);
       assert.deepEqual(results, []);
       assert.ok(JSON.stringify(results).length <= budget * 4);
     });

@@ -58,12 +58,14 @@ function registerVaultRoutes(router, vault) {
     if (!query || typeof query !== 'string' || !query.trim()) {
       return res.status(400).json({ error: 'query parameter required' });
     }
+    var responseFormat = 'detailed';
+    if (req.query.response_format === 'concise') responseFormat = 'concise';
     const results = handleSearch(vaultPath, {
       query: query.trim(),
       section: section || undefined,
       max_results: clampInt(req.query.max_results, 1, 100, REST_DEFAULT_MAX_RESULTS),
       context_lines: clampInt(req.query.context_lines, 0, 20, 3),
-      response_format: req.query.response_format === 'concise' ? 'concise' : 'detailed',
+      response_format: responseFormat,
       max_tokens: clampInt(req.query.max_tokens, 50, 50000, undefined),
     });
     if (isErrorResult(results)) return res.status(400).json(results);
