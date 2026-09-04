@@ -1,51 +1,28 @@
-import { execFileSync } from 'node:child_process';
 import { describe, it } from 'node:test';
 import assert from 'node:assert/strict';
+import { startMcpStdio } from '../src/mcp-stdio.js';
 
 describe('mcp-stdio startup', () => {
-  it('warms every search index before connecting the transport', () => {
-    var script = `
-      import { mock } from 'node:test';
-      var order = [];
-      await mock.module('@modelcontextprotocol/sdk/server/stdio.js', {
-        namedExports: { StdioServerTransport: class {} },
-      });
-      await mock.module('./src/vault-registry.js', {
-        namedExports: {
-          loadVaultRegistry: function () {
-            return [{ toolPrefix: 'docs', path: '/tmp/docs' }];
+  it('warms every search index before connecting the transport', async () => {
+    var order = [];
+    await startMcpStdio({
+      loadVaultRegistry: function () {
+        return [{ toolPrefix: 'docs', path: '/tmp/docs' }];
+      },
+      warmSearchIndex: function () {
+        order.push('warm');
+        return null;
+      },
+      createMcpServer: function () {
+        return {
+          async connect() {
+            order.push('connect');
           },
-        },
-      });
-      await mock.module('./src/tools/vault-cache.js', {
-        namedExports: {
-          warmSearchIndex: function () {
-            order.push('warm');
-            return null;
-          },
-        },
-      });
-      await mock.module('./src/mcp-handler.js', {
-        namedExports: {
-          createMcpServer: function () {
-            return {
-              async connect() {
-                order.push('connect');
-              },
-            };
-          },
-        },
-      });
-      await import('./src/mcp-stdio.js');
-      process.stdout.write(JSON.stringify(order));
-    `;
-    var output = execFileSync(process.execPath, [
-      '--experimental-test-module-mocks',
-      '--input-type=module',
-      '--eval',
-      script,
-    ], { cwd: process.cwd(), encoding: 'utf-8' });
+        };
+      },
+      StdioServerTransport: class {},
+    });
 
-    assert.deepEqual(JSON.parse(output), ['warm', 'connect']);
+    assert.deepEqual(order, ['warm', 'connect']);
   });
 });

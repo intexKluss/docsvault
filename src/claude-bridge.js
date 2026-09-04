@@ -49,14 +49,7 @@ export class ClaudeBridge {
       registry = [scoped];
     }
     const systemPrompt = buildSystemPrompt(registry);
-    var allowedTools = [];
-    for (var vaultIndex = 0; vaultIndex < registry.length; vaultIndex++) {
-      var vault = registry[vaultIndex];
-      var toolSuffixes = getToolSuffixes(vault);
-      for (var suffixIndex = 0; suffixIndex < toolSuffixes.length; suffixIndex++) {
-        allowedTools.push(`mcp__docsvault__${vault.toolPrefix}_${toolSuffixes[suffixIndex]}`);
-      }
-    }
+    var allowedTools = getAllowedTools(registry);
 
     // security-relevante felder NACH spread, nicht überschreibbar
     function buildOptions(overrides = {}) {
@@ -222,4 +215,16 @@ export class ClaudeBridge {
       }
     };
   }
+}
+
+export function getAllowedTools(registry) {
+  var allowedTools = [];
+  for (var vaultIndex = 0; vaultIndex < registry.length; vaultIndex++) {
+    var vault = registry[vaultIndex];
+    var toolSuffixes = getToolSuffixes(vault);
+    for (var suffixIndex = 0; suffixIndex < toolSuffixes.length; suffixIndex++) {
+      allowedTools.push(`mcp__docsvault__${vault.toolPrefix}_${toolSuffixes[suffixIndex]}`);
+    }
+  }
+  return allowedTools;
 }
