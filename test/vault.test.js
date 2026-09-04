@@ -9,6 +9,7 @@ import { handleSearch, DEFAULT_MAX_RESULTS } from '../src/tools/search.js';
 import { FIELD_BOOSTS, splitIntoSections } from '../src/tools/search-index.js';
 import { handleList } from '../src/tools/list.js';
 import { handleRead } from '../src/tools/read.js';
+import { getCachedSearchIndex } from '../src/tools/vault-cache.js';
 import { createTempVaultsRoot } from './helpers/temp-vault.js';
 
 // fixture-vault zur laufzeit erzeugen - vault-content liegt nicht mehr im repo
@@ -56,6 +57,8 @@ const { root, cleanup } = createTempVaultsRoot({
       'scope.md': '# Scope Landing Page\n\nSectionBoundaryNeedle',
       'fuzzy/Target.md': '# Target\n\nCommonSearchToken RareCorrectedNeedle',
       'fuzzy/Noise.md': '# Noise\n\n' + 'CommonSearchToken '.repeat(20),
+      'stable/alpha.md': '# Alpha\n\nStableOrderNeedle',
+      'stable/zeta.md': '# Zeta\n\nStableOrderNeedle',
     },
   },
 });
@@ -506,6 +509,26 @@ describe('Vault', () => {
       for (var resultIndex = 1; resultIndex < results.length; resultIndex++) {
         assert.ok(results[resultIndex - 1].score >= results[resultIndex].score);
       }
+    });
+
+    it('sorts equal-score results by file path', () => {
+      var index = getCachedSearchIndex(VAULT_PATH);
+      var originalSearch = index.mini.search.bind(index.mini);
+      index.mini.search = function (query, options) {
+        return originalSearch(query, options).reverse();
+      };
+
+      try {
+        var results = searchDocs(VAULT_PATH, 'StableOrderNeedle', { section: 'stable' });
+      } finally {
+        index.mini.search = originalSearch;
+      }
+
+      var files = [];
+      for (var resultIndex = 0; resultIndex < results.length; resultIndex++) {
+        files.push(results[resultIndex].file);
+      }
+      assert.deepEqual(files, ['stable/alpha', 'stable/zeta']);
     });
   });
 

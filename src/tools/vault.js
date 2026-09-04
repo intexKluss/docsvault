@@ -740,7 +740,11 @@ function aggregateByFile(hits, index, terms, queryFold, termSet) {
   }
 
   results.sort(function (first, second) {
-    return second.score - first.score;
+    var scoreDifference = second.score - first.score;
+    if (scoreDifference !== 0) return scoreDifference;
+    if (first.group.file < second.group.file) return -1;
+    if (first.group.file > second.group.file) return 1;
+    return 0;
   });
   return results;
 }

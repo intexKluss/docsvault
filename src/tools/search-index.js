@@ -37,6 +37,7 @@ export function buildSearchIndex(vaultPath) {
   var started = Date.now();
   var files = [];
   collectMdFilePaths(vaultPath, files);
+  files.sort();
 
   var documents = [];
   var segments = new Map();
