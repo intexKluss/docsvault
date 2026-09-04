@@ -232,8 +232,36 @@ export function searchDocs(vaultPath, query, options = {}) {
   }
 
   var hits = index.mini.search(query, { filter });
-  if (hits.length === 0) {
-    hits = index.mini.search(query, { filter, fuzzy: 0.2, prefix: true });
+  var fuzzyQuery = '';
+  for (var termIndex = 0; termIndex < terms.length; termIndex++) {
+    if (index.hasTerm(terms[termIndex])) continue;
+    if (fuzzyQuery) fuzzyQuery += ' ';
+    fuzzyQuery += terms[termIndex];
+  }
+  if (!fuzzyQuery && hits.length === 0) fuzzyQuery = query;
+
+  if (fuzzyQuery) {
+    var hitsById = new Map();
+    for (var hitIndex = 0; hitIndex < hits.length; hitIndex++) {
+      hitsById.set(hits[hitIndex].id, hits[hitIndex]);
+    }
+
+    var fuzzyHits = index.mini.search(fuzzyQuery, { filter, fuzzy: 0.2, prefix: true });
+    for (var fuzzyHitIndex = 0; fuzzyHitIndex < fuzzyHits.length; fuzzyHitIndex++) {
+      var fuzzyHit = fuzzyHits[fuzzyHitIndex];
+      var existingHit = hitsById.get(fuzzyHit.id);
+      if (!existingHit) {
+        hits.push(fuzzyHit);
+        hitsById.set(fuzzyHit.id, fuzzyHit);
+        continue;
+      }
+
+      existingHit.score += fuzzyHit.score;
+      for (var fuzzyTermIndex = 0; fuzzyTermIndex < fuzzyHit.terms.length; fuzzyTermIndex++) {
+        if (existingHit.terms.includes(fuzzyHit.terms[fuzzyTermIndex])) continue;
+        existingHit.terms.push(fuzzyHit.terms[fuzzyTermIndex]);
+      }
+    }
   }
   if (hits.length === 0) return [];
 

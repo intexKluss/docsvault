@@ -54,6 +54,8 @@ const { root, cleanup } = createTempVaultsRoot({
       'guides/H1 Boundaries.md': '# First Page\n\nFirst H1 body.\n\n## Child Section\n\nChild body.\n\n# Second Page\n\nSecond H1 body.',
       'scope/Page.md': '# Scoped Page\n\nSectionBoundaryNeedle',
       'scope.md': '# Scope Landing Page\n\nSectionBoundaryNeedle',
+      'fuzzy/Target.md': '# Target\n\nCommonSearchToken RareCorrectedNeedle',
+      'fuzzy/Noise.md': '# Noise\n\n' + 'CommonSearchToken '.repeat(20),
     },
   },
 });
@@ -492,6 +494,11 @@ describe('Vault', () => {
       var typo = searchDocs(VAULT_PATH, 'hasInvoicePlugn');
       assert.ok(typo.length > 0, 'tippfehler sollte gerettet werden');
       assert.equal(typo[0].file, 'Properties/DlcFile');
+    });
+
+    it('fuzzy-matches an unknown term even when another term has exact hits', () => {
+      var results = searchDocs(VAULT_PATH, 'CommonSearchToken RareCorrectedNeedl');
+      assert.equal(results[0].file, 'fuzzy/Target');
     });
 
     it('scores results in descending order', () => {
