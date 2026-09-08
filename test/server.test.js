@@ -7,7 +7,7 @@ import { createTempVaultsRoot } from './helpers/temp-vault.js';
 
 // minimaler fake-bridge für die ws-tests. warmUp ist sofort fertig, send liefert
 // einen kurzen stream. deterministisch, keine echten subprozesse.
-function fakeBridge() {
+function fakeBridge(warmUpError) {
   return {
     async createSession(toolPrefix) {
       let ready = false;
@@ -16,7 +16,10 @@ function fakeBridge() {
         toolPrefix,
         get ready() { return ready; },
         get destroyed() { return destroyed; },
-        async warmUp() { ready = true; },
+        async warmUp() {
+          if (warmUpError) throw new Error(warmUpError);
+          ready = true;
+        },
         async *send() {
           yield { type: 'chunk', content: 'ok' };
           yield { type: 'done' };
@@ -525,6 +528,34 @@ describe('Server', () => {
       }
       assert.ok(throttled, 'select_vault spam must hit the rate limit');
       ws.close();
+    });
+  });
+
+  describe('WebSocket warm-up errors', () => {
+    it('sends the underlying warm-up error to the frontend', async () => {
+      var vaults = createTempVaultsRoot({
+        'otris': { meta: { name: 'otris', description: 'otris', toolPrefix: 'otris' }, files: { 'x/a.md': '# A' } },
+      });
+      process.env.VAULTS_ROOT = vaults.root;
+      var result = await createServer({
+        port: 0,
+        bridge: fakeBridge('Your access token could not be refreshed because your refresh token was revoked.'),
+      });
+      var WebSocket = (await import('ws')).default;
+      var ws = new WebSocket(`ws://127.0.0.1:${result.port}`);
+      var errorResult = waitForType(ws, 'error');
+      await new Promise((resolve, reject) => {
+        ws.on('open', resolve);
+        ws.on('error', reject);
+      });
+      var waitResult = await errorResult;
+
+      assert.equal(waitResult.msg.message, 'Vorbereitung fehlgeschlagen: Your access token could not be refreshed because your refresh token was revoked.');
+
+      ws.close();
+      result.server.close();
+      vaults.cleanup();
+      process.env.VAULTS_ROOT = TEST_VAULTS_ROOT;
     });
   });
 });

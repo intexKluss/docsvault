@@ -310,7 +310,7 @@ function warmUpSession(ws, manager, clientId, toolPrefix) {
     if (err.message === 'Session superseded') return;
     console.error(`[server] warm-up failed for ${clientId}: ${err.message}`);
     if (ws.readyState === 1) {
-      ws.send(JSON.stringify({ type: 'error', message: 'Da ist leider etwas schiefgelaufen. Lade die Seite einfach neu.' }));
+      ws.send(JSON.stringify({ type: 'error', message: 'Vorbereitung fehlgeschlagen: ' + err.message }));
     }
   }).finally(() => {
     // nur löschen wenn es noch unser eintrag ist (kein neuerer warm-up gestartet).
