@@ -532,7 +532,7 @@ describe('Server', () => {
   });
 
   describe('WebSocket warm-up errors', () => {
-    it('sends the underlying warm-up error to the frontend', async () => {
+    it('sends a simple auth message to the frontend', async () => {
       var vaults = createTempVaultsRoot({
         'otris': { meta: { name: 'otris', description: 'otris', toolPrefix: 'otris' }, files: { 'x/a.md': '# A' } },
       });
@@ -550,7 +550,7 @@ describe('Server', () => {
       });
       var waitResult = await errorResult;
 
-      assert.equal(waitResult.msg.message, 'Vorbereitung fehlgeschlagen: Your access token could not be refreshed because your refresh token was revoked.');
+      assert.equal(waitResult.msg.message, 'Die Anmeldung für den KI-Chat ist abgelaufen. Bitte informiere einen Administrator.');
 
       ws.close();
       result.server.close();

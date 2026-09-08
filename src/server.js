@@ -308,9 +308,13 @@ function warmUpSession(ws, manager, clientId, toolPrefix) {
   }).catch((err) => {
     // superseded ist erwartetes verhalten beim vault-wechsel, kein fehler für den user.
     if (err.message === 'Session superseded') return;
+    var userMessage = 'Die KI konnte nicht vorbereitet werden. Bitte versuche es später erneut oder informiere einen Administrator.';
+    if (err.message.includes('refresh token was revoked')) {
+      userMessage = 'Die Anmeldung für den KI-Chat ist abgelaufen. Bitte informiere einen Administrator.';
+    }
     console.error(`[server] warm-up failed for ${clientId}: ${err.message}`);
     if (ws.readyState === 1) {
-      ws.send(JSON.stringify({ type: 'error', message: 'Vorbereitung fehlgeschlagen: ' + err.message }));
+      ws.send(JSON.stringify({ type: 'error', message: userMessage }));
     }
   }).finally(() => {
     // nur löschen wenn es noch unser eintrag ist (kein neuerer warm-up gestartet).
