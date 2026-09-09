@@ -1,4 +1,16 @@
-# VS Code (GitHub Copilot)
+# VS Code
+
+## Claude Code Extension
+
+Füge docsvault über die Claude CLI für deinen Benutzer hinzu:
+
+```bash
+claude mcp add --transport http --scope user docsvault http://<SERVER-IP>:3000/mcp
+```
+
+Der Eintrag liegt in `~/.claude.json`. Lade VS Code danach neu, damit die Extension die Konfiguration übernimmt. Ersetze `<SERVER-IP>` durch die Adresse deines Servers.
+
+## GitHub Copilot
 
 ## Voraussetzungen
 
