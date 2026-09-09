@@ -157,6 +157,14 @@ Gleicher Befehl wie beim ersten Mal.
 
 **Hinweis:** Ohne Login startet der Server, MCP Tools und REST API funktionieren, aber der Web Chat kann keine Antworten generieren.
 
+Die Modellwahl kannst du nach dem Login prüfen:
+
+```bash
+docker exec docsvault node src/codex-model.js
+```
+
+Der Chat prüft beim ersten Session Start mit demselben Account. Ein Modellwechsel wird im Log angezeigt.
+
 ### 6. Testen
 
 ```bash
@@ -205,7 +213,8 @@ Weitere Clients stehen in [INSTALL-DEVELOPER.md](INSTALL-DEVELOPER.md).
 | `PORT` | `3000` | Server Port |
 | `VAULTS_ROOT` | `/app/vaults` (Image) | Wurzel Verzeichnis der Vaults im Container (Volume Mount). Außerhalb von Docker: `./vaults` |
 | `ALLOWED_ORIGINS` | kein | Zusätzlich erlaubte Origins für den WebSocket (kommasepariert). Same origin ist immer erlaubt, nur nötig wenn das Frontend von einer anderen Origin zugreift (z.B. Reverse Proxy mit Host Rewrite) |
-| `CODEX_MODEL` | `gpt-5.6-luna` | Model für Codex Bridge |
+| `CODEX_MODEL` | `gpt-5.6-luna` | Bevorzugtes Modell; falls nicht verfügbar, wird automatisch ein passendes gewählt |
+| `CODEX_REASONING_EFFORT` | `low` | Bevorzugte Reasoning Stufe; falls nicht unterstützt, wird eine passende gewählt |
 | `ALLOW_NO_ORIGIN` | `false` | Verbindungen ohne Origin Header erlauben (für REST API/MCP Clients nötig) |
 | `MAX_SESSIONS` | `50` | Max gleichzeitige Chat Sessions |
 | `RATE_LIMIT_PER_MIN` | `10` | WebSocket Nachrichten pro Minute pro IP |
