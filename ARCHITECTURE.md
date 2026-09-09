@@ -9,6 +9,7 @@ src/
   server.js              Express + WebSocket Server
   session-manager.js     Session-Lifecycle, Rate Limiting, Validierung
   codex-bridge.js        Bridge zu OpenAI Codex SDK (@openai/codex-sdk)
+  codex-model.js         Account und verfügbare Modelle über Codex app-server prüfen
   api-routes.js          REST API für externe MCP-Clients
   mcp-handler.js         MCP SSE + Streamable HTTP Endpoints (createMcpServer, version 0.2.0)
   mcp-stdio.js           MCP stdio-Transport (lokaler Start ohne HTTP-Server, z.B. für CLI-Clients)
@@ -56,7 +57,7 @@ vaults/
 
 `npm run dev` startet den Server mit dem OpenAI Codex SDK. `npm run dev:codex` ist ein Alias für denselben Startbefehl.
 
-Die Bridge hält einen Codex Thread pro Session. Beide Chat Modi verwenden standardmäßig `gpt-5.6-luna`; `CODEX_MODEL` überschreibt das Modell. Der Modus steuert den Prompt Prefix pro Nachricht.
+Die Bridge hält einen Codex Thread pro Session. Vor der ersten Session prüft `codex-model.js` den Account und die paginierte Modellliste über den lokalen Codex App Server. Beide Chat Modi bevorzugen `CODEX_MODEL` oder `gpt-5.6-luna`. Ist das Modell nicht verfügbar, wird das empfohlene sichtbare Textmodell gewählt, sonst das erste passende. Die Reasoning Stufe wird mit dem Modellkatalog abgeglichen. Erfolgreiche Prüfungen werden pro Bridge geteilt, fehlgeschlagene bei der nächsten Session wiederholt. Der Modus steuert den Prompt Prefix pro Nachricht.
 
 `createSession()` liefert `{ warmUp(), send(content, mode), destroy(), ready, destroyed }`.
 
@@ -98,7 +99,7 @@ Kein Reconnect, kein Session Persist. Jeder Page Load ist eine frische Session.
 
 Die Tools liegen in `src/tools/` und sind über diese Schnittstellen erreichbar:
 1. **MCP stdio** (`src/mcp-stdio.js`): Die Codex Bridge nutzt die MCP Konfiguration der CLI. Das Docker Entrypoint Script konfiguriert den lokalen stdio Server.
-2. **MCP SSE** (`/sse` + `/messages`): Für externe MCP Clients (Gemini CLI, VS Code Copilot)
+2. **MCP SSE** (`/sse` + `/messages`): Für externe MCP Clients (Claude Code, Gemini CLI, VS Code Copilot)
 3. **REST API** (`/api/*`): Für simple HTTP Clients
 4. **MCP Streamable HTTP** (`/mcp`): Alternatives MCP Transportprotokoll
 
@@ -153,7 +154,8 @@ Codex Bridge: nutzt MCP über die Codex CLI Config.
 | `ALLOW_NO_ORIGIN` | `false` | WebSocket ohne Origin Header erlauben (für REST/MCP Clients nötig) |
 | `ALLOWED_ORIGINS` | kein | Komma separierte erlaubte WebSocket Origins |
 | `CODEX_PATH` | kein | Pfad zur Codex CLI |
-| `CODEX_MODEL` | `gpt-5.6-luna` | Model für Codex Bridge |
+| `CODEX_MODEL` | `gpt-5.6-luna` | Bevorzugtes Modell, mit automatischem Fallback auf ein verfügbares Modell |
+| `CODEX_REASONING_EFFORT` | `low` | Bevorzugte Reasoning Stufe, mit Fallback auf eine unterstützte Stufe |
 | `API_RATE_LIMIT_PER_MIN` | `60` | Max REST API Requests pro Minute/IP |
 | `API_TOKEN` | kein | Wenn gesetzt: erzwingt Bearer Token Auth (`Authorization: Bearer <TOKEN>`) auf `/api`, `/sse`, `/messages`, `/mcp` und dem WebSocket. Unset = offen (Default) |
 
