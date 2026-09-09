@@ -22,7 +22,7 @@ export function updateDependencies(packageNames, directDependencies, spawn, runt
   var seenPackages = Object.create(null);
   for (var validationIndex = 0; validationIndex < packageNames.length; validationIndex++) {
     var packageName = packageNames[validationIndex];
-    if (!directDependencies[packageName]) {
+    if (!Object.hasOwn(directDependencies, packageName)) {
       console.error(`'${packageName}' ist keine direkte Dependency in package.json.`);
       return 1;
     }
