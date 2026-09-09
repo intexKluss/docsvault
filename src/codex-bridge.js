@@ -119,9 +119,10 @@ export class CodexBridge {
         if (!warmedUp) throw new Error('Session not ready');
         if (typeof content !== 'string' || !content.trim()) throw new Error('Invalid content');
 
-        const modePrefix = mode === 'thorough'
-          ? '[GRÜNDLICH] Recherchiere gründlich. Lies relevante Dokumente komplett. Prüfe ob deine Antwort wirklich korrekt und vollständig ist. Gib ausführliche Erklärungen mit Code-Beispielen.\n\n'
-          : '[SCHNELL] Der Nutzer will eine schnelle, knappe Antwort. Such fokussiert statt planlos breit: nimm die API-Referenz als Leitquelle und lies sie wirklich, statt dutzendfach quer zu suchen. WICHTIGER als die Geschwindigkeit ist Konsistenz: entscheide dich für EINEN, den aktuellen API-Stil und ziehe ihn in der ganzen Antwort durch. Mische niemals unterschiedliche API Varianten.\n\n';
+        var modePrefix = '[SCHNELL] Der Nutzer will eine schnelle, knappe Antwort. Such fokussiert statt planlos breit: nimm die API-Referenz als Leitquelle und lies sie wirklich, statt dutzendfach quer zu suchen. WICHTIGER als die Geschwindigkeit ist Konsistenz: entscheide dich für EINEN, den aktuellen API-Stil und ziehe ihn in der ganzen Antwort durch. Mische niemals unterschiedliche API Varianten.\n\n';
+        if (mode === 'thorough') {
+          modePrefix = '[GRÜNDLICH] Recherchiere gründlich. Lies relevante Dokumente komplett. Prüfe ob deine Antwort wirklich korrekt und vollständig ist. Gib ausführliche Erklärungen mit Code-Beispielen.\n\n';
+        }
 
         const fullPrompt = modePrefix + content;
 
