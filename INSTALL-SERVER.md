@@ -77,7 +77,7 @@ cat > /srv/docsvault/vaults/team-notes/_meta.json <<'EOF'
 EOF
 ```
 
-Markdown Dateien ins Verzeichnis legen. Details zum `_meta.json`-Format siehe [README.md](README.md#vault-format-_metajson).
+Markdown Dateien ins Verzeichnis legen. Details zum `_meta.json`-Format siehe [README.md](README.md#vault format-_metajson).
 
 ### 4. Container starten
 
@@ -103,7 +103,7 @@ docker run -d --name docsvault --restart unless-stopped -p 3000:3000 -e ALLOW_NO
 **Dieser Platzhalter muss im `docker run` ersetzt werden:**
 - `/srv/docsvault/vaults` (Linux) bzw. `C:/dein/pfad/zu/vaults` (Windows): dein Host Pfad aus Schritt 3, also wohin du den Vault geklont hast
 
-Ein `ALLOWED_ORIGINS` brauchst du **nicht**: der Web Chat verbindet immer same-origin, und same-origin lässt der Server automatisch durch, egal über welche IP, Domain oder welchen Port die Seite aufgerufen wird. `ALLOWED_ORIGINS` braucht man nur, wenn das Frontend von einer **anderen** Origin aus zugreift (z.B. Reverse Proxy, der den `Host`-Header umschreibt).
+Ein `ALLOWED_ORIGINS` brauchst du **nicht**: der Web Chat verbindet immer same origin, und same origin lässt der Server automatisch durch, egal über welche IP, Domain oder welchen Port die Seite aufgerufen wird. `ALLOWED_ORIGINS` braucht man nur, wenn das Frontend von einer **anderen** Origin aus zugreift (z.B. Reverse Proxy, der den `Host`-Header umschreibt).
 
 **Zum Volume Format `-v ...`:** Docker erwartet drei Teile getrennt mit `:`, also `HOSTPFAD:CONTAINERPFAD:OPTIONEN`.
 
@@ -120,7 +120,7 @@ Der **Container Pfad `/app/vaults`** ist fix. Der Server sucht dort die Vaults, 
 Analog für das zweite Volume `-v docsvault-codex:/home/node/.codex`:
 - `docsvault-codex`: named volume (Docker verwaltet das automatisch, keine Host Datei nötig)
 - `/home/node/.codex`: Container Pfad wo Codex seine Auth speichert
-- Keine Optionen (read-write)
+- Keine Optionen (read write)
 
 > **Bug Reports persistent machen** (optional): Standardmäßig landen Bug Reports in `/app/reports.json` **im Container**, verschwinden also beim `docker rm`. Wenn du sie über Container Rebuilds hinweg behalten willst, mounte eine Host Datei drauf:
 > - Host Datei vorher anlegen: Linux `touch /srv/docsvault/reports.json` bzw. Windows `New-Item -ItemType File "C:\pfad\reports.json" -Force`
@@ -198,7 +198,7 @@ Weitere Clients stehen in [INSTALL-DEVELOPER.md](INSTALL-DEVELOPER.md).
 |----------|---------|--------------|
 | `PORT` | `3000` | Server Port |
 | `VAULTS_ROOT` | `/app/vaults` (Image) | Wurzel Verzeichnis der Vaults im Container (Volume Mount). Außerhalb von Docker: `./vaults` |
-| `ALLOWED_ORIGINS` | kein | Zusätzlich erlaubte Origins für den WebSocket (kommasepariert). Same-origin ist immer erlaubt, nur nötig wenn das Frontend von einer anderen Origin zugreift (z.B. Reverse Proxy mit Host Rewrite) |
+| `ALLOWED_ORIGINS` | kein | Zusätzlich erlaubte Origins für den WebSocket (kommasepariert). Same origin ist immer erlaubt, nur nötig wenn das Frontend von einer anderen Origin zugreift (z.B. Reverse Proxy mit Host Rewrite) |
 | `CODEX_MODEL` | `gpt-5.6-luna` | Model für Codex Bridge |
 | `ALLOW_NO_ORIGIN` | `false` | Verbindungen ohne Origin Header erlauben (für REST API/MCP Clients nötig) |
 | `MAX_SESSIONS` | `50` | Max gleichzeitige Chat Sessions |
@@ -229,7 +229,7 @@ Weitere Clients stehen in [INSTALL-DEVELOPER.md](INSTALL-DEVELOPER.md).
 ## Sicherheit
 
 - Container läuft als non root User (`node`, uid 1000)
-- Built-in Health Check (alle 30s)
+- Built in Health Check (alle 30s)
 - Rate Limiting für WebSocket und REST API
 - Origin Validierung **nur** für WebSocket Verbindungen
 - CSP Header auf allen Responses
@@ -300,7 +300,7 @@ docker logs docsvault 2>&1 | grep "ws rejected"
 - `Origin "..." passt nicht zu Host "..."`: die Seite läuft hinter einem Proxy, der den `Host`-Header umschreibt. Die im Log gezeigte Origin in `ALLOWED_ORIGINS` eintragen (exakter String inkl. Protokoll und Port), oder den Proxy den originalen `Host`-Header durchreichen lassen (nginx: `proxy_set_header Host $host;`).
 - `kein Origin-Header`: REST API / MCP Clients brauchen `ALLOW_NO_ORIGIN=true`.
 
-Same-origin Zugriffe (Seite direkt über `http://SERVER:3000` aufgerufen) laufen ohne Konfiguration. Wenn es da hängt, liegt es nicht an Origins, sondern an Firewall/Port Mapping.
+Same origin Zugriffe (Seite direkt über `http://SERVER:3000` aufgerufen) laufen ohne Konfiguration. Wenn es da hängt, liegt es nicht an Origins, sondern an Firewall/Port Mapping.
 
 ### Chat antwortet nicht / Fehler bei Verarbeitung
 
