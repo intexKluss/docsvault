@@ -16,6 +16,18 @@ Pro Wissensbereich (Vault) auf dem Server gibt es fünf Tools mit dem Vault Pref
 
 Falls weitere Vaults konfiguriert sind (z.B. `team-notes`), kommen entsprechende Tools wie `team_notes_search` dazu. Die vollständige Liste liefert dir `http://<SERVER-IP>:3000/api/vaults`.
 
+## Claude Code
+
+Für alle Projekte inklusive der VS Code Extension:
+
+```bash
+claude mcp add --transport http --scope user docsvault http://<SERVER-IP>:3000/mcp
+```
+
+Der Eintrag liegt in `~/.claude.json`. Für einen Eintrag in der `.mcp.json` des Projekts stattdessen `--scope project` verwenden. Danach Claude Code neu starten und die Verbindung mit `/mcp` prüfen.
+
+Claude greift hier als externer MCP Client auf die Vaults zu; das Codex Backend des Web Chats ist davon unabhängig.
+
 ## Codex CLI
 
 Per CLI (empfohlen):
