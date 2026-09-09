@@ -1,13 +1,13 @@
 # docsvault
 
-Web Chat UI und MCP Server für deine Markdown-Dokumentation. Als AI Backend läuft entweder das Claude Agent SDK oder das OpenAI Codex SDK. Die Dokumentation selbst liegt in einem separaten Vault Repo (oder einfach einem Ordner mit `.md`-Dateien) und wird zur Laufzeit als Volume gemountet, also nicht ins Docker Image gebacken. Die aktuelle Seitenanzahl liefert dir das `<prefix>_status` Tool bzw. `GET /api/<prefix>/status`.
+Web Chat UI und MCP Server für deine Markdown-Dokumentation. Als AI Backend läuft das OpenAI Codex SDK. Die Dokumentation selbst liegt in einem separaten Vault Repo (oder einfach einem Ordner mit `.md`-Dateien) und wird zur Laufzeit als Volume gemountet, also nicht ins Docker Image gebacken. Die aktuelle Seitenanzahl liefert dir das `<prefix>_status` Tool bzw. `GET /api/<prefix>/status`.
 
 ## Features
 
 - **Web Chat**: Landing Page + Chat UI mit Typewriter Effekt, Tool Fortschrittsanzeige, Speed Toggle
 - **MCP Endpoints**: SSE (`/sse`) und Streamable HTTP (`/mcp`) für externe MCP Clients
 - **REST API**: `/api/vaults` (Liste), `/api/<prefix>/{search,read,list,overview,status}` pro Vault
-- **Bridge Switching**: Claude oder Codex per `BRIDGE` ENV Variable (Code Default `claude`, das mitgelieferte Docker Image setzt `BRIDGE=codex`)
+- **Codex Backend**: Das OpenAI Codex SDK übernimmt die Chat Sessions.
 - **Volltextsuche**: BM25 Index auf Abschnittsebene, beim Start im Speicher aufgebaut
 - **Sicherheit**: Rate Limiting, DOMPurify, Tool Whitelisting, Prompt Injection Schutz. Die Origin Validierung schützt allerdings nur den WebSocket. Optionale Bearer Token Auth für REST/MCP per `API_TOKEN` (siehe unten)
 
@@ -39,15 +39,10 @@ Beim Update sinkt der MCP-Default von `search` von 10 auf 5 Treffer. Der `read`-
 
 ```bash
 npm ci
-npm run dev           # Claude Bridge (Code-Default)
-npm run dev:codex     # Codex Bridge
+npm run dev
 ```
 
-> **Windows Hinweis:** `dev:codex` und `dev:claude` nutzen die bash-typische `BRIDGE=... node ...` Inline Syntax und laufen so nur unter bash/WSL/Git Bash. Auf nativer PowerShell stattdessen:
-> ```powershell
-> $env:BRIDGE="codex"; node --watch src/server.js
-> ```
-> (`npm run dev` ohne ENV läuft überall und nutzt den Code Default `claude`.)
+Der Startbefehl funktioniert auch unter PowerShell.
 
 ## Abhängigkeiten aktualisieren
 
@@ -141,31 +136,13 @@ docker restart docsvault
 
 ## Für Entwickler (MCP Client)
 
-Verbinde deinen Coding Agent per MCP mit dem Server:
+Verbinde Codex per MCP mit dem Server:
 
 ```bash
-claude mcp add --transport sse docsvault http://SERVER-IP:3000/sse
+codex mcp add docsvault --url http://SERVER-IP:3000/mcp
 ```
 
-Oder manuell in `.mcp.json`:
-
-```json
-{
-  "mcpServers": {
-    "docsvault": {
-      "type": "sse",
-      "url": "http://SERVER-IP:3000/sse"
-    }
-  }
-}
-```
-
-**Bricht die Verbindung weg?** SSE (`type: sse`) braucht eine dauerhaft offene Verbindung, und die kappt ein Reverse Proxy gern nach kurzer Idle Zeit (typisches Symptom: der Client zeigt kurz die Tools, dann ist der Server weg). Nutze dann den Streamable HTTP Endpunkt `/mcp` (`type: http`), der ist proxy-robust:
-
-```bash
-claude mcp add --transport http docsvault http://SERVER-IP:3000/mcp
-```
-
+Codex verwendet Streamable HTTP. Der Endpunkt `/mcp` braucht keine dauerhaft offene SSE Verbindung.
 Alle Optionen findest du in [INSTALL-DEVELOPER.md](INSTALL-DEVELOPER.md).
 
 ## Sicherheit & Auth
@@ -225,7 +202,7 @@ docker stop docsvault; docker rm docsvault
 git pull
 docker build -t docsvault .
 docker run -d --name docsvault --restart unless-stopped \
-  -p 3000:3000 -e BRIDGE=codex \
+  -p 3000:3000 \
   -e ALLOW_NO_ORIGIN=true \
   -v /srv/docsvault/vaults:/app/vaults:ro \
   -v docsvault-codex:/home/node/.codex \
