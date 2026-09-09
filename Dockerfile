@@ -9,7 +9,7 @@ RUN apt-get update && apt-get install -y --no-install-recommends tini && rm -rf 
 WORKDIR /app
 
 COPY package*.json ./
-RUN npm ci --omit=dev --legacy-peer-deps
+RUN npm ci --omit=dev
 
 # codex CLI global verfuegbar machen. KEIN symlink: der npm-shim sucht
 # seinen launcher relativ zu $0 (ohne readlink), ueber den symlink also unter
