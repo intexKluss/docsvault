@@ -26,7 +26,7 @@ User-Scope (global, in jedem Projekt verfügbar):
 
 Wenn du es lieber pro Projekt willst statt global: die gleiche Config in `.gemini/settings.json` im Projektordner ablegen.
 
-**Wichtig:** Allein die `url`-Eigenschaft markiert schon den SSE-Transport. Du brauchst hier kein `"type": "sse"` wie bei Claude Code.
+**Wichtig:** Allein die `url`-Eigenschaft markiert schon den SSE-Transport. Ein zusätzliches `"type": "sse"` ist hier nicht nötig.
 
 Ersetze `<SERVER-IP>` durch die IP deines Servers (z.B. `192.168.2.100`).
 
