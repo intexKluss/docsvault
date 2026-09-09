@@ -1,9 +1,8 @@
 import assert from 'node:assert/strict';
-import { readFileSync } from 'node:fs';
 import { test } from 'node:test';
 import { updateDependencies } from '../scripts/update-dependencies.js';
 
-test('updates requested direct dependencies and verifies the result', function (t) {
+test('updates unique direct dependencies in one install and runs every gate', function (t) {
   t.mock.method(console, 'log', () => {});
   var calls = [];
   var packages = {
@@ -11,32 +10,67 @@ test('updates requested direct dependencies and verifies the result', function (
     zod: '^4.5.4'
   };
 
-  function runCommand(command, args) {
-    calls.push([command, args]);
+  function spawn(command, args, options) {
+    calls.push([command, args, options]);
     return { status: 0 };
   }
 
-  var exitCode = updateDependencies(['@openai/codex-sdk', 'zod'], packages, runCommand);
+  var runtime = {
+    execPath: 'C:\\nodejs\\node.exe',
+    platform: 'win32'
+  };
+  var exitCode = updateDependencies(
+    ['@openai/codex-sdk', 'zod', '@openai/codex-sdk'],
+    packages,
+    spawn,
+    runtime
+  );
+  var imageTag = calls[4][1][4];
 
   assert.equal(exitCode, 0);
+  assert.match(imageTag, /^docsvault-dependency-check:[0-9a-f-]{36}$/);
   assert.deepEqual(calls, [
-    ['npm', ['install', '@openai/codex-sdk@latest']],
-    ['npm', ['install', 'zod@latest']],
-    ['npm', ['ls']],
-    ['npm', ['test']],
-    ['docker', ['build', '--platform', 'linux/amd64', '-t', 'docsvault-dependency-check', '.']]
+    [runtime.execPath, [
+      'C:\\nodejs\\node_modules\\npm\\bin\\npm-cli.js',
+      'install',
+      '@openai/codex-sdk@latest',
+      'zod@latest'
+    ], { stdio: 'inherit' }],
+    [runtime.execPath, [
+      'C:\\nodejs\\node_modules\\npm\\bin\\npm-cli.js',
+      'ls'
+    ], { stdio: 'inherit' }],
+    [runtime.execPath, [
+      'C:\\nodejs\\node_modules\\npm\\bin\\npm-cli.js',
+      'audit',
+      '--omit=dev',
+      '--audit-level=high'
+    ], { stdio: 'inherit' }],
+    [runtime.execPath, [
+      'C:\\nodejs\\node_modules\\npm\\bin\\npm-cli.js',
+      'test'
+    ], { stdio: 'inherit' }],
+    ['docker', [
+      'build',
+      '--platform',
+      'linux/amd64',
+      '-t',
+      imageTag,
+      '.'
+    ], { stdio: 'inherit' }],
+    ['docker', ['image', 'rm', imageTag], { stdio: 'inherit' }]
   ]);
 });
 
 test('rejects unknown packages before npm changes anything', function (t) {
   t.mock.method(console, 'error', () => {});
   var calls = [];
-  function runCommand(command, args) {
-    calls.push([command, args]);
+  function spawn(command, args, options) {
+    calls.push([command, args, options]);
     return { status: 0 };
   }
 
-  var exitCode = updateDependencies(['express'], {}, runCommand);
+  var exitCode = updateDependencies(['express'], {}, spawn, process);
 
   assert.equal(exitCode, 1);
   assert.deepEqual(calls, []);
@@ -47,20 +81,73 @@ test('stops after a failed update', function (t) {
   var calls = [];
   var packages = { zod: '^4.5.4' };
 
-  function runCommand(command, args) {
-    calls.push([command, args]);
+  function spawn(command, args, options) {
+    calls.push([command, args, options]);
     return { status: 2 };
   }
 
-  var exitCode = updateDependencies(['zod'], packages, runCommand);
+  var exitCode = updateDependencies(['zod'], packages, spawn, process);
 
   assert.equal(exitCode, 2);
-  assert.deepEqual(calls, [['npm', ['install', 'zod@latest']]]);
+  assert.equal(calls.length, 1);
 });
 
-test('starts npm without a shell', () => {
-  var script = readFileSync(new URL('../scripts/update-dependencies.js', import.meta.url), 'utf8');
+test('removes its temporary image after a failed build', function (t) {
+  t.mock.method(console, 'log', () => {});
+  var calls = [];
+  var packages = { zod: '^4.5.4' };
 
-  assert.doesNotMatch(script, /shell:/);
-  assert.match(script, /npm-cli\.js/);
+  function spawn(command, args, options) {
+    calls.push([command, args, options]);
+    if (command === 'docker' && args[0] === 'build') return { status: 3 };
+    return { status: 0 };
+  }
+
+  var exitCode = updateDependencies(['zod'], packages, spawn, process);
+  var buildCall = calls[calls.length - 2];
+  var cleanupCall = calls[calls.length - 1];
+  var imageTag = buildCall[1][4];
+
+  assert.equal(exitCode, 3);
+  assert.deepEqual(cleanupCall, [
+    'docker',
+    ['image', 'rm', imageTag],
+    { stdio: 'inherit' }
+  ]);
+});
+
+test('fails when a successful build cannot be cleaned up', function (t) {
+  t.mock.method(console, 'log', () => {});
+  var packages = { zod: '^4.5.4' };
+
+  function spawn(command, args) {
+    if (command === 'docker' && args[0] === 'image') return { status: 4 };
+    return { status: 0 };
+  }
+
+  var exitCode = updateDependencies(['zod'], packages, spawn, process);
+
+  assert.equal(exitCode, 4);
+});
+
+test('spawns npm without a shell on non-Windows platforms', function (t) {
+  t.mock.method(console, 'log', () => {});
+  var calls = [];
+  var packages = { zod: '^4.5.4' };
+
+  function spawn(command, args, options) {
+    calls.push([command, args, options]);
+    return { status: 0 };
+  }
+
+  updateDependencies(['zod'], packages, spawn, {
+    execPath: '/usr/bin/node',
+    platform: 'linux'
+  });
+
+  assert.deepEqual(calls[0], [
+    'npm',
+    ['install', 'zod@latest'],
+    { stdio: 'inherit' }
+  ]);
 });
