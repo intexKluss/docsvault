@@ -1,6 +1,6 @@
 # MCP Tool für Entwickler
 
-Dein Coding Agent (Codex CLI, Gemini CLI, VS Code Copilot, etc.) bekommt Zugriff auf alle Wissensbereiche (Vaults) die auf dem Server konfiguriert sind. Also z.B. Produktdokumentation, interne Richtlinien oder API Referenzen. Die Inhalte liegen auf dem Server, du brauchst keinen eigenen Vault.
+Dein Coding Agent (Claude Code, Codex CLI, Gemini CLI, VS Code Copilot, etc.) bekommt Zugriff auf alle Wissensbereiche (Vaults) die auf dem Server konfiguriert sind. Also z.B. Produktdokumentation, interne Richtlinien oder API Referenzen. Die Inhalte liegen auf dem Server, du brauchst keinen eigenen Vault.
 
 Welche Vaults der Server gerade bereitstellt siehst du unter `http://SERVER-IP:3000/api/vaults`. Pro Vault gibt es fünf Tools, benannt nach dem `toolPrefix` aus der Vault Konfiguration (z.B. `docs_search`, `team_notes_search`, ...).
 
@@ -12,6 +12,16 @@ Welche Vaults der Server gerade bereitstellt siehst du unter `http://SERVER-IP:3
 ## Option 1: Remote MCP (empfohlen)
 
 Du verbindest deinen Agent direkt per MCP Netzwerkprotokoll mit dem Server. Keine lokale Installation nötig.
+
+### Claude Code
+
+Für alle Projekte und die VS Code Extension:
+
+```bash
+claude mcp add --transport http --scope user docsvault http://SERVER-IP:3000/mcp
+```
+
+Für ein einzelnes Projekt ersetzt du `--scope user` durch `--scope project`. Claude Code danach neu starten und mit `/mcp` prüfen. Die Verbindung als MCP Client hängt nicht vom Chat Backend des Servers ab.
 
 ### Codex CLI
 
