@@ -77,7 +77,7 @@ cat > /srv/docsvault/vaults/team-notes/_meta.json <<'EOF'
 EOF
 ```
 
-Markdown Dateien ins Verzeichnis legen. Details zum `_meta.json`-Format siehe [README.md](README.md#vault format-_metajson).
+Markdown Dateien ins Verzeichnis legen. Details zum `_meta.json`-Format siehe [README.md](README.md#vault-format-_metajson).
 
 ### 4. Container starten
 
