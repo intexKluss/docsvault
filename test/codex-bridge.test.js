@@ -45,3 +45,42 @@ test('retries the model check after login or connection failure', async function
   assert.equal(checks, 2);
   await session.destroy();
 });
+
+test('repeats the vault research rules for every user question', async function (t) {
+  t.mock.method(console, 'log', function () {});
+  var prompts = [];
+  t.mock.method(Codex.prototype, 'startThread', function () {
+    return {
+      async run(prompt) {
+        prompts.push(prompt);
+      },
+      async runStreamed(prompt) {
+        prompts.push(prompt);
+        return {
+          events: createAnswerEvents()
+        };
+      }
+    };
+  });
+  var bridge = new CodexBridge([
+    { name: 'otris DOCUMENTS API', description: 'otris Doku.', toolPrefix: 'otris', path: '/x' }
+  ], async function () {
+    return { model: 'available-model', reasoningEffort: 'high' };
+  });
+  var session = await bridge.createSession();
+
+  await session.warmUp();
+  for await (var event of session.send('Was ist ein FormGadget?', 'fast')) {
+    assert.ok(event.type);
+  }
+
+  assert.match(prompts[1], /Definitions- und Übersichtsfragen/);
+  assert.match(prompts[1], /Code nur, wenn der Nutzer ausdrücklich danach fragt/);
+  assert.match(prompts[1], /Was ist ein FormGadget\?/);
+  await session.destroy();
+});
+
+async function* createAnswerEvents() {
+  yield { type: 'item.completed', item: { type: 'agent_message', text: 'Antwort' } };
+  yield { type: 'turn.completed' };
+}
