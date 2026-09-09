@@ -46,13 +46,33 @@ Der Startbefehl funktioniert auch unter PowerShell.
 
 ## Abhängigkeiten aktualisieren
 
-Dependencies immer ohne `--force` oder `--legacy-peer-deps` aktualisieren. So wird ein ungültiger Peer Dependency Baum nicht still in ein Container Image übernommen. Das Script nimmt nur direkte Dependencies aus `package.json` an, aktualisiert sie gemeinsam und führt danach npm Prüfung, Production Audit, Tests und amd64 Image Build aus. Das temporäre Prüfimage wird auch nach einem fehlgeschlagenen Build entfernt:
+Dependencies immer ohne `--force` oder `--legacy-peer-deps` aktualisieren. So wird ein ungültiger Peer Dependency Baum nicht still in ein Container Image übernommen. Das Script nimmt nur direkte Dependencies aus `package.json` an, aktualisiert sie gemeinsam und führt danach npm Prüfung, Production Audit, Tests, Codex Modellprüfung und amd64 Image Build aus. Das temporäre Prüfimage wird auch nach einem fehlgeschlagenen Build entfernt:
 
 ```bash
 npm run deps:update -- @openai/codex-sdk zod
 ```
 
 Erst wenn das Script erfolgreich endet, prüfst du `package.json` und `package-lock.json` und commitest beide zusammen. Das Script erstellt keinen Commit und pusht nichts.
+
+### Automatische Codex Modellwahl
+
+Beim Dependency Update fragt docsvault die Modellliste über die installierte Codex CLI mit dem dort angemeldeten Account ab. `CODEX_MODEL` wird bevorzugt, sonst `gpt-5.6-luna`. Fehlt dieses Modell, nimmt docsvault das empfohlene verfügbare Textmodell oder das erste passende Modell aus der Liste. Eine nicht unterstützte `CODEX_REASONING_EFFORT` wird durch eine passende Stufe ersetzt; standardmäßig wird `low` bevorzugt.
+
+Die gewählte Kombination steht im Log. Es wird keine feste Account Auswahl ins Repo geschrieben: Beim ersten Chat prüft der Server mit seinem eigenen Login erneut und teilt das Ergebnis zwischen seinen Sessions. Nach einem fehlgeschlagenen Check versucht er es beim nächsten Session Start erneut.
+
+Ohne Codex Login oder bei fehlgeschlagener Abfrage bricht der Update Workflow ab. Lokal vorab mit `codex login` anmelden. Du kannst die Prüfung separat ausführen:
+
+```bash
+node src/codex-model.js
+```
+
+Im laufenden Container:
+
+```bash
+docker exec docsvault node src/codex-model.js
+```
+
+Die Prüfung verwendet den von Codex gelieferten Katalog und startet keinen Modell Turn. Aktuelle Limits oder spätere Änderungen am Account können eine Anfrage trotzdem verhindern. Grundlage ist die [offizielle App Server Schnittstelle](https://learn.chatgpt.com/docs/app-server#models).
 
 ## Deployment (Docker)
 
