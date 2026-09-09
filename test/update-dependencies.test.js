@@ -3,7 +3,7 @@ import { test } from 'node:test';
 import { updateDependencies } from '../scripts/update-dependencies.js';
 
 test('updates unique direct dependencies in one install and runs every gate', function (t) {
-  t.mock.method(console, 'log', () => {});
+  t.mock.method(console, 'log', function () {});
   var calls = [];
   var packages = {
     '@openai/codex-sdk': '^0.153.4',
@@ -63,7 +63,7 @@ test('updates unique direct dependencies in one install and runs every gate', fu
 });
 
 test('rejects unknown packages before npm changes anything', function (t) {
-  t.mock.method(console, 'error', () => {});
+  t.mock.method(console, 'error', function () {});
   var calls = [];
   function spawn(command, args, options) {
     calls.push([command, args, options]);
@@ -77,7 +77,7 @@ test('rejects unknown packages before npm changes anything', function (t) {
 });
 
 test('stops after a failed update', function (t) {
-  t.mock.method(console, 'log', () => {});
+  t.mock.method(console, 'log', function () {});
   var calls = [];
   var packages = { zod: '^4.5.4' };
 
@@ -93,7 +93,7 @@ test('stops after a failed update', function (t) {
 });
 
 test('removes its temporary image after a failed build', function (t) {
-  t.mock.method(console, 'log', () => {});
+  t.mock.method(console, 'log', function () {});
   var calls = [];
   var packages = { zod: '^4.5.4' };
 
@@ -117,7 +117,7 @@ test('removes its temporary image after a failed build', function (t) {
 });
 
 test('fails when a successful build cannot be cleaned up', function (t) {
-  t.mock.method(console, 'log', () => {});
+  t.mock.method(console, 'log', function () {});
   var packages = { zod: '^4.5.4' };
 
   function spawn(command, args) {
@@ -131,7 +131,7 @@ test('fails when a successful build cannot be cleaned up', function (t) {
 });
 
 test('spawns npm without a shell on non-Windows platforms', function (t) {
-  t.mock.method(console, 'log', () => {});
+  t.mock.method(console, 'log', function () {});
   var calls = [];
   var packages = { zod: '^4.5.4' };
 
