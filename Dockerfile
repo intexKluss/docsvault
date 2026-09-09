@@ -34,7 +34,6 @@ EXPOSE 3000
 
 ENV NODE_ENV=production
 ENV VAULTS_ROOT=/app/vaults
-ENV BRIDGE=codex
 
 HEALTHCHECK --interval=30s --timeout=5s --start-period=10s --retries=3 \
   CMD node -e "fetch('http://localhost:3000/api/health').then(r=>{if(!r.ok)throw 1}).catch(()=>process.exit(1))"

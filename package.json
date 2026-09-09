@@ -9,13 +9,11 @@
   "scripts": {
     "start": "node src/server.js",
     "dev": "node --watch src/server.js",
-    "dev:codex": "BRIDGE=codex node --watch src/server.js",
-    "dev:claude": "BRIDGE=claude node --watch src/server.js",
+    "dev:codex": "node --watch src/server.js",
     "deps:update": "node scripts/update-dependencies.js",
     "test": "node --test"
   },
   "dependencies": {
-    "@anthropic-ai/claude-agent-sdk": "^0.2.81",
     "@modelcontextprotocol/sdk": "^1.30.0",
     "@openai/codex-sdk": "^0.153.4",
     "express": "^5.2.1",
