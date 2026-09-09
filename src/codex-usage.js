@@ -143,9 +143,7 @@ async function compute() {
   };
 }
 
-// Liefert die aktuelle Burnrate oder null, wenn keine Rollouts da sind (z.b.
-// Claude-Bridge oder noch kein Turn gelaufen). Wirft nie, fehlende Daten sind
-// kein Fehler - das Frontend blendet den Balken dann einfach aus.
+// Ohne Rollout bleibt die Kontingentanzeige im Frontend ausgeblendet.
 export async function readBurnRate({ force = false } = {}) {
   const now = Date.now();
   if (!force && cache.value !== null && now - cache.at < TTL_MS) return cache.value;
