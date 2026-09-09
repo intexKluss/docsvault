@@ -9,7 +9,7 @@ Web Chat UI und MCP Server für deine Markdown Dokumentation. Als AI Backend lä
 - **REST API**: `/api/vaults` (Liste), `/api/<prefix>/{search,read,list,overview,status}` pro Vault
 - **Codex Backend**: Das OpenAI Codex SDK übernimmt die Chat Sessions.
 - **Volltextsuche**: BM25 Index auf Abschnittsebene, beim Start im Speicher aufgebaut
-- **Sicherheit**: Rate Limiting, DOMPurify, Tool Whitelisting, Prompt Injection Schutz. Die Origin Validierung schützt allerdings nur den WebSocket. Optionale Bearer Token Auth für REST/MCP per `API_TOKEN` (siehe unten)
+- **Sicherheit**: Rate Limiting, DOMPurify, Codex Sandbox und Regeln gegen Prompt Injection. Die Origin Validierung schützt allerdings nur den WebSocket. Optionale Bearer Token Auth für REST/MCP per `API_TOKEN` (siehe unten)
 
 ## Volltextsuche
 
