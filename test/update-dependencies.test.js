@@ -1,5 +1,6 @@
 import assert from 'node:assert/strict';
 import { test } from 'node:test';
+import { fileURLToPath } from 'node:url';
 import { updateDependencies } from '../scripts/update-dependencies.js';
 
 test('updates unique direct dependencies in one install and runs every gate', function (t) {
@@ -25,7 +26,7 @@ test('updates unique direct dependencies in one install and runs every gate', fu
     spawn,
     runtime
   );
-  var imageTag = calls[4][1][4];
+  var imageTag = calls[5][1][4];
 
   assert.equal(exitCode, 0);
   assert.match(imageTag, /^docsvault-dependency-check:[0-9a-f-]{36}$/);
@@ -50,6 +51,7 @@ test('updates unique direct dependencies in one install and runs every gate', fu
       'C:\\nodejs\\node_modules\\npm\\bin\\npm-cli.js',
       'test'
     ], { stdio: 'inherit' }],
+    [runtime.execPath, [fileURLToPath(new URL('../src/codex-model.js', import.meta.url))], { stdio: 'inherit' }],
     ['docker', [
       'build',
       '--platform',
@@ -180,4 +182,19 @@ test('rejects inherited constructor before spawning commands', function (t) {
 
   assert.equal(exitCode, 1);
   assert.deepEqual(calls, []);
+});
+
+test('stops before Docker when the model check fails', function (t) {
+  t.mock.method(console, 'log', function () {});
+  var calls = [];
+  function spawn(command, args) {
+    calls.push(command);
+    if (args[0].endsWith('codex-model.js')) return { status: 5 };
+    return { status: 0 };
+  }
+
+  var exitCode = updateDependencies(['ws'], { ws: '^8.21.3' }, spawn, process);
+
+  assert.equal(exitCode, 5);
+  assert.equal(calls.includes('docker'), false);
 });
