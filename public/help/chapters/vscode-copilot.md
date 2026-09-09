@@ -12,15 +12,15 @@ Der Eintrag liegt in `~/.claude.json`. Lade VS Code danach neu, damit die Extens
 
 ## GitHub Copilot
 
-## Voraussetzungen
+### Voraussetzungen
 
 - VS Code **1.102** oder neuer (empfohlen)
 - GitHub Copilot Extension installiert und eingeloggt
 - Copilot Chat im **Agent Mode**
 
-## Konfiguration
+### Konfiguration
 
-### Option A: Projekt spezifisch (.vscode/mcp.json), empfohlen
+#### Option A: Projekt spezifisch (.vscode/mcp.json), empfohlen
 
 Leg dir eine `.vscode/mcp.json` im Projektverzeichnis an:
 
@@ -35,7 +35,7 @@ Leg dir eine `.vscode/mcp.json` im Projektverzeichnis an:
 }
 ```
 
-### Option B: Global (User MCP Configuration)
+#### Option B: Global (User MCP Configuration)
 
 `Ctrl+Shift+P` → **"MCP: Open User Configuration"** und das hier einfügen:
 
@@ -56,7 +56,7 @@ So steht der Server in jedem Projekt bereit, ohne dass du pro Repo eine `.vscode
 
 Ersetz `<SERVER-IP>` durch die IP deines Servers (z.B. `192.168.2.100`).
 
-## Agent Mode aktivieren
+### Agent Mode aktivieren
 
 Die MCP Tools laufen nur im **Agent Mode** von Copilot Chat:
 
@@ -66,7 +66,7 @@ Die MCP Tools laufen nur im **Agent Mode** von Copilot Chat:
 
 > **Hinweis:** Die Chat UI wird regelmäßig umgebaut. Wenn kein Mode Picker zu sehen ist, ist Agent Mode wahrscheinlich schon der Standard. Die MCP Tools tauchen im Chat als verfügbare Tools auf, sobald der Server verbunden ist.
 
-## Verifizierung
+### Verifizierung
 
 Im Agent Mode einfach eine Testfrage stellen:
 
@@ -74,7 +74,7 @@ Im Agent Mode einfach eine Testfrage stellen:
 
 Copilot sollte die MCP Tools ziehen und dir Ergebnisse aus der Dokumentation liefern.
 
-## Troubleshooting
+### Troubleshooting
 
 Falls der Server als "not connected" angezeigt wird:
 
