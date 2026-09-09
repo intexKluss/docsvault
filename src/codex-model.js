@@ -33,7 +33,7 @@ export async function resolveCodexModel(options = {}) {
 
   var models = await new Promise(function (resolve, reject) {
     var child = spawnProcess(command, args, {
-      cwd: dirname(SCRIPT_PATH),
+      cwd: dirname(dirname(SCRIPT_PATH)),
       env: environment,
       stdio: ['pipe', 'pipe', 'ignore'],
       windowsHide: true,
