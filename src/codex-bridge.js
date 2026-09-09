@@ -129,7 +129,7 @@ export class CodexBridge {
         if (!warmedUp) throw new Error('Session not ready');
         if (typeof content !== 'string' || !content.trim()) throw new Error('Invalid content');
 
-        var modePrefix = '[SCHNELL] Der Nutzer will eine schnelle, knappe Antwort. Nutze das Recherche-Protokoll gezielt und beantworte nur das Gefragte.\n\n';
+        var modePrefix = '[SCHNELL] Der Nutzer will eine zügige Antwort. Recherchiere gezielt und vermeide unnötige Tool-Aufrufe, aber kürze nie auf Kosten von Vollständigkeit oder fachlicher Präzision.\n\n';
         if (mode === 'thorough') {
           modePrefix = '[GRÜNDLICH] Recherchiere gründlich. Lies alle nach dem Recherche-Protokoll relevanten Dokumente vollständig. Prüfe Voraussetzungen, Versionshinweise und Konsistenz, bevor du antwortest.\n\n';
         }

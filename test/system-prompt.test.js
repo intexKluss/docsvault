@@ -53,3 +53,13 @@ it('uses a question-specific research protocol instead of always requesting code
   assert.match(prompt, /API-Referenz nur bei API- oder Umsetzungsfragen/);
   assert.doesNotMatch(prompt, /Gib Code-Beispiele wenn möglich/);
 });
+
+it('requires a complete, source-backed answer without imposing a response template', function () {
+  var prompt = buildSystemPrompt(REGISTRY);
+
+  assert.match(prompt, /ANTWORT-QUALITÄT/);
+  assert.match(prompt, /Beantworte jede ausdrücklich gestellte Teilfrage/);
+  assert.match(prompt, /Trenne zwingende Voraussetzungen klar von optionalen Varianten/);
+  assert.match(prompt, /Formuliere eine zusammenhängende Erklärung/);
+  assert.doesNotMatch(prompt, /GADGET_GUIDANCE|GRUNDGERÜST|gadgetAPI|gadgetContext/);
+});

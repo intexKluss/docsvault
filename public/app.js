@@ -1,3 +1,5 @@
+import { renderMarkdown } from './markdown-renderer.js';
+
 (function () {
   'use strict';
 
@@ -258,18 +260,6 @@
   // sanitize läuft nur ~alle 60ms statt jede 12ms (sonst O(n^2) auf wachsendem doku)
   const RENDER_MS = 60;
   let lastRenderTs = 0;
-
-  // markdown/llm-output: code, tabellen, links erlaubt; svg/style raus (siehe public/help)
-  const SANITIZE_MD = {
-    ALLOWED_URI_REGEXP: /^(?:https?|mailto|tel|#|\/|\.\/|\.\.\/)/i,
-    FORBID_TAGS: ['svg', 'math', 'form', 'iframe', 'object', 'embed'],
-    FORBID_ATTR: ['style'],
-    ADD_ATTR: ['target', 'rel'],
-  };
-
-  function sanitizeMarkdown(md) {
-    return DOMPurify.sanitize(marked.parse(md), SANITIZE_MD);
-  }
 
   // reconnect/lifecycle-state
   let intentionalClose = false;
@@ -711,7 +701,7 @@
     if (!currentAiMsg) return;
     const contentEl = currentAiMsg.querySelector('.msg-content');
     if (contentEl) {
-      contentEl.innerHTML = sanitizeMarkdown(currentAiText);
+      contentEl.innerHTML = renderMarkdown(currentAiText, marked, DOMPurify);
       // fertige codebloecke sofort einfaerben + copy-button, der noch offene
       // (letzte) block bleibt aus bis er zu ist
       decorateCodeBlocks(contentEl, currentAiText);
