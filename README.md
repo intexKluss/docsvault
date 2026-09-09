@@ -38,7 +38,7 @@ Beim Update sinkt der MCP-Default von `search` von 10 auf 5 Treffer. Der `read`-
 ## Quick Start
 
 ```bash
-npm install
+npm ci
 npm run dev           # Claude Bridge (Code-Default)
 npm run dev:codex     # Codex Bridge
 ```
@@ -48,6 +48,19 @@ npm run dev:codex     # Codex Bridge
 > $env:BRIDGE="codex"; node --watch src/server.js
 > ```
 > (`npm run dev` ohne ENV läuft überall und nutzt den Code Default `claude`.)
+
+## Abhängigkeiten aktualisieren
+
+Dependencies immer ohne `--force` oder `--legacy-peer-deps` aktualisieren. So wird ein ungültiger Peer-Dependency-Baum nicht still in ein Container-Image übernommen:
+
+```bash
+npm install <package>@latest
+npm ls
+npm test
+docker build -t docsvault .
+```
+
+Erst wenn alle vier Befehle durchlaufen, gehören `package.json` und `package-lock.json` zusammen in den Commit.
 
 ## Deployment (Docker)
 
@@ -185,8 +198,8 @@ docker inspect --format='{{.State.Health.Status}}' docsvault   # Health Status
 ### Codex Auth
 
 ```bash
-docker exec -it docsvault codex auth login --device-auth   # Einloggen / Token erneuern
-docker exec docsvault codex auth status                    # Auth-Status prüfen
+docker exec -it docsvault codex login --device-auth        # Einloggen / Token erneuern
+docker exec docsvault codex login status                    # Auth-Status prüfen
 docker exec docsvault codex mcp list                       # MCP-Server prüfen
 ```
 
