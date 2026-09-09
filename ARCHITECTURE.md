@@ -65,8 +65,8 @@ npm run dev:claude    # Claude (explizit)
 | | Claude Bridge | Codex Bridge |
 |---|---|---|
 | SDK | `@anthropic-ai/claude-agent-sdk` | `@openai/codex-sdk` |
-| Model (fast) | claude-sonnet-4-6 | gpt-5.4 |
-| Model (thorough) | claude-opus-4-6 | gpt-5.4 (Prompt Prefix) |
+| Model (fast) | claude-sonnet-4-6 | gpt-5.6-luna |
+| Model (thorough) | claude-opus-4-6 | gpt-5.6-luna (Prompt Prefix) |
 | Session | `query()` mit `--resume` | `thread.runStreamed()` (persistent) |
 | Mode Steuerung | Model + maxTurns wechseln | Prompt Prefix pro Nachricht |
 | Tool Events | `message.type === 'assistant'/'tool'/'result'` | `event.type === 'item.started/completed'` |
@@ -170,7 +170,7 @@ Codex Bridge: nutzt MCP über die Codex CLI Config.
 | `ALLOWED_ORIGINS` | kein | Komma separierte erlaubte WebSocket Origins |
 | `CLAUDE_PATH` | kein | Pfad zur Claude Code CLI |
 | `CODEX_PATH` | kein | Pfad zur Codex CLI |
-| `CODEX_MODEL` | `gpt-5.4` | Model für Codex Bridge |
+| `CODEX_MODEL` | `gpt-5.6-luna` | Model für Codex Bridge |
 | `MCP_CWD` | Projekt Root | Arbeitsverzeichnis für MCP |
 | `MCP_SSE_URL` | `http://localhost:$PORT/sse` | SSE URL für Claude Bridge MCP Verbindung |
 | `API_RATE_LIMIT_PER_MIN` | `60` | Max REST API Requests pro Minute/IP |

@@ -35,7 +35,7 @@ Danach läuft die Oberfläche unter `http://localhost:3000`.
 Der Server startet, aber die KI antwortet erst nach dem Login. Beim Standard-Image (Codex) meldest du dich einmal im laufenden Container an:
 
 ```bash
-docker exec -it docsvault codex auth login --device-auth
+docker exec -it docsvault codex login --device-auth
 ```
 
 Damit der Login einen Neustart übersteht, muss `/home/node/.codex` in einem Volume liegen (siehe das `-v docsvault-codex:...` oben). Welche Modelle dein Account nutzen darf, hängt vom Plan ab.
