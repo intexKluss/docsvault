@@ -51,16 +51,13 @@ npm run dev:codex     # Codex Bridge
 
 ## Abhängigkeiten aktualisieren
 
-Dependencies immer ohne `--force` oder `--legacy-peer-deps` aktualisieren. So wird ein ungültiger Peer-Dependency-Baum nicht still in ein Container-Image übernommen:
+Dependencies immer ohne `--force` oder `--legacy-peer-deps` aktualisieren. So wird ein ungültiger Peer-Dependency-Baum nicht still in ein Container-Image übernommen. Das Script nimmt nur direkte Dependencies aus `package.json` an und führt danach automatisch npm-Prüfung, Tests und amd64-Image-Build aus:
 
 ```bash
-npm install <package>@latest
-npm ls
-npm test
-docker build -t docsvault .
+npm run deps:update -- @openai/codex-sdk zod
 ```
 
-Erst wenn alle vier Befehle durchlaufen, gehören `package.json` und `package-lock.json` zusammen in den Commit.
+Erst wenn das Script erfolgreich endet, prüfst du `package.json` und `package-lock.json` und commitest beide zusammen. Das Script erstellt keinen Commit und pusht nichts.
 
 ## Deployment (Docker)
 

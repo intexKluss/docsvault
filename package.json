@@ -11,6 +11,7 @@
     "dev": "node --watch src/server.js",
     "dev:codex": "BRIDGE=codex node --watch src/server.js",
     "dev:claude": "BRIDGE=claude node --watch src/server.js",
+    "deps:update": "node scripts/update-dependencies.js",
     "test": "node --test"
   },
   "dependencies": {
