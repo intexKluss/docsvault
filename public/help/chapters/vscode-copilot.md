@@ -8,7 +8,7 @@
 
 ## Konfiguration
 
-### Option A: Projekt-spezifisch (.vscode/mcp.json), empfohlen
+### Option A: Projekt spezifisch (.vscode/mcp.json), empfohlen
 
 Leg dir eine `.vscode/mcp.json` im Projektverzeichnis an:
 
@@ -46,13 +46,13 @@ Ersetz `<SERVER-IP>` durch die IP deines Servers (z.B. `192.168.2.100`).
 
 ## Agent Mode aktivieren
 
-Die MCP-Tools laufen nur im **Agent Mode** von Copilot Chat:
+Die MCP Tools laufen nur im **Agent Mode** von Copilot Chat:
 
 1. Copilot Chat öffnen (`Ctrl+Alt+I`)
-2. Sicherstellen, dass **Agent** als Modus ausgewählt ist (über den Mode-Picker oben im Chat-Fenster)
+2. Sicherstellen, dass **Agent** als Modus ausgewählt ist (über den Mode Picker oben im Chat Fenster)
 3. Jetzt hat Copilot Zugriff auf die docsvault Tools
 
-> **Hinweis:** Die Chat-UI wird regelmäßig umgebaut. Wenn kein Mode-Picker zu sehen ist, ist Agent Mode wahrscheinlich schon der Standard. Die MCP-Tools tauchen im Chat als verfügbare Tools auf, sobald der Server verbunden ist.
+> **Hinweis:** Die Chat UI wird regelmäßig umgebaut. Wenn kein Mode Picker zu sehen ist, ist Agent Mode wahrscheinlich schon der Standard. Die MCP Tools tauchen im Chat als verfügbare Tools auf, sobald der Server verbunden ist.
 
 ## Verifizierung
 
@@ -60,13 +60,13 @@ Im Agent Mode einfach eine Testfrage stellen:
 
 > Suche in der Doku nach Installation
 
-Copilot sollte die MCP-Tools ziehen und dir Ergebnisse aus der Dokumentation liefern.
+Copilot sollte die MCP Tools ziehen und dir Ergebnisse aus der Dokumentation liefern.
 
 ## Troubleshooting
 
 Falls der Server als "not connected" angezeigt wird:
 
-1. **Server erreichbar?** Ruf im Browser `http://<SERVER-IP>:3000/sse` auf, es sollte eine SSE-Verbindung starten
+1. **Server erreichbar?** Ruf im Browser `http://<SERVER-IP>:3000/sse` auf, es sollte eine SSE Verbindung starten
 2. **VS Code neu laden** über `Ctrl+Shift+P` → "Developer: Reload Window"
 3. **MCP Output prüfen** über `Ctrl+Shift+P` → "MCP: List Servers", das zeigt dir den Verbindungsstatus
 4. **Firewall** prüfen: Port 3000 muss vom Entwicklerrechner aus erreichbar sein
