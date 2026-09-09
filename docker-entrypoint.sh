@@ -3,8 +3,8 @@
 CONFIG="/home/node/.codex/config.toml"
 
 # nur den docsvault-block (inkl. .env) entfernen, der rest der config bleibt.
-# wir loeschen ab einer [mcp_servers.docsvault...]-section bis zur naechsten
-# section ([..]) oder EOF, damit unbeteiligte trailing-config ueberlebt
+# wir löschen ab einer [mcp_servers.docsvault...]-section bis zur nächsten
+# section ([..]) oder EOF, damit unbeteiligte trailing-config überlebt
 if [ -f "$CONFIG" ]; then
   awk '
     /^\[mcp_servers\.docsvault(\.|\])/ { skip=1; next }
