@@ -1,19 +1,3 @@
-# VS Code
-
-## Claude Code Extension
-
-Die Claude Code VS Code Extension zieht ihre MCP-Server aus `~/.claude.json` (User Scope). Am schnellsten gehts per CLI:
-
-```bash
-claude mcp add --transport sse --scope user docsvault http://<SERVER-IP>:3000/sse
-```
-
-Danach VS Code einmal neu laden. Der Server taucht dann in der MCP-Liste der Extension auf.
-
-**Wichtig:** `~/.claude/.mcp.json` liest nur die CLI, nicht die VS Code Extension. Also entweder `--scope user` benutzen oder den Eintrag von Hand in `~/.claude.json` setzen.
-
----
-
 # VS Code (GitHub Copilot)
 
 ## Voraussetzungen
