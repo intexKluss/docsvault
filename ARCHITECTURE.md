@@ -59,6 +59,7 @@ vaults/
 Die Bridge hält einen Codex Thread pro Session. Beide Chat Modi verwenden standardmäßig `gpt-5.6-luna`; `CODEX_MODEL` überschreibt das Modell. Der Modus steuert den Prompt Prefix pro Nachricht.
 
 `createSession()` liefert `{ warmUp(), send(content, mode), destroy(), ready, destroyed }`.
+
 ## WebSocket Protokoll
 
 ### Server → Client
