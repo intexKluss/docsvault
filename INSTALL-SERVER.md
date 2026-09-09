@@ -190,6 +190,12 @@ Entwickler verbinden Codex per MCP:
 codex mcp add docsvault --url http://SERVER-IP:3000/mcp
 ```
 
+Claude Code als MCP Client verbinden:
+
+```bash
+claude mcp add --transport http --scope user docsvault http://SERVER-IP:3000/mcp
+```
+
 Weitere Clients stehen in [INSTALL-DEVELOPER.md](INSTALL-DEVELOPER.md).
 
 ## Umgebungsvariablen
