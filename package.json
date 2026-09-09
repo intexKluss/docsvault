@@ -16,11 +16,11 @@
   },
   "dependencies": {
     "@anthropic-ai/claude-agent-sdk": "^0.2.81",
-    "@modelcontextprotocol/sdk": "^1.27.0",
+    "@modelcontextprotocol/sdk": "^1.30.0",
     "@openai/codex-sdk": "^0.153.4",
-    "express": "^5.1.0",
+    "express": "^5.2.1",
     "minisearch": "^7.2.0",
-    "ws": "^8.18.0",
+    "ws": "^8.21.3",
     "zod": "^4.5.4"
   }
 }
