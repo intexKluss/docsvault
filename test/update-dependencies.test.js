@@ -151,3 +151,33 @@ test('spawns npm without a shell on non-Windows platforms', function (t) {
     { stdio: 'inherit' }
   ]);
 });
+
+test('rejects inherited toString before spawning commands', function (t) {
+  t.mock.method(console, 'error', function () {});
+  t.mock.method(console, 'log', function () {});
+  var calls = [];
+  function spawn(command, args, options) {
+    calls.push([command, args, options]);
+    return { status: 0 };
+  }
+
+  var exitCode = updateDependencies(['toString'], {}, spawn, process);
+
+  assert.equal(exitCode, 1);
+  assert.deepEqual(calls, []);
+});
+
+test('rejects inherited constructor before spawning commands', function (t) {
+  t.mock.method(console, 'error', function () {});
+  t.mock.method(console, 'log', function () {});
+  var calls = [];
+  function spawn(command, args, options) {
+    calls.push([command, args, options]);
+    return { status: 0 };
+  }
+
+  var exitCode = updateDependencies(['constructor'], {}, spawn, process);
+
+  assert.equal(exitCode, 1);
+  assert.deepEqual(calls, []);
+});
