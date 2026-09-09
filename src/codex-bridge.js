@@ -3,6 +3,7 @@ import { Codex } from '@openai/codex-sdk';
 import { dirname, resolve } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { buildSystemPrompt } from './system-prompt.js';
+import { resolveCodexModel } from './codex-model.js';
 
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = dirname(__filename);
@@ -12,7 +13,6 @@ const MCP_CWD = resolve(__dirname, '..');
 // ausführliches session-logging fürs debugging. CODEX_DEBUG=1 schaltet zusätzlich
 // jedes roh-event frei (sehr gesprächig), sonst nur tool-calls, modell und fehler.
 const CODEX_DEBUG = process.env.CODEX_DEBUG === '1' || process.env.CODEX_DEBUG === 'true';
-export var DEFAULT_CODEX_MODEL = 'gpt-5.6-luna';
 
 // langen text fürs log kappen, damit eine zeile lesbar bleibt
 function truncate(v, n = 300) {
@@ -38,7 +38,8 @@ function rateLimitNotice(raw) {
 }
 
 export class CodexBridge {
-  constructor(vaultRegistry) {
+  constructor(vaultRegistry, resolveModel = resolveCodexModel) {
+    this.resolveModel = resolveModel;
     this.vaultRegistry = (vaultRegistry || []).filter(
       v => v && typeof v.toolPrefix === 'string' && v.toolPrefix.length > 0
     );
@@ -52,6 +53,17 @@ export class CodexBridge {
       if (!scoped) throw new Error(`Unknown vault: ${toolPrefix}`);
       registry = [scoped];
     }
+    var modelSelection = this.modelSelection;
+    if (!modelSelection) {
+      modelSelection = this.resolveModel();
+      this.modelSelection = modelSelection;
+    }
+    try {
+      var selection = await modelSelection;
+    } catch (error) {
+      if (this.modelSelection === modelSelection) this.modelSelection = null;
+      throw error;
+    }
     const systemPrompt = buildSystemPrompt(registry);
     let destroyed = false;
     let warmedUp = false;
@@ -60,10 +72,8 @@ export class CodexBridge {
     let codex = new Codex({
       codexPathOverride: process.env.CODEX_PATH,
     });
-    const model = process.env.CODEX_MODEL || DEFAULT_CODEX_MODEL;
-    // reasoning-modelle (gpt-5.5) denken sonst voll durch -> sehr langsam. low
-    // reicht für doku-suche + formulieren locker. tunebar: minimal..xhigh.
-    const reasoningEffort = process.env.CODEX_REASONING_EFFORT || 'low';
+    var model = selection.model;
+    var reasoningEffort = selection.reasoningEffort;
     let thread = codex.startThread({
       model,
       modelReasoningEffort: reasoningEffort,
