@@ -33,3 +33,13 @@ describe('buildSystemPrompt', () => {
     assert.ok(!prompt.includes('_search'));
   });
 });
+
+it('does not impose a gadget template on vault answers', function () {
+  var prompt = buildSystemPrompt(REGISTRY);
+  assert.doesNotMatch(prompt, /GADGET_GUIDANCE|GRUNDGERÜST|gadgetAPI|gadgetContext|Konstruktor-Aufruf/);
+});
+
+it('does not add a gadget template without vaults', function () {
+  var prompt = buildSystemPrompt([]);
+  assert.doesNotMatch(prompt, /GRUNDGERÜST|gadgetAPI|gadgetContext/);
+});
