@@ -105,6 +105,32 @@ test('uses CODEX_PATH directly without a shell', async function () {
   assert.equal(fixture.options.windowsHide, true);
 });
 
+test('settles a timed out request even if the subprocess never closes', async function () {
+  var fixture = createServer({ stall: true, keepAlive: true });
+  var result = resolveCodexModel({ spawn: fixture.spawn, timeoutMs: 10 });
+  var outcome = result.then(function () { return 'resolved'; }, function (error) { return error.message; });
+  var deadline = new Promise(function (resolve) { setTimeout(function () { resolve('still pending'); }, 1300); });
+
+  assert.match(await Promise.race([outcome, deadline]), /Zeitlimit/);
+});
+
+test('allows providers that do not require OpenAI authentication', async function () {
+  var fixture = createServer({ account: null, requiresOpenaiAuth: false, models: [model('local', true)] });
+  var selection = await resolveCodexModel({ spawn: fixture.spawn });
+
+  assert.equal(selection.model, 'local');
+});
+
+test('rejects malformed reasoning entries and empty model names', async function () {
+  var invalidModels = [model('broken'), model('broken'), model('')];
+  invalidModels[0].supportedReasoningEfforts = [{}];
+  invalidModels[1].supportedReasoningEfforts = [null];
+  for (var invalidModel of invalidModels) {
+    var fixture = createServer({ models: [invalidModel] });
+    await assert.rejects(resolveCodexModel({ spawn: fixture.spawn }), /Modellantwort/);
+  }
+});
+
 function createServer(options) {
   var fixture = { closed: false, requests: [], modelParams: [] };
   fixture.spawn = function (command, args, spawnOptions) {
@@ -123,6 +149,7 @@ function createServer(options) {
         if (message.method === 'account/read') {
           response.result = { account: { type: 'chatgpt' }, requiresOpenaiAuth: true };
           if (Object.hasOwn(options, 'account')) response.result.account = options.account;
+          if (Object.hasOwn(options, 'requiresOpenaiAuth')) response.result.requiresOpenaiAuth = options.requiresOpenaiAuth;
         }
         if (message.method === 'model/list') {
           fixture.modelParams.push(message.params);
@@ -135,10 +162,16 @@ function createServer(options) {
       final: function (callback) {
         fixture.closed = true;
         callback();
+        if (options.keepAlive) return;
         setImmediate(function () { child.stdout.end(); child.emit('close', 0); });
       }
     });
-    child.kill = function () { fixture.closed = true; child.emit('close', null); };
+    child.kill = function () {
+      if (options.keepAlive) return;
+      fixture.closed = true;
+      child.emit('close', null);
+    };
+    child.unref = function () {};
     return child;
   };
   return fixture;
