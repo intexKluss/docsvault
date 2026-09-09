@@ -74,7 +74,7 @@ Commit: `fix(search): enforce response contracts`
 - Modify: `src/mcp-stdio.js`
 - Modify: `src/vault-registry.js`
 - Modify: `src/mcp-handler.js`
-- Modify: `src/claude-bridge.js`
+- Die frühere zweite Bridge ist inzwischen entfernt.
 - Modify: `test/vault-registry.test.js`
 - Modify: `test/mcp-handler.test.js`
 - Modify: `test/integration-multi-vault.test.js`
