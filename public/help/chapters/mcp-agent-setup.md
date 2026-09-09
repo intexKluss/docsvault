@@ -1,10 +1,10 @@
-# MCP mit deinem Coding-Agent nutzen
+# MCP mit deinem Coding Agent nutzen
 
-Wenn der docsvault Server im LAN läuft, kannst du deinen Coding-Agent direkt damit verbinden, ganz ohne lokale Installation. Der Agent bekommt dann direkten Zugriff auf deine Dokumentation: suchen, lesen, auflisten.
+Wenn der docsvault Server im LAN läuft, kannst du deinen Coding Agent direkt damit verbinden, ganz ohne lokale Installation. Der Agent bekommt dann direkten Zugriff auf deine Dokumentation: suchen, lesen, auflisten.
 
 ## Verfügbare Tools nach der Einrichtung
 
-Pro Wissensbereich (Vault) auf dem Server gibt es fünf Tools mit dem Vault-Prefix. Bei einem Vault mit `toolPrefix: "docs"` sind das diese:
+Pro Wissensbereich (Vault) auf dem Server gibt es fünf Tools mit dem Vault Prefix. Bei einem Vault mit `toolPrefix: "docs"` sind das diese:
 
 | Tool | Funktion |
 |------|----------|
@@ -35,12 +35,12 @@ Danach mit `codex mcp list` prüfen, ob der Server `docsvault` auftaucht.
 
 ## Verbindung bricht weg? Dann auf Streamable HTTP (`/mcp`) umsteigen
 
-SSE (`/sse`, `type: sse`) ist der Legacy-Transport und braucht eine dauerhaft offene Verbindung. Hinter einem Reverse-Proxy (z.B. auf einem Docker-Dev-Server) wird diese Verbindung oft schon nach kurzer Idle-Zeit gekappt. Typisches Symptom: der Client zeigt kurz die Tools an, dann ist der Server wieder weg.
+SSE (`/sse`, `type: sse`) ist der Legacy Transport und braucht eine dauerhaft offene Verbindung. Hinter einem Reverse Proxy (z.B. auf einem Docker Dev Server) wird diese Verbindung oft schon nach kurzer Idle Zeit gekappt. Typisches Symptom: der Client zeigt kurz die Tools an, dann ist der Server wieder weg.
 
-Lösung: statt `/sse` den moderneren Streamable-HTTP-Endpunkt `/mcp` nutzen (`type: http`). Der hängt nicht an einer Dauerverbindung und kommt mit Proxies deutlich besser klar.
+Lösung: statt `/sse` den moderneren Streamable HTTP Endpunkt `/mcp` nutzen (`type: http`). Der hängt nicht an einer Dauerverbindung und kommt mit Proxies deutlich besser klar.
 
 Codex nutzt sowieso schon `/mcp` (siehe oben). Hinter HTTPS entsprechend `https://...` statt `http://...`.
 
 ## Hinweis
 
-Ersetze `<SERVER-IP>` durch die tatsächliche LAN-IP des Servers, auf dem docsvault läuft (z.B. `192.168.2.100`).
+Ersetze `<SERVER-IP>` durch die tatsächliche LAN IP des Servers, auf dem docsvault läuft (z.B. `192.168.2.100`).
