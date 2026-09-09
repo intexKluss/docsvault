@@ -1,6 +1,6 @@
 # docsvault: Architektur
 
-Web Chat UI für deine Markdown-Dokumentation. Der Bot läuft über das OpenAI Codex SDK. Die MCP Tools (search, read, list, overview, status) stecken direkt im Server drin, kein externer Tool Server nötig (`src/tools/`).
+Web Chat UI für deine Markdown Dokumentation. Der Bot läuft über das OpenAI Codex SDK. Die MCP Tools (search, read, list, overview, status) stecken direkt im Server drin, kein externer Tool Server nötig (`src/tools/`).
 
 ## Dateistruktur
 
@@ -110,32 +110,32 @@ Die Tools liegen in `src/tools/` und sind über diese Schnittstellen erreichbar:
 | `<prefix>_overview` | Übersicht laden |
 | `<prefix>_status` | Status prüfen |
 
-Pro Vault werden fünf Tools mit dem `toolPrefix` aus `_meta.json` registriert. Fehlt das Feld, wird der Prefix aus dem Ordnernamen abgeleitet. Setzt `_meta.json` eine existierende, kanonische `technicalSection` innerhalb des Vaults, kommt `<prefix>_technical_search` hinzu. Ohne Feld wird nur das vorhandene Standardverzeichnis `Scripting/TERAS API` erkannt. Die Toolmenge wird damit vollständig aus den Vault-Daten abgeleitet.
+Pro Vault werden fünf Tools mit dem `toolPrefix` aus `_meta.json` registriert. Fehlt das Feld, wird der Prefix aus dem Ordnernamen abgeleitet. Setzt `_meta.json` eine existierende, kanonische `technicalSection` innerhalb des Vaults, kommt `<prefix>_technical_search` hinzu. Ohne Feld wird nur das vorhandene Standardverzeichnis `Scripting/TERAS API` erkannt. Die Toolmenge wird damit vollständig aus den Vault Daten abgeleitet.
 
-Die Tool-Beschreibungen sind bewusst ein bis zwei Sätze lang: sie liegen dauerhaft im Kontext, einmal pro Vault. Die Recherche-Methodik und der `searchHint` aus `_meta.json` stehen stattdessen einmal pro Server in den `instructions` der `initialize`-Response.
+Die Tool Beschreibungen sind bewusst ein bis zwei Sätze lang: sie liegen dauerhaft im Kontext, einmal pro Vault. Die Recherche Methodik und der `searchHint` aus `_meta.json` stehen stattdessen einmal pro Server in den `instructions` der `initialize`-Response.
 
 ### Suche
 
-`searchDocs()` läuft gegen den BM25-Index aus `tools/search-index.js`. Indexiert wird auf Abschnittsebene: ein Eintrag für den Introbereich und je Überschrift von `##` bis `######` mit den Feldern `title`, `heading`, `path`, `body`. Überschriften in Backtick- und Tilde-Fences werden ignoriert. Jedes Segment erhält außerdem einen opaken Locator im Format `L<startLine>`, den `read` exakt auf dieselben Segmentgrenzen auflöst. Die bisherigen Heading-Strings bleiben erhalten.
+`searchDocs()` läuft gegen den BM25 Index aus `tools/search-index.js`. Indexiert wird auf Abschnittsebene: ein Eintrag für den Introbereich und je Überschrift von `##` bis `######` mit den Feldern `title`, `heading`, `path`, `body`. Überschriften in Backtick- und Tilde Fences werden ignoriert. Jedes Segment erhält außerdem einen opaken Locator im Format `L<startLine>`, den `read` exakt auf dieselben Segmentgrenzen auflöst. Die bisherigen Heading Strings bleiben erhalten.
 
 Gerankt wird in zwei Stufen:
-1. **Abschnitt**: BM25-Score, gewichtet mit der IDF-Masse die dieser Abschnitt selbst abdeckt, plus Boost wenn die Überschrift komplett aus Query-Tokens besteht (`## hasInvoicePlugin`).
-2. **Datei**: bester Abschnitt mal der quadrierten IDF-Abdeckung der ganzen Datei. Damit schlägt eine Datei die den seltenen Token trifft eine Datei die nur häufige Tokens oft trifft.
+1. **Abschnitt**: BM25 Score, gewichtet mit der IDF Masse die dieser Abschnitt selbst abdeckt, plus Boost wenn die Überschrift komplett aus Query Tokens besteht (`## hasInvoicePlugin`).
+2. **Datei**: bester Abschnitt mal der quadrierten IDF Abdeckung der ganzen Datei. Damit schlägt eine Datei die den seltenen Token trifft eine Datei die nur häufige Tokens oft trifft.
 
-Die Registry sortiert Vaults nach `toolPrefix`. HTTP- und stdio-Startup bauen deren Indizes anschließend nacheinander mit `warmSearchIndex()` auf, bevor die Bridge beziehungsweise der Transport verbunden wird. Damit hängt die erste Suche nicht von einem Lazy-Aufbau ab. Der Cache invalidiert über mtime und Größe von `_manifest.json`. Ohne Manifest verwendet er eine rekursive Änderungskennung aus Pfad, mtime und Größe aller Markdown-Dateien. Diese teure Prüfung läuft höchstens einmal pro Sekunde; Änderungen in manifestlosen Vaults werden daher mit maximal einer Sekunde Verzögerung erkannt. Ein gemessener Vault mit etwa 1800 Seiten benötigt ungefähr 2 bis 8 Sekunden und 100 MB Heap.
+Die Registry sortiert Vaults nach `toolPrefix`. HTTP- und stdio Startup bauen deren Indizes anschließend nacheinander mit `warmSearchIndex()` auf, bevor die Bridge beziehungsweise der Transport verbunden wird. Damit hängt die erste Suche nicht von einem Lazy Aufbau ab. Der Cache invalidiert über mtime und Größe von `_manifest.json`. Ohne Manifest verwendet er eine rekursive Änderungskennung aus Pfad, mtime und Größe aller Markdown Dateien. Diese teure Prüfung läuft höchstens einmal pro Sekunde; Änderungen in manifestlosen Vaults werden daher mit maximal einer Sekunde Verzögerung erkannt. Ein gemessener Vault mit etwa 1800 Seiten benötigt ungefähr 2 bis 8 Sekunden und 100 MB Heap.
 
-### Antwortbudgets und REST-Kompatibilität
+### Antwortbudgets und REST Kompatibilität
 
 | Pfad | Default | Grenzen und Format |
 |---|---|---|
 | MCP `search` | 5 Treffer, `concise` | `max_results` 1 bis 100, `max_tokens` 50 bis 50000 |
-| REST `search` | 10 Treffer, `detailed` | Gleiche Parameter, bewusst kompatibel zum bisherigen REST-Verhalten |
+| REST `search` | 10 Treffer, `detailed` | Gleiche Parameter, bewusst kompatibel zum bisherigen REST Verhalten |
 | MCP `read` | 8000 Zeichen | `max_length` effektiv 200 bis 25000 |
 | REST `read` | 8000 Zeichen | `max_length` effektiv 200 bis 200000 |
 | MCP `list` | 50 Seiten | `max_results` 1 bis 500 |
 | REST `list` | ungekürzt | Gibt weiterhin das vollständige Array zurück |
 
-`max_tokens` wird bei `search` und `read` als `max_tokens * 4` Zeichen angenähert. Die MCP-Read-Schicht begrenzt damit den finalen Text einschließlich Titel und Quelle. Beim REST-Read gilt das Budget für den Dokumentinhalt; der JSON-Umschlag kann größer sein.
+`max_tokens` wird bei `search` und `read` als `max_tokens * 4` Zeichen angenähert. Die MCP Read Schicht begrenzt damit den finalen Text einschließlich Titel und Quelle. Beim REST Read gilt das Budget für den Dokumentinhalt; der JSON Umschlag kann größer sein.
 
 Codex Bridge: nutzt MCP über die Codex CLI Config.
 
@@ -176,13 +176,13 @@ Codex Bridge: nutzt MCP über die Codex CLI Config.
 ## Sicherheit
 
 - **Prompt Injection**: System Prompt mit strikten Regeln, Social Engineering Abwehr
-- **Tool Zugriff**: Der System Prompt beschränkt die Recherche auf die Vault Tools. Die Codex Sandbox ist `read-only`, Web Search ist deaktiviert; Built-in Tools sind damit nicht pauschal gesperrt.
-- **Rate Limiting**: IP-basiert, proxy-aware via `trust proxy` (WebSocket + REST)
+- **Tool Zugriff**: Der System Prompt beschränkt die Recherche auf die Vault Tools. Die Codex Sandbox ist `read-only`, Web Search ist deaktiviert; Built in Tools sind damit nicht pauschal gesperrt.
+- **Rate Limiting**: IP basiert, proxy aware via `trust proxy` (WebSocket + REST)
 - **WebSocket**: Origin Validierung, 16KB Payload Limit, Heartbeat
 - **XSS**: DOMPurify auf allen Markdown Outputs, `CSS.escape` in Selektoren
 - **Error Filtering**: generische Messages an den Client, keine Internals
 - **Bug Reports**: JSONL append only (keine Race Condition), chatContext sanitized
-- **Auth (opt-in)**: `API_TOKEN` schaltet Bearer Token Auth auf `/api`, `/sse`, `/messages`, `/mcp` und dem WebSocket frei. Ohne `API_TOKEN` sind diese Endpoints offen.
+- **Auth (opt in)**: `API_TOKEN` schaltet Bearer Token Auth auf `/api`, `/sse`, `/messages`, `/mcp` und dem WebSocket frei. Ohne `API_TOKEN` sind diese Endpoints offen.
 
 > **Wichtig, mach dir keine Illusionen:** Die Origin Validierung schützt **nur den WebSocket**. REST (`/api`) und MCP (`/sse`, `/messages`, `/mcp`) haben **keinen Origin Check** und ohne gesetztes `API_TOKEN` auch **keine Auth**. Wer den Port erreicht, kann den Vault lesen. Rate Limiting bremst Missbrauch, ist aber keine Zugriffskontrolle. Für öffentliche Deployments also `API_TOKEN` setzen oder den Port hinter Reverse Proxy / VPN dichtmachen.
 
@@ -193,6 +193,6 @@ Codex Bridge: nutzt MCP über die Codex CLI Config.
 | `express` | HTTP Server |
 | `ws` | WebSocket Server |
 | `@openai/codex-sdk` | Codex Bridge |
-| `minisearch` | BM25-Volltextindex auf Abschnittsebene |
+| `minisearch` | BM25 Volltextindex auf Abschnittsebene |
 
 Frontend (CDN): `marked.js`, `highlight.js`, `dompurify.js`
