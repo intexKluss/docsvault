@@ -6,7 +6,7 @@ docsvault ist quelloffen. Wenn du es auf deiner eigenen Infrastruktur betreiben 
 
 | Repo | Was drin ist |
 |------|--------------|
-| [docsvault](https://github.com/intexKluss/docsvault) | Der komplette Server: Web-Chat, MCP-Server, Codex-/Claude-Bridge und das Dockerfile. |
+| [docsvault](https://github.com/intexKluss/docsvault) | Der komplette Server: Web-Chat, MCP-Server, Codex Bridge und das Dockerfile. |
 
 Server und Inhalte sind bewusst getrennt: docsvault ist die Engine, deine Dokumentation sind die Daten. Die Vault-Inhalte leben in einem eigenen Repo (oder einfach einem Ordner mit `.md`-Dateien) - docsvault bringt selbst keinen Content mit, du kannst beliebig viele eigene Vaults einhängen.
 
@@ -39,13 +39,6 @@ docker exec -it docsvault codex login --device-auth
 ```
 
 Damit der Login einen Neustart übersteht, muss `/home/node/.codex` in einem Volume liegen (siehe das `-v docsvault-codex:...` oben). Welche Modelle dein Account nutzen darf, hängt vom Plan ab.
-
-## Bridge wählen: Codex oder Claude
-
-docsvault läuft mit zwei KI-Backends, gesteuert über die Umgebungsvariable `BRIDGE`:
-
-- `BRIDGE=codex` - OpenAI Codex (Standard im mitgelieferten Image).
-- `BRIDGE=claude` - Anthropic Claude.
 
 ## Ausführliche Anleitungen
 
