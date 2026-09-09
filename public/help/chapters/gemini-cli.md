@@ -2,9 +2,9 @@
 
 ## Konfiguration
 
-Gemini CLI kann mittlerweile Remote-MCP, du brauchst also keinen lokalen Proxy mehr. Du verbindest dich direkt per SSE.
+Gemini CLI kann mittlerweile Remote MCP, du brauchst also keinen lokalen Proxy mehr. Du verbindest dich direkt per SSE.
 
-### Option A: CLI-Befehl (empfohlen)
+### Option A: CLI Befehl (empfohlen)
 
 ```bash
 gemini mcp add --transport sse docsvault http://<SERVER-IP>:3000/sse
@@ -12,7 +12,7 @@ gemini mcp add --transport sse docsvault http://<SERVER-IP>:3000/sse
 
 ### Option B: Manuell in ~/.gemini/settings.json
 
-User-Scope (global, in jedem Projekt verfügbar):
+User Scope (global, in jedem Projekt verfügbar):
 
 ```json
 {
@@ -26,7 +26,7 @@ User-Scope (global, in jedem Projekt verfügbar):
 
 Wenn du es lieber pro Projekt willst statt global: die gleiche Config in `.gemini/settings.json` im Projektordner ablegen.
 
-**Wichtig:** Allein die `url`-Eigenschaft markiert schon den SSE-Transport. Ein zusätzliches `"type": "sse"` ist hier nicht nötig.
+**Wichtig:** Allein die `url`-Eigenschaft markiert schon den SSE Transport. Ein zusätzliches `"type": "sse"` ist hier nicht nötig.
 
 Ersetze `<SERVER-IP>` durch die IP deines Servers (z.B. `192.168.2.100`).
 
