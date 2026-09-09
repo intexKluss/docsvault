@@ -1,8 +1,8 @@
 # Search Quality Hardening Implementation Plan
 
-> **For agentic workers:** REQUIRED SUB-SKILL: Use superpowers:subagent-driven-development (recommended) or superpowers:executing-plans to implement this plan task-by-task. Steps use checkbox (`- [ ]`) syntax for tracking.
+> **For agentic workers:** REQUIRED SUB SKILL: Use superpowers:subagent-driven-development (recommended) or superpowers:executing-plans to implement this plan task by task. Steps use checkbox (`- [ ]`) syntax for tracking.
 
-**Goal:** Die fünf Review-Findings aus Pull Request #4 mit reproduzierenden Tests und kleinen Commits beheben.
+**Goal:** Die fünf Review Findings aus Pull Request #4 mit reproduzierenden Tests und kleinen Commits beheben.
 
 **Architecture:** Die bestehende Suchpipeline bleibt erhalten. Korrekturen werden an den vorhandenen Filter-, Fallback-, Cache- und Fehlergrenzen vorgenommen; neue öffentliche APIs oder plattformabhängige Watcher entstehen nicht.
 
@@ -13,12 +13,12 @@
 - Produktionscode folgt Manus `coding-style`: `var`, klassische Schleifen, Guard Clauses, Hauptablauf zuerst und keine unnötigen Helper.
 - Jede Verhaltensänderung beginnt mit einem fehlschlagenden Test.
 - Nach jeder grünen Änderung wird sofort ein kleiner englischer Commit erstellt.
-- Bestehende MCP- und REST-Antwortformen bleiben unverändert.
+- Bestehende MCP- und REST Antwortformen bleiben unverändert.
 - Nicht pushen.
 
 ---
 
-### Task 1: Section-Scope strikt halten
+### Task 1: Section Scope strikt halten
 
 **Files:**
 - Modify: `test/vault.test.js`
@@ -65,19 +65,19 @@ Commit: `fix(search): keep section results inside directory`
 
 ---
 
-### Task 2: Unbekannte Query-Terme fuzzy ergänzen
+### Task 2: Unbekannte Query Terme fuzzy ergänzen
 
 **Files:**
 - Modify: `test/vault.test.js`
 - Modify: `src/tools/vault.js:234-238`
 
 **Interfaces:**
-- Consumes: exakte MiniSearch-Treffer und `index.hasTerm(term)`
-- Produces: kombinierte Treffer mit vereinigten `terms` und addiertem Score pro Segment-ID
+- Consumes: exakte MiniSearch Treffer und `index.hasTerm(term)`
+- Produces: kombinierte Treffer mit vereinigten `terms` und addiertem Score pro Segment ID
 
 - [ ] **Step 1: Failing Test schreiben**
 
-Lege ein Zielsegment mit `CommonSearchToken RareCorrectedNeedle` und eine Noise-Seite mit häufigem `CommonSearchToken` an. Die Query `CommonSearchToken RareCorrectedNeedl` muss das Ziel zuerst liefern.
+Lege ein Zielsegment mit `CommonSearchToken RareCorrectedNeedle` und eine Noise Seite mit häufigem `CommonSearchToken` an. Die Query `CommonSearchToken RareCorrectedNeedl` muss das Ziel zuerst liefern.
 
 ```js
 it('fuzzy-matches an unknown term even when another term has exact hits', () => {
@@ -94,7 +94,7 @@ Expected: FAIL, weil der exakte häufige Term den fuzzy Fallback unterdrückt.
 
 - [ ] **Step 3: Minimalen Fix schreiben**
 
-Baue aus unbekannten Query-Termen eine zusätzliche Query. Führe dafür fuzzy und Prefix Search aus. Merge anhand `id`, addiere den Score und ergänze fehlende Trefferterme; neue IDs werden angehängt.
+Baue aus unbekannten Query Termen eine zusätzliche Query. Führe dafür fuzzy und Prefix Search aus. Merge anhand `id`, addiere den Score und ergänze fehlende Trefferterme; neue IDs werden angehängt.
 
 ```js
 var fuzzyQuery = '';
@@ -113,7 +113,7 @@ Commit: `fix(search): fuzzy match missing query terms`
 
 ---
 
-### Task 3: Manifestlose Cache-Prüfung drosseln
+### Task 3: Manifestlose Cache Prüfung drosseln
 
 **Files:**
 - Modify: `test/cache-traversal.test.js`
@@ -126,7 +126,7 @@ Commit: `fix(search): fuzzy match missing query terms`
 
 - [ ] **Step 1: Failing Test schreiben**
 
-Erweitere `cache-traversal.test.js`: Nach einem warmen Zugriff setzt der Test den Zähler zurück und führt sofort eine zweite Suche aus. Der Vault-Root darf dabei nicht erneut gelesen werden.
+Erweitere `cache-traversal.test.js`: Nach einem warmen Zugriff setzt der Test den Zähler zurück und führt sofort eine zweite Suche aus. Der Vault Root darf dabei nicht erneut gelesen werden.
 
 ```js
 rootReads = 0;
@@ -143,7 +143,7 @@ Expected: FAIL mit `rootReads === 1`.
 
 - [ ] **Step 3: Minimalen Fix schreiben**
 
-Speichere `manifestlessValidUntil` im Cache-Eintrag. Manifestlose bestehende Einträge werden innerhalb von 1000 Millisekunden direkt geliefert. Nach einer echten Prüfung mit unverändertem Change-Key wird die Frist erneuert. Der Invalidierungstest wartet vor der erwarteten Neuerkennung 1100 Millisekunden.
+Speichere `manifestlessValidUntil` im Cache Eintrag. Manifestlose bestehende Einträge werden innerhalb von 1000 Millisekunden direkt geliefert. Nach einer echten Prüfung mit unverändertem Change Key wird die Frist erneuert. Der Invalidierungstest wartet vor der erwarteten Neuerkennung 1100 Millisekunden.
 
 ```js
 var MANIFESTLESS_VALIDATION_INTERVAL_MS = 1000;
@@ -170,7 +170,7 @@ Commit: `perf(cache): throttle manifestless vault scans`
 
 - [ ] **Step 1: Failing Tests schreiben**
 
-Ändere die bestehenden Fehlerassertions auf die generische Meldung und fange `console.error` ab. Prüfe getrennt, dass das Log weiterhin `Vault path is not a directory` beziehungsweise den betroffenen Markdown-Dateinamen enthält.
+Ändere die bestehenden Fehlerassertions auf die generische Meldung und fange `console.error` ab. Prüfe getrennt, dass das Log weiterhin `Vault path is not a directory` beziehungsweise den betroffenen Markdown Dateinamen enthält.
 
 ```js
 assert.equal(result.error, 'Search index unavailable.');
@@ -211,7 +211,7 @@ Commit: `fix(search): redact internal index errors`
 
 - [ ] **Step 1: Failing Test schreiben**
 
-Erzeuge zwei inhaltlich identische Treffer `alpha` und `zeta`, drehe die MiniSearch-Hits kontrolliert um und prüfe, dass `alpha` trotzdem zuerst kommt.
+Erzeuge zwei inhaltlich identische Treffer `alpha` und `zeta`, drehe die MiniSearch Hits kontrolliert um und prüfe, dass `alpha` trotzdem zuerst kommt.
 
 ```js
 var originalSearch = index.mini.search.bind(index.mini);
@@ -255,7 +255,7 @@ Commit: `fix(search): stabilize equal-score ordering`
 
 **Interfaces:**
 - Consumes: Tasks 1 bis 5
-- Produces: grüner Branch ohne Whitespace-Fehler oder unerwartete Änderungen
+- Produces: grüner Branch ohne Whitespace Fehler oder unerwartete Änderungen
 
 - [ ] **Step 1: Vollständige Suite ausführen**
 
@@ -269,4 +269,4 @@ Run: `git diff --check origin/main...HEAD`
 
 Run: `git status --short`
 
-Expected: kein Diff-Fehler und keine uncommitteten Dateien.
+Expected: kein Diff Fehler und keine uncommitteten Dateien.
