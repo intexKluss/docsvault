@@ -143,6 +143,12 @@ codex mcp add docsvault --url http://SERVER-IP:3000/mcp
 ```
 
 Codex verwendet Streamable HTTP. Der Endpunkt `/mcp` braucht keine dauerhaft offene SSE Verbindung.
+Claude Code als MCP Client verbinden:
+
+```bash
+claude mcp add --transport http --scope user docsvault http://SERVER-IP:3000/mcp
+```
+
 Alle Optionen findest du in [INSTALL-DEVELOPER.md](INSTALL-DEVELOPER.md).
 
 ## Sicherheit & Auth
