@@ -1,6 +1,6 @@
 # MCP Tool für Entwickler
 
-Dein Coding Agent (Codex CLI, Gemini CLI, VS Code Copilot, etc.) bekommt Zugriff auf alle Wissensbereiche (Vaults) die auf dem Server konfiguriert sind. Also z.B. Produktdokumentation, interne Richtlinien oder API-Referenzen. Die Inhalte liegen auf dem Server, du brauchst keinen eigenen Vault.
+Dein Coding Agent (Codex CLI, Gemini CLI, VS Code Copilot, etc.) bekommt Zugriff auf alle Wissensbereiche (Vaults) die auf dem Server konfiguriert sind. Also z.B. Produktdokumentation, interne Richtlinien oder API Referenzen. Die Inhalte liegen auf dem Server, du brauchst keinen eigenen Vault.
 
 Welche Vaults der Server gerade bereitstellt siehst du unter `http://SERVER-IP:3000/api/vaults`. Pro Vault gibt es fünf Tools, benannt nach dem `toolPrefix` aus der Vault Konfiguration (z.B. `docs_search`, `team_notes_search`, ...).
 
@@ -52,7 +52,7 @@ Oder manuell in `~/.gemini/settings.json`:
 
 Brauchst du: VS Code 1.99+, Copilot Extension, **Agent Mode** im Chat.
 
-Projekt-spezifisch in `.vscode/mcp.json`:
+Projekt spezifisch in `.vscode/mcp.json`:
 
 ```json
 {
