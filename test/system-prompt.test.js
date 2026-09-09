@@ -43,3 +43,13 @@ it('does not add a gadget template without vaults', function () {
   var prompt = buildSystemPrompt([]);
   assert.doesNotMatch(prompt, /GRUNDGERÜST|gadgetAPI|gadgetContext/);
 });
+
+it('uses a question-specific research protocol instead of always requesting code', function () {
+  var prompt = buildSystemPrompt(REGISTRY);
+
+  assert.match(prompt, /Definitions- und Übersichtsfragen/);
+  assert.match(prompt, /Handbuch- oder Konzeptseite/);
+  assert.match(prompt, /Code nur, wenn der Nutzer ausdrücklich danach fragt/);
+  assert.match(prompt, /API-Referenz nur bei API- oder Umsetzungsfragen/);
+  assert.doesNotMatch(prompt, /Gib Code-Beispiele wenn möglich/);
+});
