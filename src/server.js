@@ -13,6 +13,7 @@ import { warmSearchIndex } from './tools/vault-cache.js';
 import { requireToken, wsAuthOk } from './auth.js';
 import { installLogCapture, recentLogs } from './log-buffer.js';
 import { readBurnRate } from './codex-usage.js';
+import { CodexBridge } from './codex-bridge.js';
 
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = dirname(__filename);
@@ -20,22 +21,7 @@ const __dirname = dirname(__filename);
 // max anzahl gepufferter ws-nachrichten pro verbindung bevor wir droppen.
 const MAX_QUEUE = 20;
 
-async function loadBridge(bridgeMode, vaultRegistry) {
-  if (bridgeMode === 'codex') {
-    const { CodexBridge } = await import('./codex-bridge.js');
-    console.log(`[server] bridge: codex (OpenAI Codex SDK)`);
-    return new CodexBridge(vaultRegistry);
-  }
-  const { ClaudeBridge } = await import('./claude-bridge.js');
-  console.log(`[server] bridge: claude (Claude Agent SDK)`);
-  return new ClaudeBridge(vaultRegistry);
-}
-
-// Schickt einem Client die aktuelle KI-Burnrate (Codex-Kontingent). Nur für die
-// Codex-Bridge sinnvoll - Claude hat keine Rollout-Quote. Schlucke fehlende
-// Daten still: kein Rollout -> kein Event, das Frontend blendet den Balken aus.
 async function sendBurnRate(ws, force = false) {
-  if ((process.env.BRIDGE || 'claude') !== 'codex') return;
   if (!ws || ws.readyState !== 1) return;
   try {
     const data = await readBurnRate({ force });
@@ -50,7 +36,6 @@ export async function createServer(opts = {}) {
   // console.* in den ring-buffer spiegeln, damit ein bug-report die server-logs mitliefert
   installLogCapture();
   // env vars erst zur laufzeit lesen, damit tests VAULTS_ROOT überschreiben können
-  const bridgeMode = process.env.BRIDGE || 'claude';
   const vaultsRoot = process.env.VAULTS_ROOT || join(__dirname, '..', 'vaults');
 
   if (process.env.VAULT_PATH && !process.env.VAULTS_ROOT) {
@@ -86,7 +71,7 @@ export async function createServer(opts = {}) {
   }
 
   // opts.bridge erlaubt tests einen kontrollierbaren fake-bridge zu injizieren.
-  const bridge = opts.bridge ?? await loadBridge(bridgeMode, vaultRegistry);
+  var bridge = opts.bridge ?? new CodexBridge(vaultRegistry);
   const manager = new SessionManager(bridge, config);
 
   const app = express();
@@ -202,31 +187,24 @@ export async function createServer(opts = {}) {
     }
   }, 30000);
 
-  // burnrate periodisch an alle pushen, damit der balken auch ohne eigene anfrage
-  // aktuell bleibt (das kontingent sinkt auch durch andere sessions). nur codex.
-  const burnRateInterval = (bridgeMode === 'codex')
-    ? setInterval(async () => {
-        // try/catch um den ganzen tick: ein wurf hier wäre eine unhandled
-        // rejection und würde den prozess (alle sessions) runterreissen.
-        try {
-          const data = await readBurnRate();
-          if (!data) return;
-          const payload = JSON.stringify({ type: 'burn_rate', ...data });
-          for (const ws of wss.clients) {
-            if (ws.readyState === 1) ws.send(payload);
-          }
-        } catch (err) {
-          console.error(`[server] burn-rate broadcast error: ${err.message}`);
-        }
-      }, 60000)
-    : null;
-  // der periodische push soll den prozess nicht am leben halten
-  if (burnRateInterval) burnRateInterval.unref();
-
+  // Das Kontingent kann auch durch andere Sessions sinken.
+  var burnRateInterval = setInterval(async function () {
+    try {
+      var data = await readBurnRate();
+      if (!data) return;
+      var payload = JSON.stringify({ type: 'burn_rate', ...data });
+      for (var ws of wss.clients) {
+        if (ws.readyState === 1) ws.send(payload);
+      }
+    } catch (err) {
+      console.error(`[server] burn-rate broadcast error: ${err.message}`);
+    }
+  }, 60000);
+  burnRateInterval.unref();
   // nur an einer stelle cleanen
   server.on('close', () => {
     clearInterval(heartbeatInterval);
-    if (burnRateInterval) clearInterval(burnRateInterval);
+    clearInterval(burnRateInterval);
     wss.close();
     manager.shutdown();
   });

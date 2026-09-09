@@ -60,10 +60,7 @@ describe('Server vault-selector websocket flow', () => {
   before(async () => {
     process.env.ALLOW_NO_ORIGIN = 'true';
     process.env.VAULTS_ROOT = VAULTS_ROOT;
-    // Bridge überschreiben gibt es nicht, wir testen nur die WS-Events, nicht das Warmup.
-    // Dafür BRIDGE=claude lassen und einfach nie "send" aufrufen; warm-up wird durch die echte
-    // Bridge getriggert, aber da kein CLAUDE_PATH -> error im Log, aber WS-Events davor kommen an.
-    const result = await createServer({ port: 0 });
+    var result = await createServer({ port: 0, bridge: spyBridge() });
     server = result.server;
     port = result.port;
   });

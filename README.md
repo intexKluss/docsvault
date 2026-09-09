@@ -1,15 +1,15 @@
 # docsvault
 
-Web Chat UI und MCP Server für deine Markdown-Dokumentation. Als AI Backend läuft entweder das Claude Agent SDK oder das OpenAI Codex SDK. Die Dokumentation selbst liegt in einem separaten Vault Repo (oder einfach einem Ordner mit `.md`-Dateien) und wird zur Laufzeit als Volume gemountet, also nicht ins Docker Image gebacken. Die aktuelle Seitenanzahl liefert dir das `<prefix>_status` Tool bzw. `GET /api/<prefix>/status`.
+Web Chat UI und MCP Server für deine Markdown Dokumentation. Als AI Backend läuft das OpenAI Codex SDK. Die Dokumentation selbst liegt in einem separaten Vault Repo (oder einfach einem Ordner mit `.md`-Dateien) und wird zur Laufzeit als Volume gemountet, also nicht ins Docker Image gebacken. Die aktuelle Seitenanzahl liefert dir das `<prefix>_status` Tool bzw. `GET /api/<prefix>/status`.
 
 ## Features
 
 - **Web Chat**: Landing Page + Chat UI mit Typewriter Effekt, Tool Fortschrittsanzeige, Speed Toggle
 - **MCP Endpoints**: SSE (`/sse`) und Streamable HTTP (`/mcp`) für externe MCP Clients
 - **REST API**: `/api/vaults` (Liste), `/api/<prefix>/{search,read,list,overview,status}` pro Vault
-- **Bridge Switching**: Claude oder Codex per `BRIDGE` ENV Variable (Code Default `claude`, das mitgelieferte Docker Image setzt `BRIDGE=codex`)
+- **Codex Backend**: Das OpenAI Codex SDK übernimmt die Chat Sessions.
 - **Volltextsuche**: BM25 Index auf Abschnittsebene, beim Start im Speicher aufgebaut
-- **Sicherheit**: Rate Limiting, DOMPurify, Tool Whitelisting, Prompt Injection Schutz. Die Origin Validierung schützt allerdings nur den WebSocket. Optionale Bearer Token Auth für REST/MCP per `API_TOKEN` (siehe unten)
+- **Sicherheit**: Rate Limiting, DOMPurify, Codex Sandbox und Regeln gegen Prompt Injection. Die Origin Validierung schützt allerdings nur den WebSocket. Optionale Bearer Token Auth für REST/MCP per `API_TOKEN` (siehe unten)
 
 ## Volltextsuche
 
@@ -17,37 +17,62 @@ Web Chat UI und MCP Server für deine Markdown-Dokumentation. Als AI Backend lä
 
 Gerankt wird primär nach der abgedeckten **IDF Masse** der Query, nicht nach der rohen BM25 Summe. Eine Seite die den seltenen Begriff trifft schlägt damit eine Seite die nur die häufigen Wörter der Query oft enthält. Umlaute werden symmetrisch gefaltet (`ue`/`ü`, `ae`/`ä`, `ss`/`ß`).
 
-Der Startup ist deterministisch: Die Vault Registry ist nach `toolPrefix` sortiert, danach werden die Indizes nacheinander und vollständig aufgebaut, bevor HTTP-Server beziehungsweise stdio-Transport bereit sind. Ein gemessener Vault mit etwa 1800 Seiten braucht dafür ungefähr 2 bis 8 Sekunden und 100 MB Heap. Externe Suchbinaries braucht der Server nicht mehr.
+Der Startup ist deterministisch: Die Vault Registry ist nach `toolPrefix` sortiert, danach werden die Indizes nacheinander und vollständig aufgebaut, bevor HTTP Server beziehungsweise stdio Transport bereit sind. Ein gemessener Vault mit etwa 1800 Seiten braucht dafür ungefähr 2 bis 8 Sekunden und 100 MB Heap. Externe Suchbinaries braucht der Server nicht mehr.
 
 ### Antwortgröße im Griff behalten
 
 - MCP `search` liefert standardmäßig 5 Treffer im kompakten Format. `response_format: "detailed"` liefert zusätzlich die bisherigen Trefferzeilen. `max_results` liegt zwischen 1 und 100.
 - MCP `read` liefert standardmäßig 8000 Zeichen. `max_length` ist bei MCP auf 25000 begrenzt. Werte unter 200 werden intern auf 200 angehoben.
 - MCP `list` liefert standardmäßig 50 und höchstens 500 Seiten.
-- `search` und `read` akzeptieren `max_tokens` von 50 bis 50000. Das wird als hartes Zeichenbudget von `max_tokens * 4` umgesetzt, nicht mit einem Modell-Tokenizer.
+- `search` und `read` akzeptieren `max_tokens` von 50 bis 50000. Das wird als hartes Zeichenbudget von `max_tokens * 4` umgesetzt, nicht mit einem Modell Tokenizer.
 
-Bei der REST API bleiben die bisherigen Verträge für `search` und `list` erhalten: `search` liefert standardmäßig 10 Treffer im `detailed`-Format und `list` bleibt ungekürzt. Der REST-`read`-Default sinkt von effektiv 25000 auf 8000 Zeichen. Dafür wird die Unterstützung für ein explizites `read.max_length` von bisher effektiv 25000 auf 200000 Zeichen erweitert. `response_format`, `max_tokens`, `heading` und `locator` funktionieren als Query-Parameter. Bei REST begrenzt `read.max_tokens` den Dokumentinhalt; das JSON mit Titel, Quelle und Metadaten kann entsprechend etwas größer sein.
+Bei der REST API bleiben die bisherigen Verträge für `search` und `list` erhalten: `search` liefert standardmäßig 10 Treffer im `detailed`-Format und `list` bleibt ungekürzt. Der REST-`read`-Default sinkt von effektiv 25000 auf 8000 Zeichen. Dafür wird die Unterstützung für ein explizites `read.max_length` von bisher effektiv 25000 auf 200000 Zeichen erweitert. `response_format`, `max_tokens`, `heading` und `locator` funktionieren als Query Parameter. Bei REST begrenzt `read.max_tokens` den Dokumentinhalt; das JSON mit Titel, Quelle und Metadaten kann entsprechend etwas größer sein.
 
 ```bash
 curl "http://localhost:3000/api/docs/search?query=Installation&max_tokens=300"
 curl "http://localhost:3000/api/docs/read?path=api/DocFile&locator=L12"
 ```
 
-Beim Update sinkt der MCP-Default von `search` von 10 auf 5 Treffer. Der `read`-Default sinkt bei MCP von 20000 und bei REST von effektiv 25000 auf 8000 Zeichen. Die maximale REST-Leselänge steigt gleichzeitig von effektiv 25000 auf 200000 Zeichen. Wer mehr braucht, setzt `max_results` beziehungsweise `max_length` explizit.
+Beim Update sinkt der MCP Default von `search` von 10 auf 5 Treffer. Der `read`-Default sinkt bei MCP von 20000 und bei REST von effektiv 25000 auf 8000 Zeichen. Die maximale REST Leselänge steigt gleichzeitig von effektiv 25000 auf 200000 Zeichen. Wer mehr braucht, setzt `max_results` beziehungsweise `max_length` explizit.
 
 ## Quick Start
 
 ```bash
-npm install
-npm run dev           # Claude Bridge (Code-Default)
-npm run dev:codex     # Codex Bridge
+npm ci
+npm run dev
 ```
 
-> **Windows Hinweis:** `dev:codex` und `dev:claude` nutzen die bash-typische `BRIDGE=... node ...` Inline Syntax und laufen so nur unter bash/WSL/Git Bash. Auf nativer PowerShell stattdessen:
-> ```powershell
-> $env:BRIDGE="codex"; node --watch src/server.js
-> ```
-> (`npm run dev` ohne ENV läuft überall und nutzt den Code Default `claude`.)
+Der Startbefehl funktioniert auch unter PowerShell.
+
+## Abhängigkeiten aktualisieren
+
+Dependencies immer ohne `--force` oder `--legacy-peer-deps` aktualisieren. So wird ein ungültiger Peer Dependency Baum nicht still in ein Container Image übernommen. Das Script nimmt nur direkte Dependencies aus `package.json` an, aktualisiert sie gemeinsam und führt danach npm Prüfung, Production Audit, Tests, Codex Modellprüfung und amd64 Image Build aus. Das temporäre Prüfimage wird auch nach einem fehlgeschlagenen Build entfernt:
+
+```bash
+npm run deps:update -- @openai/codex-sdk zod
+```
+
+Erst wenn das Script erfolgreich endet, prüfst du `package.json` und `package-lock.json` und commitest beide zusammen. Das Script erstellt keinen Commit und pusht nichts.
+
+### Automatische Codex Modellwahl
+
+Beim Dependency Update fragt docsvault die Modellliste über die installierte Codex CLI mit dem dort angemeldeten Account ab. `CODEX_MODEL` wird bevorzugt, sonst `gpt-5.6-luna`. Fehlt dieses Modell, nimmt docsvault das empfohlene verfügbare Textmodell oder das erste passende Modell aus der Liste. Eine nicht unterstützte `CODEX_REASONING_EFFORT` wird durch eine passende Stufe ersetzt; standardmäßig wird `low` bevorzugt.
+
+Die gewählte Kombination steht im Log. Es wird keine feste Account Auswahl ins Repo geschrieben: Beim ersten Chat prüft der Server mit seinem eigenen Login erneut und teilt das Ergebnis zwischen seinen Sessions. Nach einem fehlgeschlagenen Check versucht er es beim nächsten Session Start erneut.
+
+Ohne Codex Login oder bei fehlgeschlagener Abfrage bricht der Update Workflow ab. Lokal vorab mit `codex login` anmelden. Du kannst die Prüfung separat ausführen:
+
+```bash
+node src/codex-model.js
+```
+
+Im laufenden Container:
+
+```bash
+docker exec docsvault node src/codex-model.js
+```
+
+Die Prüfung verwendet den von Codex gelieferten Katalog und startet keinen Modell Turn. Aktuelle Limits oder spätere Änderungen am Account können eine Anfrage trotzdem verhindern. Grundlage ist die [offizielle App Server Schnittstelle](https://learn.chatgpt.com/docs/app-server#models).
 
 ## Deployment (Docker)
 
@@ -131,29 +156,17 @@ docker restart docsvault
 
 ## Für Entwickler (MCP Client)
 
-Verbinde deinen Coding Agent per MCP mit dem Server:
+Verbinde Codex per MCP mit dem Server:
 
 ```bash
-claude mcp add --transport sse docsvault http://SERVER-IP:3000/sse
+codex mcp add docsvault --url http://SERVER-IP:3000/mcp
 ```
 
-Oder manuell in `.mcp.json`:
-
-```json
-{
-  "mcpServers": {
-    "docsvault": {
-      "type": "sse",
-      "url": "http://SERVER-IP:3000/sse"
-    }
-  }
-}
-```
-
-**Bricht die Verbindung weg?** SSE (`type: sse`) braucht eine dauerhaft offene Verbindung, und die kappt ein Reverse Proxy gern nach kurzer Idle Zeit (typisches Symptom: der Client zeigt kurz die Tools, dann ist der Server weg). Nutze dann den Streamable HTTP Endpunkt `/mcp` (`type: http`), der ist proxy-robust:
+Codex verwendet Streamable HTTP. Der Endpunkt `/mcp` braucht keine dauerhaft offene SSE Verbindung.
+Claude Code als MCP Client verbinden:
 
 ```bash
-claude mcp add --transport http docsvault http://SERVER-IP:3000/mcp
+claude mcp add --transport http --scope user docsvault http://SERVER-IP:3000/mcp
 ```
 
 Alle Optionen findest du in [INSTALL-DEVELOPER.md](INSTALL-DEVELOPER.md).
@@ -166,7 +179,7 @@ Ehrlich gesagt, damit niemand falsche Annahmen trifft:
 - **Origin Validierung greift nur für den WebSocket** (Web Chat), nicht für REST/MCP.
 - **Rate Limiting** (`RATE_LIMIT_PER_MIN` für WebSocket, `API_RATE_LIMIT_PER_MIN` für REST) bremst Missbrauch, ist aber keine Auth.
 
-**Opt-in Auth via `API_TOKEN`:** Setzt du die ENV Variable `API_TOKEN`, verlangen `/api`, `/sse`, `/messages`, `/mcp` und der WebSocket einen Bearer Token (`Authorization: Bearer <TOKEN>`). Ist `API_TOKEN` nicht gesetzt, bleiben alle Endpoints offen (aktuelles Default Verhalten). Für öffentlich erreichbare Deployments solltest du das dringend setzen oder den Port hinter einem Reverse Proxy / VPN dichtmachen.
+**Opt in Auth via `API_TOKEN`:** Setzt du die ENV Variable `API_TOKEN`, verlangen `/api`, `/sse`, `/messages`, `/mcp` und der WebSocket einen Bearer Token (`Authorization: Bearer <TOKEN>`). Ist `API_TOKEN` nicht gesetzt, bleiben alle Endpoints offen (aktuelles Default Verhalten). Für öffentlich erreichbare Deployments solltest du das dringend setzen oder den Port hinter einem Reverse Proxy / VPN dichtmachen.
 
 ## Nützliche Befehle
 
@@ -185,8 +198,8 @@ docker inspect --format='{{.State.Health.Status}}' docsvault   # Health Status
 ### Codex Auth
 
 ```bash
-docker exec -it docsvault codex auth login --device-auth   # Einloggen / Token erneuern
-docker exec docsvault codex auth status                    # Auth-Status prüfen
+docker exec -it docsvault codex login --device-auth        # Einloggen / Token erneuern
+docker exec docsvault codex login status                    # Auth-Status prüfen
 docker exec docsvault codex mcp list                       # MCP-Server prüfen
 ```
 
@@ -215,7 +228,7 @@ docker stop docsvault; docker rm docsvault
 git pull
 docker build -t docsvault .
 docker run -d --name docsvault --restart unless-stopped \
-  -p 3000:3000 -e BRIDGE=codex \
+  -p 3000:3000 \
   -e ALLOW_NO_ORIGIN=true \
   -v /srv/docsvault/vaults:/app/vaults:ro \
   -v docsvault-codex:/home/node/.codex \

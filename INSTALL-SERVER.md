@@ -88,7 +88,6 @@ docker run -d \
   --name docsvault \
   --restart unless-stopped \
   -p 3000:3000 \
-  -e BRIDGE=codex \
   -e ALLOW_NO_ORIGIN=true \
   -v /srv/docsvault/vaults:/app/vaults:ro \
   -v docsvault-codex:/home/node/.codex \
@@ -98,13 +97,13 @@ docker run -d \
 **Windows (PowerShell)**, absolute Pfade, Forward Slashes für Docker:
 
 ```powershell
-docker run -d --name docsvault --restart unless-stopped -p 3000:3000 -e BRIDGE=codex -e ALLOW_NO_ORIGIN=true -v "C:/dein/pfad/zu/vaults:/app/vaults:ro" -v docsvault-codex:/home/node/.codex docsvault
+docker run -d --name docsvault --restart unless-stopped -p 3000:3000 -e ALLOW_NO_ORIGIN=true -v "C:/dein/pfad/zu/vaults:/app/vaults:ro" -v docsvault-codex:/home/node/.codex docsvault
 ```
 
 **Dieser Platzhalter muss im `docker run` ersetzt werden:**
 - `/srv/docsvault/vaults` (Linux) bzw. `C:/dein/pfad/zu/vaults` (Windows): dein Host Pfad aus Schritt 3, also wohin du den Vault geklont hast
 
-Ein `ALLOWED_ORIGINS` brauchst du **nicht**: der Web Chat verbindet immer same-origin, und same-origin lässt der Server automatisch durch, egal über welche IP, Domain oder welchen Port die Seite aufgerufen wird. `ALLOWED_ORIGINS` braucht man nur, wenn das Frontend von einer **anderen** Origin aus zugreift (z.B. Reverse Proxy, der den `Host`-Header umschreibt).
+Ein `ALLOWED_ORIGINS` brauchst du **nicht**: der Web Chat verbindet immer same origin, und same origin lässt der Server automatisch durch, egal über welche IP, Domain oder welchen Port die Seite aufgerufen wird. `ALLOWED_ORIGINS` braucht man nur, wenn das Frontend von einer **anderen** Origin aus zugreift (z.B. Reverse Proxy, der den `Host`-Header umschreibt).
 
 **Zum Volume Format `-v ...`:** Docker erwartet drei Teile getrennt mit `:`, also `HOSTPFAD:CONTAINERPFAD:OPTIONEN`.
 
@@ -121,7 +120,7 @@ Der **Container Pfad `/app/vaults`** ist fix. Der Server sucht dort die Vaults, 
 Analog für das zweite Volume `-v docsvault-codex:/home/node/.codex`:
 - `docsvault-codex`: named volume (Docker verwaltet das automatisch, keine Host Datei nötig)
 - `/home/node/.codex`: Container Pfad wo Codex seine Auth speichert
-- Keine Optionen (read-write)
+- Keine Optionen (read write)
 
 > **Bug Reports persistent machen** (optional): Standardmäßig landen Bug Reports in `/app/reports.json` **im Container**, verschwinden also beim `docker rm`. Wenn du sie über Container Rebuilds hinweg behalten willst, mounte eine Host Datei drauf:
 > - Host Datei vorher anlegen: Linux `touch /srv/docsvault/reports.json` bzw. Windows `New-Item -ItemType File "C:\pfad\reports.json" -Force`
@@ -135,7 +134,7 @@ Die Volumes sorgen dafür, dass Vaults, Codex Auth und Bug Reports bei Container
 Der Web Chat nutzt die Codex CLI mit ChatGPT Account (kein API Key nötig). Login per Device Auth:
 
 ```bash
-docker exec -it docsvault codex auth login --device-auth
+docker exec -it docsvault codex login --device-auth
 ```
 
 So läufts:
@@ -151,12 +150,20 @@ Der Token wird im Volume `docsvault-codex` gespeichert und überlebt Container R
 **Erneut einloggen** (z.B. nach Token Ablauf):
 
 ```bash
-docker exec -it docsvault codex auth login --device-auth
+docker exec -it docsvault codex login --device-auth
 ```
 
 Gleicher Befehl wie beim ersten Mal.
 
 **Hinweis:** Ohne Login startet der Server, MCP Tools und REST API funktionieren, aber der Web Chat kann keine Antworten generieren.
+
+Die Modellwahl kannst du nach dem Login prüfen:
+
+```bash
+docker exec docsvault node src/codex-model.js
+```
+
+Der Chat prüft beim ersten Session Start mit demselben Account. Ein Modellwechsel wird im Log angezeigt.
 
 ### 6. Testen
 
@@ -185,36 +192,29 @@ docker inspect --format='{{.State.Health.Status}}' docsvault
 
 ### 7. Entwickler verbinden
 
-Entwickler verbinden ihren Coding Agent per MCP. Claude Code (empfohlen):
+Entwickler verbinden Codex per MCP:
 
 ```bash
-claude mcp add --transport sse docsvault http://SERVER-IP:3000/sse
+codex mcp add docsvault --url http://SERVER-IP:3000/mcp
 ```
 
-Oder manuell in `.mcp.json`:
+Claude Code als MCP Client verbinden:
 
-```json
-{
-  "mcpServers": {
-    "docsvault": {
-      "type": "sse",
-      "url": "http://SERVER-IP:3000/sse"
-    }
-  }
-}
+```bash
+claude mcp add --transport http --scope user docsvault http://SERVER-IP:3000/mcp
 ```
 
-Details: [INSTALL-DEVELOPER.md](INSTALL-DEVELOPER.md)
+Weitere Clients stehen in [INSTALL-DEVELOPER.md](INSTALL-DEVELOPER.md).
 
 ## Umgebungsvariablen
 
 | Variable | Default | Beschreibung |
 |----------|---------|--------------|
-| `BRIDGE` | `claude` (Code) / `codex` (Image) | AI Bridge: `codex` oder `claude`. Der Code Default ist `claude`, das mitgelieferte Docker Image setzt aber `BRIDGE=codex` (siehe Dockerfile) |
 | `PORT` | `3000` | Server Port |
 | `VAULTS_ROOT` | `/app/vaults` (Image) | Wurzel Verzeichnis der Vaults im Container (Volume Mount). Außerhalb von Docker: `./vaults` |
-| `ALLOWED_ORIGINS` | kein | Zusätzlich erlaubte Origins für den WebSocket (kommasepariert). Same-origin ist immer erlaubt, nur nötig wenn das Frontend von einer anderen Origin zugreift (z.B. Reverse Proxy mit Host Rewrite) |
-| `CODEX_MODEL` | `gpt-5.4` | Model für Codex Bridge |
+| `ALLOWED_ORIGINS` | kein | Zusätzlich erlaubte Origins für den WebSocket (kommasepariert). Same origin ist immer erlaubt, nur nötig wenn das Frontend von einer anderen Origin zugreift (z.B. Reverse Proxy mit Host Rewrite) |
+| `CODEX_MODEL` | `gpt-5.6-luna` | Bevorzugtes Modell; falls nicht verfügbar, wird automatisch ein passendes gewählt |
+| `CODEX_REASONING_EFFORT` | `low` | Bevorzugte Reasoning Stufe; falls nicht unterstützt, wird eine passende gewählt |
 | `ALLOW_NO_ORIGIN` | `false` | Verbindungen ohne Origin Header erlauben (für REST API/MCP Clients nötig) |
 | `MAX_SESSIONS` | `50` | Max gleichzeitige Chat Sessions |
 | `RATE_LIMIT_PER_MIN` | `10` | WebSocket Nachrichten pro Minute pro IP |
@@ -244,7 +244,7 @@ Details: [INSTALL-DEVELOPER.md](INSTALL-DEVELOPER.md)
 ## Sicherheit
 
 - Container läuft als non root User (`node`, uid 1000)
-- Built-in Health Check (alle 30s)
+- Built in Health Check (alle 30s)
 - Rate Limiting für WebSocket und REST API
 - Origin Validierung **nur** für WebSocket Verbindungen
 - CSP Header auf allen Responses
@@ -286,7 +286,6 @@ docker run -d \
   --name docsvault \
   --restart unless-stopped \
   -p 3000:3000 \
-  -e BRIDGE=codex \
   -e ALLOW_NO_ORIGIN=true \
   -v /srv/docsvault/vaults:/app/vaults:ro \
   -v docsvault-codex:/home/node/.codex \
@@ -316,13 +315,13 @@ docker logs docsvault 2>&1 | grep "ws rejected"
 - `Origin "..." passt nicht zu Host "..."`: die Seite läuft hinter einem Proxy, der den `Host`-Header umschreibt. Die im Log gezeigte Origin in `ALLOWED_ORIGINS` eintragen (exakter String inkl. Protokoll und Port), oder den Proxy den originalen `Host`-Header durchreichen lassen (nginx: `proxy_set_header Host $host;`).
 - `kein Origin-Header`: REST API / MCP Clients brauchen `ALLOW_NO_ORIGIN=true`.
 
-Same-origin Zugriffe (Seite direkt über `http://SERVER:3000` aufgerufen) laufen ohne Konfiguration. Wenn es da hängt, liegt es nicht an Origins, sondern an Firewall/Port Mapping.
+Same origin Zugriffe (Seite direkt über `http://SERVER:3000` aufgerufen) laufen ohne Konfiguration. Wenn es da hängt, liegt es nicht an Origins, sondern an Firewall/Port Mapping.
 
 ### Chat antwortet nicht / Fehler bei Verarbeitung
 
 Der Server startet, aber Chat Anfragen schlagen fehl:
-- Prüf ob Codex eingeloggt ist: `docker exec docsvault codex auth status`
-- Neu einloggen: `docker exec -it docsvault codex auth login --device-auth`
+- Prüf ob Codex eingeloggt ist: `docker exec docsvault codex login status`
+- Neu einloggen: `docker exec -it docsvault codex login --device-auth`
 - Container Logs prüfen: `docker logs docsvault`
 - Die REST API (Suche, Lesen) funktioniert auch ohne Login, nur der Chat braucht ihn.
 

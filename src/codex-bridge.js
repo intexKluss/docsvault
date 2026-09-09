@@ -3,6 +3,7 @@ import { Codex } from '@openai/codex-sdk';
 import { dirname, resolve } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { buildSystemPrompt } from './system-prompt.js';
+import { resolveCodexModel } from './codex-model.js';
 
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = dirname(__filename);
@@ -37,7 +38,8 @@ function rateLimitNotice(raw) {
 }
 
 export class CodexBridge {
-  constructor(vaultRegistry) {
+  constructor(vaultRegistry, resolveModel = resolveCodexModel) {
+    this.resolveModel = resolveModel;
     this.vaultRegistry = (vaultRegistry || []).filter(
       v => v && typeof v.toolPrefix === 'string' && v.toolPrefix.length > 0
     );
@@ -51,6 +53,17 @@ export class CodexBridge {
       if (!scoped) throw new Error(`Unknown vault: ${toolPrefix}`);
       registry = [scoped];
     }
+    var modelSelection = this.modelSelection;
+    if (!modelSelection) {
+      modelSelection = this.resolveModel();
+      this.modelSelection = modelSelection;
+    }
+    try {
+      var selection = await modelSelection;
+    } catch (error) {
+      if (this.modelSelection === modelSelection) this.modelSelection = null;
+      throw error;
+    }
     const systemPrompt = buildSystemPrompt(registry);
     let destroyed = false;
     let warmedUp = false;
@@ -59,10 +72,8 @@ export class CodexBridge {
     let codex = new Codex({
       codexPathOverride: process.env.CODEX_PATH,
     });
-    const model = process.env.CODEX_MODEL || 'gpt-5.4';
-    // reasoning-modelle (gpt-5.5) denken sonst voll durch -> sehr langsam. low
-    // reicht für doku-suche + formulieren locker. tunebar: minimal..xhigh.
-    const reasoningEffort = process.env.CODEX_REASONING_EFFORT || 'low';
+    var model = selection.model;
+    var reasoningEffort = selection.reasoningEffort;
     let thread = codex.startThread({
       model,
       modelReasoningEffort: reasoningEffort,
@@ -118,9 +129,10 @@ export class CodexBridge {
         if (!warmedUp) throw new Error('Session not ready');
         if (typeof content !== 'string' || !content.trim()) throw new Error('Invalid content');
 
-        const modePrefix = mode === 'thorough'
-          ? '[GRÜNDLICH] Recherchiere gründlich. Lies relevante Dokumente komplett. Prüfe ob deine Antwort wirklich korrekt und vollständig ist. Gib ausführliche Erklärungen mit Code-Beispielen.\n\n'
-          : '[SCHNELL] Der Nutzer will eine schnelle, knappe Antwort. Such fokussiert statt planlos breit: nimm die API-Referenz als Leitquelle und lies sie wirklich, statt dutzendfach quer zu suchen. WICHTIGER als die Geschwindigkeit ist Konsistenz: entscheide dich für EINEN, den aktuellen API-Stil und ziehe ihn in der ganzen Antwort durch. Mische niemals Varianten (mal formGadget.addX, mal form.addX, mal mit/ohne context.enableModules).\n\n';
+        var modePrefix = '[SCHNELL] Der Nutzer will eine schnelle, knappe Antwort. Such fokussiert statt planlos breit: nimm die API-Referenz als Leitquelle und lies sie wirklich, statt dutzendfach quer zu suchen. WICHTIGER als die Geschwindigkeit ist Konsistenz: entscheide dich für EINEN, den aktuellen API-Stil und ziehe ihn in der ganzen Antwort durch. Mische niemals unterschiedliche API Varianten.\n\n';
+        if (mode === 'thorough') {
+          modePrefix = '[GRÜNDLICH] Recherchiere gründlich. Lies relevante Dokumente komplett. Prüfe ob deine Antwort wirklich korrekt und vollständig ist. Gib ausführliche Erklärungen mit Code-Beispielen.\n\n';
+        }
 
         const fullPrompt = modePrefix + content;
 

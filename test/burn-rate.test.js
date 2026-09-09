@@ -121,7 +121,7 @@ describe('Server burn_rate push', () => {
       },
     });
     process.env.CODEX_HOME = home;
-    process.env.BRIDGE = 'codex';
+    delete process.env.BRIDGE;
     process.env.ALLOW_NO_ORIGIN = 'true';
     process.env.VAULTS_ROOT = vaults.root;
     const result = await createServer({ port: 0, bridge: fakeBridge() });
