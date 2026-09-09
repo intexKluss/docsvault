@@ -88,7 +88,6 @@ docker run -d \
   --name docsvault \
   --restart unless-stopped \
   -p 3000:3000 \
-  -e BRIDGE=codex \
   -e ALLOW_NO_ORIGIN=true \
   -v /srv/docsvault/vaults:/app/vaults:ro \
   -v docsvault-codex:/home/node/.codex \
@@ -98,7 +97,7 @@ docker run -d \
 **Windows (PowerShell)**, absolute Pfade, Forward Slashes für Docker:
 
 ```powershell
-docker run -d --name docsvault --restart unless-stopped -p 3000:3000 -e BRIDGE=codex -e ALLOW_NO_ORIGIN=true -v "C:/dein/pfad/zu/vaults:/app/vaults:ro" -v docsvault-codex:/home/node/.codex docsvault
+docker run -d --name docsvault --restart unless-stopped -p 3000:3000 -e ALLOW_NO_ORIGIN=true -v "C:/dein/pfad/zu/vaults:/app/vaults:ro" -v docsvault-codex:/home/node/.codex docsvault
 ```
 
 **Dieser Platzhalter muss im `docker run` ersetzt werden:**
@@ -185,32 +184,18 @@ docker inspect --format='{{.State.Health.Status}}' docsvault
 
 ### 7. Entwickler verbinden
 
-Entwickler verbinden ihren Coding Agent per MCP. Claude Code (empfohlen):
+Entwickler verbinden Codex per MCP:
 
 ```bash
-claude mcp add --transport sse docsvault http://SERVER-IP:3000/sse
+codex mcp add docsvault --url http://SERVER-IP:3000/mcp
 ```
 
-Oder manuell in `.mcp.json`:
-
-```json
-{
-  "mcpServers": {
-    "docsvault": {
-      "type": "sse",
-      "url": "http://SERVER-IP:3000/sse"
-    }
-  }
-}
-```
-
-Details: [INSTALL-DEVELOPER.md](INSTALL-DEVELOPER.md)
+Weitere Clients stehen in [INSTALL-DEVELOPER.md](INSTALL-DEVELOPER.md).
 
 ## Umgebungsvariablen
 
 | Variable | Default | Beschreibung |
 |----------|---------|--------------|
-| `BRIDGE` | `claude` (Code) / `codex` (Image) | AI Bridge: `codex` oder `claude`. Der Code Default ist `claude`, das mitgelieferte Docker Image setzt aber `BRIDGE=codex` (siehe Dockerfile) |
 | `PORT` | `3000` | Server Port |
 | `VAULTS_ROOT` | `/app/vaults` (Image) | Wurzel Verzeichnis der Vaults im Container (Volume Mount). Außerhalb von Docker: `./vaults` |
 | `ALLOWED_ORIGINS` | kein | Zusätzlich erlaubte Origins für den WebSocket (kommasepariert). Same-origin ist immer erlaubt, nur nötig wenn das Frontend von einer anderen Origin zugreift (z.B. Reverse Proxy mit Host Rewrite) |
@@ -286,7 +271,6 @@ docker run -d \
   --name docsvault \
   --restart unless-stopped \
   -p 3000:3000 \
-  -e BRIDGE=codex \
   -e ALLOW_NO_ORIGIN=true \
   -v /srv/docsvault/vaults:/app/vaults:ro \
   -v docsvault-codex:/home/node/.codex \
