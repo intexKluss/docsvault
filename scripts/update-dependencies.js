@@ -50,6 +50,11 @@ export function updateDependencies(packageNames, directDependencies, spawn, runt
     if (checkExitCode !== 0) return checkExitCode;
   }
 
+  var modelScript = fileURLToPath(new URL('../src/codex-model.js', import.meta.url));
+  var modelResult = executeCommand('node', [modelScript], spawn, runtime);
+  var modelExitCode = getExitCode(modelResult, 'Codex Modellprüfung');
+  if (modelExitCode !== 0) return modelExitCode;
+
   var imageTag = `docsvault-dependency-check:${randomUUID()}`;
   var buildArgs = [
     'build',
@@ -93,6 +98,7 @@ function readDirectDependencies() {
 function executeCommand(command, args, spawn, runtime) {
   var executable = command;
   var commandArgs = args;
+  if (command === 'node') executable = runtime.execPath;
   if (runtime.platform === 'win32' && command === 'npm') {
     var nodeDirectory = dirname(runtime.execPath);
     var npmCliPath = resolve(nodeDirectory, 'node_modules', 'npm', 'bin', 'npm-cli.js');
