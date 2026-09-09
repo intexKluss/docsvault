@@ -21,7 +21,7 @@ function record(level, args) {
 }
 
 // console.* einmalig umleiten: Ausgabe geht weiter nach stdout/stderr (docker
-// logs bleibt unveraendert) UND zusaetzlich in den Ring-Buffer.
+// logs bleibt unverändert) UND zusätzlich in den Ring-Buffer.
 export function installLogCapture() {
   if (console.__captured) return;
   const orig = {
