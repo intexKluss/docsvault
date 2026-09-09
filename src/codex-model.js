@@ -36,7 +36,8 @@ export async function resolveCodexModel(options = {}) {
       cwd: dirname(SCRIPT_PATH),
       env: environment,
       stdio: ['pipe', 'pipe', 'ignore'],
-      windowsHide: true
+      windowsHide: true,
+      detached: process.platform !== 'win32'
     });
     var reader = createInterface({ input: child.stdout });
     var catalog = [];
@@ -51,6 +52,7 @@ export async function resolveCodexModel(options = {}) {
 
     child.on('error', function (error) { finish(error); });
     child.stdin.on('error', function (error) { finish(error); });
+    reader.on('error', function (error) { finish(error); });
     child.on('close', function (code) {
       clearTimeout(timer);
       clearTimeout(cleanupTimer);
@@ -73,17 +75,27 @@ export async function resolveCodexModel(options = {}) {
           return;
         }
         if (requestId === 1) {
-          if (!message.result.account) throw new Error('Codex Login fehlt. Melde dich mit codex login an und wiederhole die Modellprüfung.');
+          if (!message.result.account && message.result.requiresOpenaiAuth !== false) {
+            throw new Error('Codex Login fehlt. Melde dich mit codex login an und wiederhole die Modellprüfung.');
+          }
           requestId++;
           child.stdin.write(JSON.stringify({ id: requestId, method: 'model/list', params: { limit: 100, includeHidden: true } }) + '\n');
           return;
         }
 
         if (!Array.isArray(message.result.data)) throw new Error('Ungültige Modellantwort der Codex CLI.');
-        for (var model of message.result.data) {
-          if (!model || typeof model.model !== 'string' || !Array.isArray(model.supportedReasoningEfforts)) {
+        for (var modelIndex = 0; modelIndex < message.result.data.length; modelIndex++) {
+          var model = message.result.data[modelIndex];
+          if (!model || typeof model.model !== 'string' || !model.model.trim() || !Array.isArray(model.supportedReasoningEfforts)) {
             throw new Error('Ungültige Modellantwort der Codex CLI.');
           }
+          for (var effortIndex = 0; effortIndex < model.supportedReasoningEfforts.length; effortIndex++) {
+            var effort = model.supportedReasoningEfforts[effortIndex];
+            if (!effort || typeof effort.reasoningEffort !== 'string' || !effort.reasoningEffort.trim()) {
+              throw new Error('Ungültige Modellantwort der Codex CLI.');
+            }
+          }
+          if (model.inputModalities && !Array.isArray(model.inputModalities)) throw new Error('Ungültige Modellantwort der Codex CLI.');
           catalog.push(model);
         }
         var cursor = message.result.nextCursor;
@@ -112,12 +124,24 @@ export async function resolveCodexModel(options = {}) {
       clearTimeout(timer);
       child.stdin.end();
       cleanupTimer = setTimeout(function () {
-        // Der npm Launcher hat einen nativen Kindprozess, der unter Windows mit beendet werden muss.
-        if (process.platform === 'win32' && child.pid) {
-          spawnSync('taskkill', ['/PID', String(child.pid), '/T', '/F'], { stdio: 'ignore', windowsHide: true, timeout: 5000 });
-          return;
+        // Der npm Launcher und sein nativer Kindprozess müssen gemeinsam beendet werden.
+        try {
+          if (process.platform === 'win32' && child.pid) {
+            spawnSync('taskkill', ['/PID', String(child.pid), '/T', '/F'], { stdio: 'ignore', windowsHide: true, timeout: 5000 });
+          } else if (child.pid) {
+            process.kill(-child.pid, 'SIGKILL');
+          } else {
+            child.kill('SIGKILL');
+          }
+        } catch (error) {
+          if (!failure) failure = error;
+        } finally {
+          reader.close();
+          child.stdout.destroy();
+          child.stdin.destroy();
+          child.unref();
+          reject(failure || new Error('Codex Modellprüfung konnte den CLI Prozess nicht rechtzeitig beenden.'));
         }
-        child.kill('SIGTERM');
       }, 1000);
     }
   });
@@ -139,7 +163,8 @@ export async function resolveCodexModel(options = {}) {
 
   var reasoningEffort = selected.defaultReasoningEffort;
   var supported = false;
-  for (var effort of selected.supportedReasoningEfforts) {
+  for (var effortIndex = 0; effortIndex < selected.supportedReasoningEfforts.length; effortIndex++) {
+    var effort = selected.supportedReasoningEfforts[effortIndex];
     if (effort.reasoningEffort === preferredEffort) {
       reasoningEffort = preferredEffort;
       supported = true;
