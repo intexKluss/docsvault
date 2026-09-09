@@ -12,6 +12,7 @@ const MCP_CWD = resolve(__dirname, '..');
 // ausführliches session-logging fürs debugging. CODEX_DEBUG=1 schaltet zusätzlich
 // jedes roh-event frei (sehr gesprächig), sonst nur tool-calls, modell und fehler.
 const CODEX_DEBUG = process.env.CODEX_DEBUG === '1' || process.env.CODEX_DEBUG === 'true';
+export var DEFAULT_CODEX_MODEL = 'gpt-5.6-luna';
 
 // langen text fürs log kappen, damit eine zeile lesbar bleibt
 function truncate(v, n = 300) {
@@ -59,7 +60,7 @@ export class CodexBridge {
     let codex = new Codex({
       codexPathOverride: process.env.CODEX_PATH,
     });
-    const model = process.env.CODEX_MODEL || 'gpt-5.4';
+    const model = process.env.CODEX_MODEL || DEFAULT_CODEX_MODEL;
     // reasoning-modelle (gpt-5.5) denken sonst voll durch -> sehr langsam. low
     // reicht für doku-suche + formulieren locker. tunebar: minimal..xhigh.
     const reasoningEffort = process.env.CODEX_REASONING_EFFORT || 'low';
