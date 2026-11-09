@@ -454,17 +454,6 @@ body {
   background: var(--help-accent-light);
 }
 
-.help-toc-bar .toc-dot {
-  width: 5px;
-  height: 5px;
-  border-radius: 50%;
-  background: var(--help-border-strong);
-  flex-shrink: 0;
-  transition: background 0.15s;
-}
-
-.help-toc-bar a.active .toc-dot { background: var(--help-accent); }
-
 .help-toc-mobile {
   display: none;
   margin: 8px 0 24px;

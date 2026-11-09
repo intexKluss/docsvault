@@ -319,7 +319,7 @@
       var a = document.createElement('a');
       a.href = '#' + h.id;
       a.dataset.headingId = h.id;
-      a.innerHTML = '<span class="toc-dot"></span>' + escapeHtml(h.textContent);
+      a.textContent = h.textContent;
       inner.appendChild(a);
       tocLinks.push(a);
       tocLinkMap[h.id] = a;
