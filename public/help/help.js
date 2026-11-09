@@ -59,7 +59,7 @@
         flattenChapters(data.chapters);
         preloadChapters();
         navigateFromHash();
-        $footer.innerHTML = 'made by <a href="https://leminkozey.me" target="_blank" rel="noopener noreferrer">leminkozey</a>' +
+        $footer.innerHTML = 'made by intex' +
           (data.version ? ' &middot; ' + escapeHtml(data.version) : '');
       })
       .catch(function () {
