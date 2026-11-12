@@ -7,6 +7,8 @@
     { "id": "codex-cli", "title": "Codex CLI", "file": "chapters/codex-cli.md" },
     { "id": "vscode-copilot", "title": "VS Code (Copilot)", "file": "chapters/vscode-copilot.md" },
     { "id": "gemini-cli", "title": "Gemini CLI", "file": "chapters/gemini-cli.md" },
+    { "id": "lm-studio", "title": "LM Studio (lokale Modelle)", "file": "chapters/lm-studio.md" },
+    { "id": "llama-cpp", "title": "llama.cpp (lokale Modelle)", "file": "chapters/llama-cpp.md" },
     { "id": "mcp-agent-setup", "title": "MCP mit Coding-Agent", "file": "chapters/mcp-agent-setup.md" },
     { "id": "self-hosting", "title": "Selbst hosten & Quellcode", "file": "chapters/self-hosting.md" }
   ]
