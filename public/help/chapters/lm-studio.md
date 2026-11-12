@@ -5,7 +5,7 @@ LM Studio kann als MCP Client auf docsvault zugreifen. Das Modell läuft komplet
 ## Voraussetzungen
 
 - Eine aktuelle LM Studio Version (MCP gibt es ab 0.3.17)
-- Ein Modell, das **Tool Calling** kann. In der Modellliste erkennst du das am Hammer Symbol. Modelle ohne Tool Calling sehen die docsvault Tools nicht.
+- Ein Modell, das **Tool Calling** kann. Modelle ohne Tool Calling nutzen die docsvault Tools nicht.
 - Der Server muss von deinem Rechner erreichbar sein (im Firmennetz oder per VPN)
 
 ## Konfiguration
@@ -46,7 +46,7 @@ Läuft der Server mit `API_TOKEN`, schickst du den Token als Header mit:
 ## Benutzen
 
 1. Ein Modell mit Tool Calling laden
-2. Im Chat die docsvault Tools aktivieren (der Server taucht in der Tool Auswahl auf)
+2. Prüfen, dass der Server `docsvault` im Chat aktiv ist
 3. Eine Frage zur Dokumentation stellen. Das Modell ruft dann `..._search` und `..._read` auf.
 
 Bei jedem Tool Aufruf fragt LM Studio nach. Du siehst die Argumente und kannst den Aufruf einmal erlauben oder dauerhaft freigeben. Die dauerhaften Freigaben ändern sich unter **App Settings > Tools & Integrations**.
@@ -61,4 +61,4 @@ Bei jedem Tool Aufruf fragt LM Studio nach. Du siehst die Argumente und kannst d
 
 Frag im Chat zum Beispiel: "Such in der Dokumentation nach X und fass die erste Seite zusammen." Siehst du einen Tool Aufruf `..._search` mit Ergebnissen, passt alles.
 
-Kommt kein Tool Aufruf, prüfe zuerst, ob das Modell Tool Calling unterstützt, und dann, ob der Server im Browser unter `http://<SERVER-IP>:3000/api/vaults` antwortet.
+Kommt kein Tool Aufruf, prüfe zuerst, ob das Modell Tool Calling unterstützt, und dann, ob der Server im Browser unter `http://<SERVER-IP>:3000/api/vaults` antwortet. Verbindet sich LM Studio trotzdem nicht, kannst du alternativ den älteren Endpunkt `http://<SERVER-IP>:3000/sse` eintragen.
