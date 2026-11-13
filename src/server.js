@@ -10,6 +10,7 @@ import { handleSseGet, handleSsePost, handleStreamablePost } from './mcp-handler
 import { createApiRouter } from './api-routes.js';
 import { loadVaultRegistry, getToolSuffixes } from './vault-registry.js';
 import { warmSearchIndex } from './tools/vault-cache.js';
+import { trackVaultChanges } from './change-tracker.js';
 import { requireToken, wsAuthOk } from './auth.js';
 import { installLogCapture, recentLogs } from './log-buffer.js';
 import { readBurnRate } from './codex-usage.js';
@@ -49,6 +50,9 @@ export async function createServer(opts = {}) {
     maxMessageLength: parseInt(process.env.MAX_MESSAGE_LENGTH || '2000', 10),
   };
 
+  // change tracking needs a writable state directory, so it is opt-in
+  const dataDir = opts.dataDir ?? process.env.DATA_DIR ?? null;
+
   const vaultRegistry = loadVaultRegistry(vaultsRoot);
   if (vaultRegistry.length === 0) {
     console.warn(`[server] WARNING: no vaults found under ${vaultsRoot}, LLM will have no tools.`);
@@ -67,6 +71,7 @@ export async function createServer(opts = {}) {
       if (index) {
         console.log(`[server] ${vault.toolPrefix}: ${index.fileCount} pages, ${index.segmentCount} sections indexed in ${index.buildMs}ms`);
       }
+      recordChanges(vault, dataDir);
     }
   }
 
@@ -101,7 +106,7 @@ export async function createServer(opts = {}) {
     return requireToken(req, res, next);
   });
 
-  app.use(createApiRouter(vaultRegistry));
+  app.use(createApiRouter(vaultRegistry, dataDir));
 
   app.get('/sse', async (req, res) => {
     try {
@@ -272,6 +277,17 @@ export async function createServer(opts = {}) {
 
 // startet genau einen warm-up und merkt ihn als in-flight auf der verbindung.
 // gibt das promise zurück, damit aufrufer darauf warten können.
+function recordChanges(vault, dataDir) {
+  if (!dataDir) return;
+  try {
+    const entry = trackVaultChanges(vault, dataDir);
+    if (!entry) return;
+    console.log(`[server] ${vault.toolPrefix}: ${entry.added.length} added, ${entry.changed.length} changed, ${entry.removed.length} removed pages recorded`);
+  } catch (err) {
+    console.warn(`[server] ${vault.toolPrefix}: change tracking failed (${err.message})`);
+  }
+}
+
 function warmUpSession(ws, manager, clientId, toolPrefix) {
   const promise = manager.createAndWarmUp(clientId, toolPrefix).then(() => {
     // stale-check: wenn der user zwischenzeitlich einen anderen vault gewählt hat,

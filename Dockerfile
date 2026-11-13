@@ -23,7 +23,7 @@ COPY src/ ./src/
 COPY public/ ./public/
 COPY docker-entrypoint.sh ./
 RUN sed -i 's/\r$//' docker-entrypoint.sh && chmod +x docker-entrypoint.sh
-RUN mkdir -p /app/vaults && chown node:node /app/vaults
+RUN mkdir -p /app/vaults /app/data && chown node:node /app/vaults /app/data
 
 # reports.json als leere JSONL-Datei anlegen, wird beim Betrieb gefüllt
 RUN touch /app/reports.json && chown node:node /app/reports.json
@@ -34,6 +34,7 @@ EXPOSE 3000
 
 ENV NODE_ENV=production
 ENV VAULTS_ROOT=/app/vaults
+ENV DATA_DIR=/app/data
 
 HEALTHCHECK --interval=30s --timeout=5s --start-period=10s --retries=3 \
   CMD node -e "fetch('http://localhost:3000/api/health').then(r=>{if(!r.ok)throw 1}).catch(()=>process.exit(1))"

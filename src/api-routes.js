@@ -5,6 +5,7 @@ import { DEFAULT_READ_LENGTH } from './tools/vault.js';
 import { handleList } from './tools/list.js';
 import { handleOverview } from './tools/overview.js';
 import { handleStatus } from './tools/status.js';
+import { readChangeHistory, readChangeEntry } from './change-tracker.js';
 
 function clampInt(value, min, max, fallback) {
   if (value == null) return fallback;
@@ -32,7 +33,7 @@ setInterval(() => {
   for (const [ip, entry] of apiRateCounts) {
     if (now > entry.resetAt) apiRateCounts.delete(ip);
   }
-}, 60000);
+}, 60000).unref();
 
 function apiRateLimit(req, res, next) {
   const ip = req.ip || req.socket?.remoteAddress || 'unknown';
@@ -49,7 +50,7 @@ function apiRateLimit(req, res, next) {
   next();
 }
 
-function registerVaultRoutes(router, vault) {
+function registerVaultRoutes(router, vault, dataDir) {
   const base = `/api/${vault.toolPrefix}`;
   const vaultPath = vault.path;
 
@@ -119,9 +120,21 @@ function registerVaultRoutes(router, vault) {
     const result = handleStatus(vaultPath);
     res.json(result);
   });
+
+  router.get(`${base}/changes`, (req, res) => {
+    if (!dataDir) return res.json({ enabled: false, entries: [] });
+    res.json({ enabled: true, entries: readChangeHistory(dataDir, vault.toolPrefix) });
+  });
+
+  router.get(`${base}/changes/:id`, (req, res) => {
+    if (!dataDir) return res.status(404).json({ error: 'change tracking is disabled' });
+    const entry = readChangeEntry(dataDir, vault.toolPrefix, req.params.id);
+    if (!entry) return res.status(404).json({ error: 'unknown change entry' });
+    res.json(entry);
+  });
 }
 
-export function createApiRouter(vaultRegistry) {
+export function createApiRouter(vaultRegistry, dataDir) {
   const router = Router();
 
   router.use('/api', apiRateLimit);
@@ -141,7 +154,7 @@ export function createApiRouter(vaultRegistry) {
   });
 
   for (const vault of vaultRegistry) {
-    registerVaultRoutes(router, vault);
+    registerVaultRoutes(router, vault, dataDir);
   }
 
   router.use('/api', (err, req, res, next) => {

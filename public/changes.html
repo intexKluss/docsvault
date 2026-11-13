@@ -1,0 +1,41 @@
+<!DOCTYPE html>
+<html lang="de">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>docsvault Änderungen</title>
+  <link rel="icon" type="image/png" href="logo.png">
+  <link rel="stylesheet" href="style.css">
+  <link rel="stylesheet" href="changes.css">
+  <script>
+    (function () {
+      var theme = 'dark';
+      try { theme = localStorage.getItem('theme') || 'dark'; } catch (e) {}
+      document.documentElement.setAttribute('data-theme', theme);
+    })();
+  </script>
+</head>
+<body class="changes-page">
+  <header id="chat-header">
+    <div class="header-left">
+      <img src="logo.png" alt="intex" class="header-logo-img">
+      <span class="header-title">docsvault</span>
+      <span class="page-badge" id="page-badge"></span>
+    </div>
+    <div id="vault-selector" class="vault-selector hidden" role="tablist" aria-label="Vault auswählen"></div>
+    <div class="header-right">
+      <button id="btn-theme" class="header-btn" title="Theme wechseln"></button>
+      <a id="btn-chat" class="header-btn" href="/"></a>
+    </div>
+  </header>
+
+  <main class="changes-layout">
+    <aside class="changes-sidebar" aria-label="Änderungen">
+      <div id="entry-list" class="entry-list"></div>
+    </aside>
+    <section id="detail" class="changes-detail"></section>
+  </main>
+
+  <script src="changes.js"></script>
+</body>
+</html>
